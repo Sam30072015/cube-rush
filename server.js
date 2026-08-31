@@ -108,7 +108,7 @@ app.get("/api/status", (req,res)=>{
   res.json({onlinePlayers:[...players.keys()]});
 });
 
-app.get("*", (req,res)=>{
+app.use((req,res)=>{
   res.sendFile(path.join(__dirname,"public","index.html"));
 });
 
