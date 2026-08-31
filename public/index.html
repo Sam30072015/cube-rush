@@ -576,6 +576,18 @@ body.phone-mode #mobileJump{display:flex}
   </div>
 </div>
 
+<div id="nameSetup" class="screen" style="z-index:1150">
+  <h1 style="font-size:clamp(42px,8vw,76px)">WILLKOMMEN</h1>
+  <p style="max-width:650px;line-height:1.5;color:#d7ddff;margin:0 20px 16px">
+    Gib deinen Spielernamen ein. Der Name wird gespeichert und kann später in den Einstellungen geändert werden.
+  </p>
+  <input id="firstPlayerName" type="text" maxlength="24" placeholder="Spielername"
+         autocomplete="nickname"
+         style="width:min(420px,84vw);padding:15px 18px;border-radius:14px;border:2px solid #00eaff;background:#0d1230;color:#fff;font-size:20px;text-align:center;outline:none">
+  <button id="firstPlayerNameSave" class="blue" type="button">SPIELERNAME SPEICHERN</button>
+  <div id="firstPlayerNameStatus" style="min-height:24px;color:#ffb84d;font-weight:700"></div>
+</div>
+
 <div id="menu" class="screen">
 <h1>CUBE RUSH</h1>
 
@@ -622,6 +634,17 @@ body.phone-mode #mobileJump{display:flex}
     <h2>⚙️ Einstellungen</h2>
 
     <div class="settingRow">
+      <span>👤 Spielername</span>
+      <div style="display:flex;gap:8px;width:100%;align-items:center">
+        <input id="playerNameSettings" type="text" maxlength="24"
+               placeholder="Dein Name" autocomplete="nickname"
+               style="flex:1;min-width:0">
+        <button id="playerNameSave" class="settingBtn" type="button">Speichern</button>
+      </div>
+      <div id="playerNameStatus"></div>
+    </div>
+
+    <div class="settingRow">
       <span>🎵 Musik</span>
       <button id="musicToggle" class="settingBtn" type="button">Musik AN</button>
     </div>
@@ -652,11 +675,12 @@ body.phone-mode #mobileJump{display:flex}
 
     <div class="adminSectionTitle">👥 Online-Spieler</div>
     <button class="adminAction" id="adminRefreshPlayers">🔄 Online-Spieler aktualisieren</button>
-    <select id="adminOnlinePlayers">
+        <div id="adminPlayersStatus">ℹ️ Online-Spieler werden geladen …</div>
+<select id="adminOnlinePlayers">
       <option value="">Spieler auswählen</option>
     </select>
 
-    <div class="adminSectionTitle">🎁 Spieler etwas geben</div>
+    <div class="adminSectionTitle">🎁 Diesem Spieler geben</div>
     <input id="adminGiftCoins" type="number" min="0" max="1000000" placeholder="Münzen">
     <input id="adminGiftSkin" type="text" maxlength="40" placeholder="Skin (optional)">
     <button class="adminAction" id="adminGiftSend">🎁 Vergabe senden</button>
@@ -850,7 +874,7 @@ function updateAbilityHud(){
 
 
 /*
-  Alle Flug-Portale sind bei y=485.
+  Alle Flug-Portale liegen bewusst über dem Boden bei y=445.
   In Level 2 sitzt das Portal bewusst bei x=1500 und
   der erste Flug-Hindernisblock beginnt erst deutlich später.
 */
@@ -861,10 +885,10 @@ const levels=[
   ["spike",650,46,45],["spike",900,46,45],
   ["spike",1190,42,42],["spike",1238,42,42],
   ["block",1500,70,72],["spike",1780,46,45],
-  ["portal",2050,485,"ship"],
+  ["portal",2050,445,"ship"],
   ["wall",2400,0,150,225],["wall",2700,320,150,220],
   ["wall",3000,0,150,225],["wall",3300,320,150,220],
-  ["portal",3600,485,"cube"],
+  ["portal",3600,445,"cube"],
   ["spike",3980,46,48],["saw",4300,405,34],
   ["spike",4600,46,45],["spike",4650,46,45],["block",4900,70,80]
  ]
@@ -874,11 +898,11 @@ const levels=[
  objects:[
   ["spike",620,46,45],["block",900,72,78],
   ["spike",1200,42,42],["spike",1250,42,42],
-  ["portal",1550,485,"ship"],
+  ["portal",1550,445,"ship"],
   ["wall",1950,0,145,210],["wall",2220,350,145,190],
   ["wall",2490,70,145,205],["wall",2760,350,145,190],
   ["wall",3030,0,145,210],["wall",3300,350,145,190],
-  ["portal",3650,485,"cube"],
+  ["portal",3650,445,"cube"],
   ["spike",4000,46,48],["saw",4280,405,35],
   ["spike",4550,42,42],["spike",4600,42,42],
   ["block",4900,72,95],["saw",5150,410,32]
@@ -889,12 +913,12 @@ const levels=[
  objects:[
   ["spike",620,46,48],["spike",880,46,52],
   ["block",1120,72,88],["saw",1380,405,34],
-  ["portal",1650,485,"ship"],
+  ["portal",1650,445,"ship"],
   ["wall",1970,0,140,205],["wall",2230,335,140,205],
   ["wall",2490,70,140,220],["wall",2750,350,140,190],
   ["wall",3010,0,140,190],["wall",3270,330,140,210],
   ["wall",3530,75,140,215],
-  ["portal",3900,485,"cube"],
+  ["portal",3900,445,"cube"],
   ["spike",4250,46,50],["spike",4300,46,50],
   ["saw",4580,405,36],["block",4860,72,105],
   ["spike",5200,46,48],["spike",5450,42,42]
@@ -906,12 +930,12 @@ const levels=[
   ["spike",600,46,46],["block",850,72,90],
   ["spike",1130,42,42],["spike",1180,42,42],
   ["saw",1450,405,34],
-  ["portal",1750,485,"ship"],
+  ["portal",1750,445,"ship"],
   ["wall",2050,0,135,185],["wall",2310,355,135,185],
   ["wall",2570,75,135,200],["wall",2830,350,135,190],
   ["wall",3090,0,135,185],["wall",3350,355,135,185],
   ["wall",3610,75,135,200],
-  ["portal",3970,485,"cube"],
+  ["portal",3970,445,"cube"],
   ["spike",4300,46,50],["saw",4560,405,36],
   ["spike",4830,42,42],["spike",4880,42,42],
   ["block",5150,72,110],["spike",5500,46,50],["saw",5800,405,34]
@@ -922,13 +946,13 @@ const levels=[
  objects:[
   ["spike",620,46,48],["spike",900,46,48],
   ["block",1170,74,95],["saw",1450,405,35],
-  ["portal",1800,485,"ship"],
+  ["portal",1800,445,"ship"],
   ["wall",2120,0,130,180],["wall",2380,360,130,180],
   ["wall",2640,80,130,195],["wall",2900,350,130,190],
   ["wall",3160,0,130,180],["wall",3420,360,130,180],
   ["wall",3680,80,130,195],["wall",3940,350,130,190],
   ["wall",4200,0,130,180],
-  ["portal",4550,485,"cube"],
+  ["portal",4550,445,"cube"],
   ["spike",4900,46,52],["spike",4950,46,52],
   ["saw",5230,405,37],["block",5520,74,112],
   ["spike",5840,42,42],["spike",5890,42,42],
@@ -939,13 +963,13 @@ const levels=[
  name:"LEVEL 6",length:7000,
  objects:[
   ["spike",650,46,48],["block",930,72,85],["spike",1200,42,42],
-  ["portal",1500,485,"ship"],
+  ["portal",1500,445,"ship"],
   ["wall",1800,0,125,175],["wall",2050,365,125,175],
   ["wall",2300,95,125,185],["wall",2550,345,125,195],
   ["wall",2800,0,125,175],["wall",3050,365,125,175],
   ["wall",3300,95,125,185],["wall",3550,345,125,195],
   ["wall",3800,0,125,175],["wall",4050,365,125,175],
-  ["portal",4380,485,"cube"],
+  ["portal",4380,445,"cube"],
   ["spike",4700,46,50],["saw",4980,405,37],
   ["block",5260,72,115],["spike",5580,42,42],
   ["spike",5630,42,42],["saw",5910,405,36],
@@ -957,13 +981,13 @@ const levels=[
  objects:[
   ["spike",620,46,48],["spike",900,46,52],["block",1180,74,90],
   ["saw",1450,405,34],["spike",1700,46,48],
-  ["portal",1980,485,"ship"],
+  ["portal",1980,445,"ship"],
   ["wall",2250,0,120,180],["wall",2500,360,120,180],
   ["wall",2750,80,120,195],["wall",3000,350,120,190],
   ["wall",3250,0,120,180],["wall",3500,360,120,180],
   ["wall",3750,80,120,195],["wall",4000,350,120,190],
   ["wall",4250,0,120,180],
-  ["portal",4570,485,"cube"],
+  ["portal",4570,445,"cube"],
   ["spike",4900,46,50],["block",5180,74,100],
   ["spike",5450,42,42],["spike",5500,42,42],
   ["saw",5780,405,36],["spike",6100,46,50],
@@ -975,13 +999,13 @@ const levels=[
  objects:[
   ["block",700,72,80],["spike",980,46,48],["spike",1030,46,48],
   ["saw",1300,405,34],["block",1580,72,100],
-  ["portal",1900,485,"ship"],
+  ["portal",1900,445,"ship"],
   ["wall",2180,0,118,175],["wall",2430,365,118,175],
   ["wall",2680,90,118,185],["wall",2930,350,118,190],
   ["wall",3180,0,118,175],["wall",3430,365,118,175],
   ["wall",3680,90,118,185],["wall",3930,350,118,190],
   ["wall",4180,0,118,175],["wall",4430,365,118,175],
-  ["portal",4700,485,"cube"],
+  ["portal",4700,445,"cube"],
   ["spike",5050,46,50],["saw",5320,405,38],
   ["spike",5600,42,42],["block",5880,74,118],
   ["spike",6180,42,42],["spike",6230,42,42],
@@ -993,14 +1017,14 @@ const levels=[
  objects:[
   ["spike",650,46,48],["block",920,74,92],["saw",1210,405,35],
   ["spike",1480,46,50],["spike",1530,46,50],
-  ["portal",1850,485,"ship"],
+  ["portal",1850,445,"ship"],
   ["wall",2150,0,115,170],["wall",2390,370,115,170],
   ["wall",2630,90,115,190],["wall",2870,350,115,190],
   ["wall",3110,0,115,170],["wall",3350,370,115,170],
   ["wall",3590,90,115,190],["wall",3830,350,115,190],
   ["wall",4070,0,115,170],["wall",4310,370,115,170],
   ["wall",4550,90,115,190],
-  ["portal",4850,485,"cube"],
+  ["portal",4850,445,"cube"],
   ["spike",5200,46,52],["block",5480,74,120],["saw",5780,405,38],
   ["spike",6100,42,42],["spike",6150,42,42],
   ["saw",6450,405,38],["block",6750,74,110],
@@ -1012,14 +1036,14 @@ const levels=[
  objects:[
   ["spike",620,46,48],["spike",900,46,50],["block",1180,76,96],
   ["saw",1470,405,35],["spike",1730,46,50],
-  ["portal",2050,485,"ship"],
+  ["portal",2050,445,"ship"],
   ["wall",2330,0,110,170],["wall",2550,370,110,170],
   ["wall",2770,90,110,190],["wall",2990,350,110,190],
   ["wall",3210,0,110,170],["wall",3430,370,110,170],
   ["wall",3650,90,110,190],["wall",3870,350,110,190],
   ["wall",4090,0,110,170],["wall",4310,370,110,170],
   ["wall",4530,90,110,190],["wall",4750,350,110,190],
-  ["portal",5050,485,"cube"],
+  ["portal",5050,445,"cube"],
   ["spike",5400,46,52],["spike",5450,46,52],
   ["saw",5730,405,38],["block",6030,76,120],
   ["spike",6370,42,42],["spike",6420,42,42],
@@ -1032,11 +1056,11 @@ const levels=[
  name:"LEVEL 11",length:5600,world:2,
  objects:[
   ["crystal",650,395,34],["laser",930,365,120,9],["doubleSaw",1200,410,34],
-  ["portal",1500,485,"ship"],
+  ["portal",1500,445,"ship"],
   ["wall",1800,0,125,190],["wall",2050,350,125,190],
   ["wall",2300,70,125,205],["wall",2550,350,125,190],
   ["wall",2800,0,125,190],["wall",3050,350,125,190],
-  ["portal",3400,485,"cube"],
+  ["portal",3400,445,"cube"],
   ["spike",3750,46,48],["saw",4030,410,36],["block",4320,70,100],
   ["spike",4650,42,42],["spike",4700,42,42],["saw",5000,410,34]
  ]
@@ -1045,12 +1069,12 @@ const levels=[
  name:"LEVEL 12",length:6000,world:2,
  objects:[
   ["spike",600,46,48],["spike",850,46,48],["block",1120,72,90],
-  ["crystal",1280,300,34],["movingBar",1380,300,120,12],["portal",1450,485,"ship"],
+  ["crystal",1280,300,34],["movingBar",1380,300,120,12],["portal",1450,445,"ship"],
   ["wall",1770,20,120,190],["wall",2020,330,120,210],
   ["wall",2270,100,120,180],["wall",2520,350,120,190],
   ["wall",2770,20,120,190],["wall",3020,330,120,210],
   ["wall",3270,100,120,180],
-  ["portal",3650,485,"cube"],
+  ["portal",3650,445,"cube"],
   ["saw",4000,410,36],["spike",4300,46,50],["block",4580,72,105],
   ["spike",4920,42,42],["saw",5200,410,36],["spike",5550,46,50]
  ]
@@ -1059,12 +1083,12 @@ const levels=[
  name:"LEVEL 13",length:6400,world:2,
  objects:[
   ["block",650,72,95],["spike",950,46,50],["saw",1210,410,35],
-  ["spike",1480,46,50],["laser",1250,380,150,9],["doubleSaw",1430,410,35],["portal",1800,485,"ship"],
+  ["spike",1480,46,50],["laser",1250,380,150,9],["doubleSaw",1430,410,35],["portal",1800,445,"ship"],
   ["wall",2110,0,115,175],["wall",2350,365,115,175],
   ["wall",2590,75,115,205],["wall",2830,350,115,190],
   ["wall",3070,0,115,175],["wall",3310,365,115,175],
   ["wall",3550,75,115,205],["wall",3790,350,115,190],
-  ["portal",4100,485,"cube"],
+  ["portal",4100,445,"cube"],
   ["spike",4450,46,52],["saw",4720,410,37],["block",5000,72,110],
   ["spike",5350,42,42],["spike",5400,42,42],["saw",5680,410,36],["spike",6050,46,50]
  ]
@@ -1073,13 +1097,13 @@ const levels=[
  name:"LEVEL 14",length:6800,world:2,
  objects:[
   ["spike",620,46,48],["block",900,74,100],["saw",1190,410,36],
-  ["movingBar",1300,280,125,12],["crystal",1440,300,34],["portal",1500,485,"ship"],
+  ["movingBar",1300,280,125,12],["crystal",1440,300,34],["portal",1500,445,"ship"],
   ["wall",1810,0,110,180],["wall",2050,360,110,180],
   ["wall",2290,90,110,190],["wall",2530,350,110,190],
   ["wall",2770,0,110,180],["wall",3010,360,110,180],
   ["wall",3250,90,110,190],["wall",3490,350,110,190],
   ["wall",3730,0,110,180],
-  ["portal",4050,485,"cube"],
+  ["portal",4050,445,"cube"],
   ["spike",4400,46,50],["spike",4450,46,50],["block",4730,74,115],
   ["saw",5050,410,38],["spike",5380,42,42],["block",5650,74,105],
   ["saw",5960,410,36],["spike",6250,46,50],["spike",6300,46,50]
@@ -1089,13 +1113,13 @@ const levels=[
  name:"LEVEL 15",length:7200,world:2,
  objects:[
   ["spike",650,46,50],["spike",900,46,50],["block",1180,75,105],
-  ["saw",1460,410,36],["doubleSaw",1280,410,35],["laser",1430,360,150,9],["portal",1750,485,"ship"],
+  ["saw",1460,410,36],["doubleSaw",1280,410,35],["laser",1430,360,150,9],["portal",1750,445,"ship"],
   ["wall",2070,0,105,170],["wall",2300,370,105,170],
   ["wall",2530,80,105,200],["wall",2760,350,105,190],
   ["wall",2990,0,105,170],["wall",3220,370,105,170],
   ["wall",3450,80,105,200],["wall",3680,350,105,190],
   ["wall",3910,0,105,170],
-  ["portal",4220,485,"cube"],
+  ["portal",4220,445,"cube"],
   ["spike",4570,46,52],["saw",4840,410,38],["block",5120,75,115],
   ["spike",5480,42,42],["saw",5750,410,38],["block",6020,75,110],
   ["spike",6380,46,50],["saw",6680,410,36]
@@ -1105,13 +1129,13 @@ const levels=[
  name:"LEVEL 16",length:7600,world:2,
  objects:[
   ["block",650,74,90],["spike",950,46,50],["saw",1220,410,36],
-  ["crystal",1260,300,36],["movingBar",1400,290,120,12],["portal",1540,485,"ship"],
+  ["crystal",1260,300,36],["movingBar",1400,290,120,12],["portal",1540,445,"ship"],
   ["wall",1850,20,105,180],["wall",2080,360,105,180],
   ["wall",2310,90,105,190],["wall",2540,350,105,190],
   ["wall",2770,20,105,180],["wall",3000,360,105,180],
   ["wall",3230,90,105,190],["wall",3460,350,105,190],
   ["wall",3690,20,105,180],["wall",3920,360,105,180],
-  ["portal",4250,485,"cube"],
+  ["portal",4250,445,"cube"],
   ["spike",4600,46,50],["block",4880,74,120],["saw",5190,410,38],
   ["spike",5510,42,42],["spike",5560,42,42],["saw",5840,410,38],
   ["block",6150,74,110],["spike",6500,46,50],["saw",6900,410,36],["spike",7250,46,50]
@@ -1121,13 +1145,13 @@ const levels=[
  name:"LEVEL 17",length:8000,world:2,
  objects:[
   ["spike",620,46,48],["block",880,75,100],["spike",1160,42,42],["saw",1430,410,36],
-  ["laser",1270,380,145,9],["doubleSaw",1430,410,36],["portal",1760,485,"ship"],
+  ["laser",1270,380,145,9],["doubleSaw",1430,410,36],["portal",1760,445,"ship"],
   ["wall",2080,0,100,165],["wall",2300,375,100,165],
   ["wall",2520,95,100,185],["wall",2740,355,100,185],
   ["wall",2960,0,100,165],["wall",3180,375,100,165],
   ["wall",3400,95,100,185],["wall",3620,355,100,185],
   ["wall",3840,0,100,165],["wall",4060,375,100,165],
-  ["portal",4380,485,"cube"],
+  ["portal",4380,445,"cube"],
   ["spike",4730,46,52],["saw",5010,410,38],["block",5300,75,115],
   ["spike",5630,42,42],["saw",5900,410,38],["block",6200,75,120],
   ["spike",6540,46,50],["saw",6840,410,38],["spike",7160,42,42],["block",7480,75,110]
@@ -1137,14 +1161,14 @@ const levels=[
  name:"LEVEL 18",length:8400,world:2,
  objects:[
   ["spike",650,46,50],["saw",920,410,36],["block",1200,75,100],
-  ["spike",1500,46,50],["movingBar",1260,285,125,12],["crystal",1430,300,36],["portal",1820,485,"ship"],
+  ["spike",1500,46,50],["movingBar",1260,285,125,12],["crystal",1430,300,36],["portal",1820,445,"ship"],
   ["wall",2140,0,98,165],["wall",2360,375,98,165],
   ["wall",2580,90,98,190],["wall",2800,350,98,190],
   ["wall",3020,0,98,165],["wall",3240,375,98,165],
   ["wall",3460,90,98,190],["wall",3680,350,98,190],
   ["wall",3900,0,98,165],["wall",4120,375,98,165],
   ["wall",4340,90,98,190],
-  ["portal",4650,485,"cube"],
+  ["portal",4650,445,"cube"],
   ["spike",5000,46,52],["block",5280,75,125],["saw",5590,410,40],
   ["spike",5920,42,42],["spike",5970,42,42],["saw",6260,410,38],
   ["block",6550,75,115],["spike",6890,46,50],["saw",7200,410,38],
@@ -1155,14 +1179,14 @@ const levels=[
  name:"LEVEL 19",length:8800,world:2,
  objects:[
   ["block",650,75,95],["spike",930,46,50],["saw",1210,410,37],
-  ["spike",1490,46,50],["spike",1540,46,50],["doubleSaw",1280,410,36],["laser",1430,370,150,9],["portal",1870,485,"ship"],
+  ["spike",1490,46,50],["spike",1540,46,50],["doubleSaw",1280,410,36],["laser",1430,370,150,9],["portal",1870,445,"ship"],
   ["wall",2190,0,95,160],["wall",2410,380,95,160],
   ["wall",2630,100,95,180],["wall",2850,350,95,190],
   ["wall",3070,0,95,160],["wall",3290,380,95,160],
   ["wall",3510,100,95,180],["wall",3730,350,95,190],
   ["wall",3950,0,95,160],["wall",4170,380,95,160],
   ["wall",4390,100,95,180],
-  ["portal",4700,485,"cube"],
+  ["portal",4700,445,"cube"],
   ["spike",5050,46,52],["saw",5330,410,40],["block",5620,75,120],
   ["spike",5960,42,42],["saw",6250,410,38],["block",6540,75,115],
   ["spike",6870,46,50],["saw",7160,410,38],["block",7450,75,110],
@@ -1173,14 +1197,14 @@ const levels=[
  name:"LEVEL 20",length:9300,world:2,
  objects:[
   ["spike",620,46,50],["spike",880,46,50],["block",1150,76,105],
-  ["saw",1440,410,38],["spike",1710,46,50],["crystal",1260,300,38],["movingBar",1430,280,130,12],["portal",2020,485,"ship"],
+  ["saw",1440,410,38],["spike",1710,46,50],["crystal",1260,300,38],["movingBar",1430,280,130,12],["portal",2020,445,"ship"],
   ["wall",2340,0,92,160],["wall",2550,380,92,160],
   ["wall",2760,100,92,180],["wall",2970,350,92,190],
   ["wall",3180,0,92,160],["wall",3390,380,92,160],
   ["wall",3600,100,92,180],["wall",3810,350,92,190],
   ["wall",4020,0,92,160],["wall",4230,380,92,160],
   ["wall",4440,100,92,180],["wall",4650,350,92,190],
-  ["portal",5000,485,"cube"],
+  ["portal",5000,445,"cube"],
   ["spike",5350,46,52],["saw",5630,410,40],["block",5920,76,125],
   ["spike",6260,42,42],["spike",6310,42,42],["saw",6600,410,40],
   ["block",6890,76,120],["spike",7230,46,50],["saw",7530,410,40],
@@ -2789,6 +2813,7 @@ const loungeBass=[98,123.47,146.83,130.81];
       return;
     }
 
+    // Neue Spieler können Code 6 ODER 7 einmalig für +100 Münzen einlösen.
     if(localStorage.getItem(usedKey)==="1"){
       msg.textContent="ℹ️ Code wurde bereits eingelöst";
       return;
@@ -2930,6 +2955,7 @@ setInterval(renderServerMessage,250);
   const coinsInput=document.getElementById("adminGiftCoins");
   const skinInput=document.getElementById("adminGiftSkin");
   const status=document.getElementById("adminGiftStatus");
+  const playersStatus=document.getElementById("adminPlayersStatus");
 
   if(!playersSelect||!refreshBtn||!sendBtn)return;
 
@@ -2942,6 +2968,8 @@ setInterval(renderServerMessage,250);
       if(!res.ok)throw new Error(data.error||"Fehler");
 
       playersSelect.innerHTML='<option value="">Spieler auswählen</option>';
+      const count=(data.onlinePlayers||[]).length;
+      if(playersStatus)playersStatus.textContent=count ? "🟢 "+count+" Spieler online" : "ℹ️ Keine Spieler online";
       (data.onlinePlayers||[]).forEach(name=>{
         const option=document.createElement("option");
         option.value=name;
@@ -3323,6 +3351,64 @@ loop();
 </script>
 
 <script>
+/* ---------- PERSISTENTER SPIELERNAME ---------- */
+(function(){
+  const setup=document.getElementById("nameSetup");
+  const firstInput=document.getElementById("firstPlayerName");
+  const firstSave=document.getElementById("firstPlayerNameSave");
+  const firstStatus=document.getElementById("firstPlayerNameStatus");
+  const settingsInput=document.getElementById("playerNameSettings");
+  const settingsSave=document.getElementById("playerNameSave");
+  const settingsStatus=document.getElementById("playerNameStatus");
+
+  function currentName(){
+    return String(localStorage.getItem("crPlayerName")||"").trim();
+  }
+
+  function saveName(raw,statusEl){
+    const name=String(raw||"").trim().slice(0,24);
+    if(!name){
+      if(statusEl)statusEl.textContent="❌ Bitte einen Namen eingeben.";
+      return false;
+    }
+    localStorage.setItem("crPlayerName",name);
+    if(settingsInput)settingsInput.value=name;
+    if(window.cubeRushServer && typeof window.cubeRushServer.setPlayerName==="function"){
+      window.cubeRushServer.setPlayerName(name);
+    }
+    if(statusEl)statusEl.textContent="✅ Name gespeichert";
+    return true;
+  }
+
+  const name=currentName();
+  if(settingsInput)settingsInput.value=name;
+
+  if(setup){
+    if(name){
+      setup.style.display="none";
+    }else{
+      setup.style.display="flex";
+      setTimeout(()=>firstInput?.focus(),100);
+    }
+  }
+
+  firstSave?.addEventListener("click",()=>{
+    if(saveName(firstInput?.value,firstStatus))setup.style.display="none";
+  });
+
+  firstInput?.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();firstSave?.click();}
+  });
+
+  settingsSave?.addEventListener("click",()=>{
+    saveName(settingsInput?.value,settingsStatus);
+  });
+
+  settingsInput?.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();settingsSave?.click();}
+  });
+})();
+
 /* ---------- CUBE RUSH SERVER BRIDGE ---------- */
 (function(){
   const SERVER_URL = localStorage.getItem("crServerUrl") || location.origin;
