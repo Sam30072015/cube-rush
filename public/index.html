@@ -632,6 +632,15 @@ body.phone-mode #serverMessage.show{
   display:block !important;
 }
 
+
+#coinEventHud{
+  position:fixed;top:276px;left:50%;transform:translateX(-50%);z-index:9;
+  padding:7px 13px;border:2px solid #ffd83d;border-radius:999px;
+  background:rgba(55,42,0,.9);color:#ffd83d;font-weight:900;font-size:16px;
+  text-shadow:0 0 10px #ffd83d;box-shadow:0 0 18px rgba(255,216,61,.28);
+  pointer-events:none;
+}
+body.phone-mode #coinEventHud{top:108px;max-width:92vw;font-size:12px;padding:5px 9px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -695,6 +704,8 @@ body.phone-mode #serverMessage.show{
 <div id="powerHud" class="hidden"></div>
 <div id="abilityHud" class="hidden">🐱 POP-KRAFT: E</div>
 
+<div id="coinEventHud" class="hidden">🪙 2× MÜNZEN</div>
+
 <div id="tacoHud">🌮 Nächster Taco-Regen · 15:00</div>
 
 <button id="settingsBtn" type="button" aria-label="Einstellungen">
@@ -757,6 +768,16 @@ body.phone-mode #serverMessage.show{
     <input id="adminGiftSkin" type="text" maxlength="40" placeholder="Skin (optional)">
     <button class="adminAction" id="adminGiftSend">🎁 Vergabe senden</button>
     <div id="adminGiftStatus"></div>
+
+    <div class="adminSectionTitle">🪙 2×-MÜNZEN-EVENT</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+      <input id="adminCoinsMinutes" type="number" min="0" max="10080"
+             placeholder="Minuten" inputmode="numeric">
+      <span style="font-weight:800;color:#ffd83d">Doppelte Münzen</span>
+    </div>
+    <button class="adminAction" id="adminCoinsEventStart">🪙 2× Münzen für alle starten</button>
+    <button class="adminAction" id="adminCoinsEventStop">🛑 2× Münzen stoppen</button>
+    <div id="adminCoinsEventStatus"></div>
 
     <div id="adminMessageArea">
       <strong>📢 Server Nachricht schreiben</strong>
@@ -950,6 +971,36 @@ function updateAbilityHud(){
   In Level 2 sitzt das Portal bewusst bei x=1500 und
   der erste Flug-Hindernisblock beginnt erst deutlich später.
 */
+/* ---------- GLOBALES 2×-MÜNZEN-EVENT ---------- */
+let coinEventUntil=0;
+let coinEventActive=false;
+
+function setCoinEvent(until){
+  coinEventUntil=Number(until)||0;
+  coinEventActive=coinEventUntil>Date.now();
+  updateCoinEventHud();
+}
+
+function updateCoinEventHud(){
+  const hud=document.getElementById("coinEventHud");
+  if(!hud)return;
+  const now=Date.now();
+  if(coinEventActive && now<coinEventUntil){
+    hud.classList.remove("hidden");
+    const sec=Math.max(0,Math.ceil((coinEventUntil-now)/1000));
+    hud.textContent="🪙 2× MÜNZEN · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
+  }else{
+    coinEventActive=false;
+    hud.classList.add("hidden");
+  }
+}
+
+function coinReward(base){
+  return coinEventActive && Date.now()<coinEventUntil ? base*2 : base;
+}
+
+setInterval(updateCoinEventHud,500);
+
 const levels=[
 {
  name:"LEVEL 1",length:5000,
@@ -1663,7 +1714,7 @@ function updateTacos(){
     const sx=t.x-camera+180;
     if(Math.hypot(px-sx,py-t.y)<t.r+22){
       t.collected=true;
-      coins+=TACO_REWARD;
+      coins+=coinReward(TACO_REWARD);
       save();
       updateHUD();
     }
@@ -2058,7 +2109,7 @@ function win(){
 
   if(firstTime){
     completed.push(levelIndex);
-    coins+=50;
+    coins+=coinReward(50);
     if(levelIndex+1<levels.length){
       unlocked=Math.max(unlocked,levelIndex+2);
     }
@@ -3096,6 +3147,45 @@ setInterval(renderServerMessage,250);
   // Load immediately when the admin section is used/opened.
   setTimeout(loadPlayers,300);
 })();
+/* ---------- ADMIN 2× MÜNZEN TOOL ---------- */
+(function(){
+  const start=document.getElementById("adminCoinsEventStart");
+  const stop=document.getElementById("adminCoinsEventStop");
+  const minutes=document.getElementById("adminCoinsMinutes");
+  const status=document.getElementById("adminCoinsEventStatus");
+  const ADMIN_KEY="4729";
+  if(!start||!stop||!minutes)return;
+
+  async function send(action,durationMs=0){
+    try{
+      const res=await fetch("/api/admin/coins-event",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-admin-key":ADMIN_KEY},
+        body:JSON.stringify({action,durationMs})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Fehler");
+      setCoinEvent(data.until||0);
+      if(status)status.textContent=action==="start"
+        ?"✅ 2× Münzen für alle aktiviert"
+        :"🛑 2× Münzen beendet";
+    }catch(e){
+      if(status)status.textContent="❌ "+e.message;
+    }
+  }
+
+  start.addEventListener("click",()=>{
+    const min=Math.max(0,Number(minutes.value)||0);
+    if(min<=0){
+      if(status)status.textContent="❌ Bitte Minuten eingeben";
+      return;
+    }
+    send("start",min*60000);
+  });
+
+  stop.addEventListener("click",()=>send("stop"));
+})();
+
 /* ---------- ADMIN CODE 4729 ---------- */
 (function(){
   const input=document.getElementById("codeInput");
@@ -3515,6 +3605,10 @@ loop();
               if(typeof updateHUD==="function") updateHUD();
               if(typeof updateShop==="function" && document.getElementById("shop")?.classList.contains("open")) updateShop();
             }
+          }
+
+          if(msg.type==="coinEvent"){
+            setCoinEvent(msg.until||0);
           }
 
           if(msg.type==="serverMessage"){
