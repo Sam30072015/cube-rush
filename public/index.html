@@ -1007,13 +1007,13 @@ function world2Unlocked(){
   for(let i=0;i<10;i++){
     if(!completed.includes(i)) return false;
   }
+  return true;
+}
 
 function world3Unlocked(){
   for(let i=10;i<20;i++){
     if(!completed.includes(i)) return false;
   }
-  return true;
-}
   return true;
 }
 
@@ -2237,6 +2237,7 @@ function cubeCollision(){
  const p={x:player.x+7,y:player.y+7,w:32,h:32};
 
  for(const o of levels[levelIndex].objects){
+   if(!Array.isArray(o) || !o[0])continue;
    const x=o[1]-camera+180;
 
    if(o[0]==="spike"){
@@ -2279,6 +2280,7 @@ function shipCollision(){
  const p={x:player.x+4,y:player.y+5,w:38,h:35};
 
  for(const o of levels[levelIndex].objects){
+   if(!Array.isArray(o) || !o[0])continue;
    if(o[0]!=="wall")continue;
    if(rectHit(p,{x:o[1]-camera+180,y:o[2],w:o[3],h:o[4]}))return true;
  }
@@ -2684,6 +2686,7 @@ function world2SpecialCollision(o){
 
 function drawObjects(){
  for(const o of levels[levelIndex].objects){
+   if(!Array.isArray(o) || !o[0])continue;
    const type=o[0];
    const x=o[1]-camera+180;
 
