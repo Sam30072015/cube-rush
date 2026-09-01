@@ -14,7 +14,7 @@ app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const players = new Map(); // name -> ws
+const players = new Map(); // name -> websocket
 
 function cleanName(name) {
   return String(name || "").trim().slice(0, 40);
@@ -37,6 +37,7 @@ function broadcast(payload) {
 }
 
 wss.on("connection", (ws) => {
+  ws.lastSeen = Date.now();
   ws.playerName = "";
 
   ws.on("message", (raw) => {
@@ -48,7 +49,16 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    // Spieler meldet, dass er noch online ist
+    if (msg.type === "heartbeat") {
+      ws.lastSeen = Date.now();
+      return;
+    }
+
+    // Spielername registrieren
     if (msg.type === "identify") {
+      ws.lastSeen = Date.now();
+
       let name = cleanName(msg.name);
 
       if (!name) {
@@ -57,6 +67,7 @@ wss.on("connection", (ws) => {
           Math.random().toString(36).slice(2, 8).toUpperCase();
       }
 
+      // Verhindert doppelte Namen bei gleichzeitig verbundenen Spielern
       if (players.has(name) && players.get(name) !== ws) {
         name =
           name +
@@ -80,32 +91,69 @@ wss.on("connection", (ws) => {
     }
   });
 
+  // Spieler wirklich entfernen, wenn Verbindung geschlossen wird
   ws.on("close", () => {
-    if (ws.playerName && players.get(ws.playerName) === ws) {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+
+  ws.on("error", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
       players.delete(ws.playerName);
     }
   });
 });
 
 /* =========================================
+   OFFLINE-SPIELER AUFRÄUMEN
+   ========================================= */
+
+setInterval(() => {
+  const now = Date.now();
+
+  for (const [name, ws] of players.entries()) {
+    if (now - (ws.lastSeen || 0) > 30000) {
+      players.delete(name);
+
+      try {
+        ws.terminate();
+      } catch (e) {}
+    }
+  }
+}, 15000);
+
+/* =========================================
    ADMIN: 2× MÜNZEN EVENT
    ========================================= */
 
 app.post("/api/admin/coins-event", (req, res) => {
-  if (req.headers["x-admin-key"] !== ADMIN_KEY) {
+  if (
+    req.headers["x-admin-key"] !== ADMIN_KEY
+  ) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
-  const action = String(req.body.action || "");
+  const action = String(
+    req.body.action || ""
+  );
 
   if (action === "start") {
     const durationMs = Math.max(
       1000,
       Math.min(
         10080 * 60 * 1000,
-        Math.floor(Number(req.body.durationMs) || 0)
+        Math.floor(
+          Number(req.body.durationMs) || 0
+        )
       )
     );
 
@@ -116,6 +164,7 @@ app.post("/api/admin/coins-event", (req, res) => {
       until
     };
 
+    // An alle Spieler senden
     broadcast(message);
 
     return res.json({
@@ -148,32 +197,47 @@ app.post("/api/admin/coins-event", (req, res) => {
    ========================================= */
 
 app.post("/api/admin/give", (req, res) => {
-  if (req.headers["x-admin-key"] !== ADMIN_KEY) {
+  if (
+    req.headers["x-admin-key"] !== ADMIN_KEY
+  ) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
-  const player = cleanName(req.body.player);
+  const player = cleanName(
+    req.body.player
+  );
 
   const coins = Math.max(
     0,
-    Math.floor(Number(req.body.coins) || 0)
+    Math.floor(
+      Number(req.body.coins) || 0
+    )
   );
 
-  const skin = String(req.body.skin || "")
+  const skin = String(
+    req.body.skin || ""
+  )
     .trim()
     .slice(0, 40);
 
-  if (!player || (coins === 0 && !skin)) {
+  if (
+    !player ||
+    (coins === 0 && !skin)
+  ) {
     return res.status(400).json({
-      error: "Player and coins or skin required"
+      error:
+        "Player and coins or skin required"
     });
   }
 
   const target = players.get(player);
 
-  if (!target || target.readyState !== WebSocket.OPEN) {
+  if (
+    !target ||
+    target.readyState !== WebSocket.OPEN
+  ) {
     return res.status(404).json({
       error: "Player is not online"
     });
@@ -199,32 +263,41 @@ app.post("/api/admin/give", (req, res) => {
    ========================================= */
 
 app.post("/api/admin/message", (req, res) => {
-  if (req.headers["x-admin-key"] !== ADMIN_KEY) {
+  if (
+    req.headers["x-admin-key"] !== ADMIN_KEY
+  ) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
-  const text = String(req.body.text || "")
+  const text = String(
+    req.body.text || ""
+  )
     .trim()
     .slice(0, 120);
 
   const minutes = Math.max(
     0,
-    Math.floor(Number(req.body.minutes) || 0)
+    Math.floor(
+      Number(req.body.minutes) || 0
+    )
   );
 
   const seconds = Math.max(
     0,
     Math.min(
       59,
-      Math.floor(Number(req.body.seconds) || 0)
+      Math.floor(
+        Number(req.body.seconds) || 0
+      )
     )
   );
 
-  const duration = (minutes * 60 + seconds) * 1000;
+  const duration =
+    (minutes * 60 + seconds) * 1000;
 
-  /* Servernachricht für alle löschen */
+  // Servernachricht für alle löschen
   if (
     req.body.clear === true ||
     (!text && duration === 0)
@@ -255,6 +328,7 @@ app.post("/api/admin/message", (req, res) => {
     endsAt: Date.now() + duration
   };
 
+  // Nachricht an alle Spieler
   broadcast(message);
 
   return res.json({
@@ -268,24 +342,38 @@ app.post("/api/admin/message", (req, res) => {
    ========================================= */
 
 app.get("/api/status", (req, res) => {
-  if (req.headers["x-admin-key"] !== ADMIN_KEY) {
+  if (
+    req.headers["x-admin-key"] !== ADMIN_KEY
+  ) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
   res.json({
-    onlinePlayers: [...players.keys()]
+    onlinePlayers: [
+      ...players.keys()
+    ]
   });
 });
 
 /* =========================================
    SPIEL AUSLIEFERN
-   ========================================= */
+   =========================================
+
+   WICHTIG:
+   Kein app.get("*"), weil das bei
+   neueren Express-Versionen den
+   PathError verursacht.
+   */
 
 app.use((req, res) => {
   res.sendFile(
-    path.join(__dirname, "public", "index.html")
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
   );
 });
 
