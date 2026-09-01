@@ -2246,6 +2246,9 @@ function burst(x,y,n=8){
 function die(msg){
   running=false;
   spaceHeld=false;
+
+  // Taco-Event NICHT stoppen und NICHT zurücksetzen.
+  // Der Event-Countdown und die Regen-Timer laufen weiter.
   if(typeof stopMusic==="function")stopMusic();
 
   const result=document.getElementById("result");
@@ -2311,6 +2314,11 @@ function win(){
 
 /* ---------- update ---------- */
 function update(){
+  // Taco-Event läuft unabhängig vom Spieler weiter – auch wenn man stirbt.
+  // Dadurch fallen Tacos weiter, verschwinden nach 5 Sekunden und der Countdown
+  // wird nicht zurückgesetzt.
+  if(typeof updateTacos==="function") updateTacos();
+
   if(!running)return;
 
   if(mode==="cube"){
@@ -2371,7 +2379,6 @@ function update(){
     }
   }
 
-  if(typeof updateTacos==="function")updateTacos();
   if(typeof updateAbilityHud==="function")updateAbilityHud();
   if(typeof updatePopPowerHud==="function")updatePopPowerHud();
   if(typeof updateParticles==="function")updateParticles();
