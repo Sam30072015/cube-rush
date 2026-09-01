@@ -815,6 +815,8 @@ body.world3-unlocked .screen#menu #levels{
   .screen#menu #levels{width:min(1120px,92vw) !important;}
 }
 
+
+.magmaSkin{background:linear-gradient(145deg,#ffd36b 0%,#ff7a00 45%,#7a0012 100%)}
 </style>
 </head>
 <body>
@@ -1156,7 +1158,68 @@ function useCatAbility(){
   updateAbilityHud();
 }
 
+/* ---------- MAGMA-BLOCK FÄHIGKEIT ---------- */
+const MAGMA_ABILITY_ERUPTION=5000;
+const MAGMA_ABILITY_CLEAR=5000;
+const MAGMA_ABILITY_COOLDOWN=15000;
+
+let magmaEruptionUntil=0;
+let magmaClearUntil=0;
+let magmaReadyAt=0;
+
+function magmaEquipped(){
+  return equippedSkin==="magma";
+}
+
+function magmaObstaclesCleared(){
+  return magmaEquipped() && Date.now()<magmaClearUntil;
+}
+
+function useMagmaAbility(){
+  if(!running || !magmaEquipped())return;
+
+  const now=Date.now();
+  if(now<magmaReadyAt)return;
+  if(now<magmaEruptionUntil || now<magmaClearUntil)return;
+
+  // 5 Sekunden Lava-Ausbruch, danach 5 Sekunden sind alle Hindernisse weg.
+  magmaEruptionUntil=now+MAGMA_ABILITY_ERUPTION;
+  magmaClearUntil=magmaEruptionUntil+MAGMA_ABILITY_CLEAR;
+  magmaReadyAt=magmaClearUntil+MAGMA_ABILITY_COOLDOWN;
+
+  player.vy=-6;
+  updateMagmaHud();
+}
+
+function updateMagmaHud(){
+  const h=document.getElementById("abilityHud");
+  if(!h)return;
+
+  if(!magmaEquipped()){
+    h.classList.add("hidden");
+    return;
+  }
+
+  h.classList.remove("hidden");
+  const now=Date.now();
+
+  if(now<magmaEruptionUntil){
+    h.textContent="🌋 MAGMA-AUSBRUCH · "+Math.ceil((magmaEruptionUntil-now)/1000)+"s";
+  }else if(now<magmaClearUntil){
+    h.textContent="🌋 HINDERNISSE WEG · "+Math.ceil((magmaClearUntil-now)/1000)+"s";
+  }else if(now<magmaReadyAt){
+    h.textContent="🌋 MAGMA · E · "+Math.ceil((magmaReadyAt-now)/1000)+"s";
+  }else{
+    h.textContent="🌋 MAGMA-BLOCK BEREIT · E";
+  }
+}
+
 function updateAbilityHud(){
+  if(typeof updateMagmaHud==="function" && magmaEquipped()){
+    updateMagmaHud();
+    return;
+  }
+
   const hud=document.getElementById("abilityHud");
   if(!hud)return;
 
@@ -2008,7 +2071,8 @@ const SKINS = [
   {id:"fire", name:"🔥 Feuer", price:75, css:"fire"},
   {id:"ocean", name:"🌊 Ozean", price:75, css:"ocean"},
   {id:"shadow", name:"🌑 Schatten", price:100, css:"shadowSkin"},
-  {id:"sunset", name:"🌅 Sunset", price:125, css:"sunset"}
+  {id:"sunset", name:"🌅 Sunset", price:125, css:"sunset"},
+  {id:"magma", name:"🌋 Magma-Block", price:5500, css:"magmaSkin"}
 ];
 
 let ownedSkins = [];
@@ -2062,7 +2126,15 @@ function updateShop(){
 
     const owned=ownedSkins.includes(skin.id);
 
-    if(owned){
+    // Der Magma-Block darf erst gekauft werden, wenn Welt 3 freigeschaltet ist.
+    const magmaLockedByWorld =
+      skin.id==="magma" &&
+      !(typeof world3Unlocked==="function" && world3Unlocked());
+
+    if(magmaLockedByWorld){
+      btn.disabled=true;
+      btn.textContent="🔒 ERST IN WELT 3";
+    }else if(owned){
       btn.disabled=false;
       btn.textContent=equippedSkin===skin.id?"✅ AUSGERÜSTET":"⭐ AUSRÜSTEN";
 
@@ -2086,6 +2158,10 @@ function updateShop(){
         let buying=false;
 
         btn.onclick=()=>{
+          // Magma-Block bleibt bis zur Freischaltung von Welt 3 gesperrt.
+          if(skin.id==="magma" &&
+             !(typeof world3Unlocked==="function" && world3Unlocked()))return;
+
           // Doppelklick/Mehrfachklick darf keinen zweiten Kauf auslösen.
           if(buying)return;
           if(ownedSkins.includes(skin.id)){
@@ -2539,7 +2615,8 @@ function update(){
 
   if(typeof missedPortal==="function"&&missedPortal())return;
 
-  if(!(typeof popKraftAktiv==="function"&&popKraftAktiv())){
+  if(!(typeof popKraftAktiv==="function"&&popKraftAktiv()) &&
+     !(typeof magmaObstaclesCleared==="function"&&magmaObstaclesCleared())){
     if(mode==="cube"){
       if(cubeCollision()){
         die("Du bist gegen ein Hindernis gekracht!");
@@ -2555,6 +2632,7 @@ function update(){
 
   if(typeof updateAbilityHud==="function")updateAbilityHud();
   if(typeof updatePopPowerHud==="function")updatePopPowerHud();
+  if(typeof updateMagmaHud==="function")updateMagmaHud();
   if(typeof updateParticles==="function")updateParticles();
 
   score=Math.floor(camera/5);
@@ -2987,6 +3065,13 @@ function drawPlayer(){
    const g=ctx.createLinearGradient(-23,-23,23,23);
    g.addColorStop(0,"#fff09a");g.addColorStop(.5,"#ff7c52");g.addColorStop(1,"#933cff");
    ctx.fillStyle=g;
+ }else if(currentSkin.id==="magma"){
+   const g=ctx.createLinearGradient(-23,-23,23,23);
+   g.addColorStop(0,"#ffd36b");
+   g.addColorStop(.35,"#ff7a00");
+   g.addColorStop(.7,"#e21b00");
+   g.addColorStop(1,"#5b0010");
+   ctx.fillStyle=g;
  }else{
    const g=ctx.createLinearGradient(-23,-23,23,23);
    g.addColorStop(0,"#ffff9a");
@@ -3130,6 +3215,22 @@ ctx.clearRect(0,0,W,H);
  drawGround();
  drawObjects();
  drawTacos();
+
+ // Lava-Ausbruch visualisieren.
+ if(typeof magmaEquipped==="function" && magmaEquipped() && Date.now()<magmaEruptionUntil){
+   ctx.save();
+   const t=Date.now();
+   for(let i=0;i<14;i++){
+     const x=((i*83+Math.sin(t/180+i)*20)%W+W)%W;
+     const h=28+((i*17)%70);
+     ctx.fillStyle=i%2===0?"#ff6a00":"#ff2200";
+     ctx.shadowBlur=18;
+     ctx.shadowColor="#ff6a00";
+     ctx.fillRect(x,GROUND-h,7,18+(i%4)*4);
+   }
+   ctx.restore();
+ }
+
  drawPlayer();
 }
 
@@ -3155,7 +3256,11 @@ document.addEventListener("keydown",e=>{
 
   if(e.code==="KeyE" && !e.repeat){
     e.preventDefault();
-    if(typeof useCatAbility==="function")useCatAbility();
+    if(typeof magmaEquipped==="function" && magmaEquipped()){
+      useMagmaAbility();
+    }else if(typeof useCatAbility==="function"){
+      useCatAbility();
+    }
     return;
   }
 
@@ -3261,7 +3366,11 @@ window.addEventListener("keydown",(e)=>{
   if(e.target && (e.target.tagName==="INPUT" || e.target.tagName==="TEXTAREA")) return;
   if(e.code==="KeyE" && !e.repeat){
     e.preventDefault();
-    popKraft();
+    if(typeof magmaEquipped==="function" && magmaEquipped()){
+      useMagmaAbility();
+    }else{
+      popKraft();
+    }
   }
 },false);
 
