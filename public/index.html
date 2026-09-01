@@ -1799,7 +1799,7 @@ function startTacoClock(){
 function showTacoCoinPopup(amount){
   const el=document.getElementById("tacoCoinPopup");
   if(!el)return;
-  el.textContent="🪙 +"+amount+" Münzen";
+  el.textContent=typeof amount==="number" ? "🪙 +"+amount+" Münzen" : String(amount);
   el.classList.remove("show");
   void el.offsetWidth;
   el.classList.add("show");
@@ -1969,18 +1969,29 @@ function updateShop(){
       btn.textContent=coins>=skin.price?"🛒 KAUFEN":"🔒 ZU TEUER";
 
       if(!btn.disabled){
+        let buying=false;
+
         btn.onclick=()=>{
+          // Doppelklick/Mehrfachklick darf keinen zweiten Kauf auslösen.
+          if(buying)return;
+          if(ownedSkins.includes(skin.id)){
+            updateShop();
+            return;
+          }
           if(coins<skin.price)return;
 
-          coins-=skin.price;
-          if(!ownedSkins.includes(skin.id))ownedSkins.push(skin.id);
+          buying=true;
+          btn.disabled=true;
+
+          // Münzen genau einmal abbuchen.
+          coins=Math.max(0,coins-skin.price);
+          ownedSkins.push(skin.id);
           equippedSkin=skin.id;
 
-          // Save the new balance and equipped skin BEFORE rebuilding the shop.
           saveSkins();
           save();
 
-          // Immediate visual refresh while the shop stays open.
+          // Sofort auf Hauptbildschirm + Shop aktualisieren.
           updateShop();
           updateMenu();
           updateHUD();
@@ -3252,7 +3263,13 @@ setInterval(renderServerMessage,250);
   }
 
   refreshBtn.addEventListener("click",loadPlayers);
+  let giftSending=false;
+
   sendBtn.addEventListener("click",async()=>{
+    if(giftSending)return;
+    giftSending=true;
+    sendBtn.disabled=true;
+
     const player=playersSelect.value;
     const coins=Math.max(0,Math.floor(Number(coinsInput.value)||0));
     const skin=skinInput.value.trim();
@@ -3284,56 +3301,15 @@ setInterval(renderServerMessage,250);
       loadPlayers();
     }catch(e){
       status.textContent="❌ "+e.message;
+    }finally{
+      giftSending=false;
+      sendBtn.disabled=false;
     }
   });
 
   // Load immediately when the admin section is used/opened.
   setTimeout(loadPlayers,300);
 })();
-/* ---------- ADMIN SKIN-GESCHENK ROBUST ---------- */
-(function(){
-  const send=document.getElementById("adminGiftSend");
-  const playerSel=document.getElementById("adminOnlinePlayers");
-  const playerInput=document.getElementById("adminGiftPlayer");
-  const coinsInput=document.getElementById("adminGiftCoins");
-  const skinInput=document.getElementById("adminGiftSkin");
-  const status=document.getElementById("adminGiftStatus");
-  const ADMIN_KEY="603781";
-
-  if(!send)return;
-
-  send.addEventListener("click",async()=>{
-    const player=String(playerSel?.value || playerInput?.value || "").trim();
-    const coins=Math.max(0,Math.floor(Number(coinsInput?.value)||0));
-    const skin=String(skinInput?.value||"").trim();
-
-    if(!player){
-      if(status)status.textContent="❌ Bitte einen Online-Spieler auswählen";
-      return;
-    }
-    if(coins===0 && !skin){
-      if(status)status.textContent="❌ Münzen oder Skin auswählen";
-      return;
-    }
-
-    try{
-      const res=await fetch("/api/admin/give",{
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "x-admin-key":ADMIN_KEY
-        },
-        body:JSON.stringify({player,coins,skin})
-      });
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok)throw new Error(data.error||"Geschenk konnte nicht gesendet werden");
-      if(status)status.textContent="✅ Geschenk an "+player+" gesendet";
-    }catch(err){
-      if(status)status.textContent="❌ "+err.message;
-    }
-  });
-})();
-
 /* ---------- ADMIN EVENT-SCHNELLSTART ---------- */
 (function(){
   const box=document.getElementById("adminQuickEvents");
@@ -3861,14 +3837,34 @@ setInterval(updateSettingsScore,500);
 
           if(msg.type==="gift"){
             if(msg.target===playerName){
-              if(typeof coins==="number") coins += Number(msg.coins)||0;
-              if(msg.skin && typeof ownedSkins!=="undefined" && !ownedSkins.includes(msg.skin)){
-                ownedSkins.push(msg.skin);
+              const receivedCoins=Math.max(0,Number(msg.coins)||0);
+
+              // Geschenkte Münzen sind exakt die vom Admin gesendete Menge.
+              // Das 2×-Münzen-Event wird auf Admin-Geschenke NICHT angewendet.
+              coins = Math.max(0,Number(coins)||0) + receivedCoins;
+
+              let receivedSkin="";
+              if(msg.skin && typeof ownedSkins!=="undefined"){
+                receivedSkin=String(msg.skin).trim();
+                if(receivedSkin && !ownedSkins.includes(receivedSkin)){
+                  ownedSkins.push(receivedSkin);
+                }
               }
+
               if(typeof save==="function") save();
               if(typeof updateMenu==="function") updateMenu();
               if(typeof updateHUD==="function") updateHUD();
-              if(typeof updateShop==="function" && document.getElementById("shop")?.classList.contains("open")) updateShop();
+
+              // Der geschenkte Skin ist danach im Shop als "AUSRÜSTEN" verfügbar.
+              if(typeof updateShop==="function") updateShop();
+
+              if(receivedCoins>0 || receivedSkin){
+                const giftText =
+                  (receivedCoins>0 ? "🪙 +"+receivedCoins+" Münzen" : "") +
+                  (receivedCoins>0 && receivedSkin ? " · " : "") +
+                  (receivedSkin ? "🎁 Skin: "+receivedSkin : "");
+                showTacoCoinPopup?.(giftText);
+              }
             }
           }
 
@@ -3891,7 +3887,16 @@ setInterval(updateSettingsScore,500);
     }catch(e){}
   }
 
-  window.cubeRushServer={
+  // Regelmäßig melden, dass der Spieler noch verbunden ist.
+  const cubeRushHeartbeat=setInterval(()=>{
+    try{
+      if(ws && ws.readyState===WebSocket.OPEN){
+        ws.send(JSON.stringify({type:"heartbeat"}));
+      }
+    }catch(e){}
+  },10000);
+
+window.cubeRushServer={
     connect:connectServer,
     setPlayerName(name){
       playerName=(name||"").trim();
