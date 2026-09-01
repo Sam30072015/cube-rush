@@ -683,6 +683,109 @@ body.phone-mode #progress{min-width:0;border-radius:10px;}
   body.phone-mode #percent::before{font-size:11px;}
   body.phone-mode #bar{top:71px;}
 }
+#coinEventHud{
+  position:fixed;top:276px;left:50%;transform:translateX(-50%);z-index:9;
+  padding:7px 13px;border:2px solid #ffd83d;border-radius:999px;
+  background:rgba(55,42,0,.9);color:#ffd83d;font-weight:900;font-size:16px;
+  text-shadow:0 0 10px #ffd83d;box-shadow:0 0 18px rgba(255,216,61,.28);
+  pointer-events:none;
+}
+body.phone-mode #coinEventHud{top:150px;max-width:92vw;font-size:13px;padding:6px 10px}
+
+/* ---------- HANDY HAUPTMENÜ · SAUBER ---------- */
+@media (max-width:600px){
+  body.phone-mode .screen#menu{
+    position:fixed !important;
+    inset:0 !important;
+    width:100vw !important;
+    height:100dvh !important;
+    height:100vh !important;
+    padding:12px 10px 18px !important;
+    overflow:hidden !important;
+    justify-content:flex-start !important;
+    align-items:center !important;
+  }
+
+  body.phone-mode .screen#menu h1{
+    width:100%;
+    margin:8px 0 5px !important;
+    font-size:clamp(38px,11vw,58px) !important;
+    text-align:center;
+    line-height:1;
+  }
+
+  body.phone-mode #menuCoins{
+    margin:2px 0 8px !important;
+    padding:7px 13px !important;
+    font-size:18px;
+  }
+
+  body.phone-mode #levels{
+    width:100% !important;
+    max-width:390px !important;
+    height:auto !important;
+    max-height:none !important;
+    padding:9px !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    overflow:visible !important;
+    border-radius:22px !important;
+    box-sizing:border-box !important;
+  }
+
+  body.phone-mode #levels h2{
+    margin:2px 0 8px !important;
+    font-size:20px !important;
+  }
+
+  body.phone-mode #levels > div{
+    width:100% !important;
+    display:flex !important;
+    flex-wrap:wrap !important;
+    justify-content:center !important;
+    gap:7px !important;
+    margin:0 !important;
+  }
+
+  body.phone-mode .levelBtn{
+    width:70px !important;
+    min-height:54px !important;
+    margin:0 !important;
+    padding:6px 3px !important;
+    border-width:3px !important;
+    border-radius:14px !important;
+    font-size:10px !important;
+    line-height:1.05 !important;
+  }
+
+  body.phone-mode #shopOpen{
+    margin:10px 0 5px !important;
+    padding:11px 20px !important;
+    font-size:17px !important;
+    border-radius:16px !important;
+  }
+
+  body.phone-mode #tip{
+    width:min(360px,94vw);
+    margin:4px auto 0 !important;
+    padding:0 6px !important;
+    font-size:11px !important;
+    line-height:1.25 !important;
+    text-align:center !important;
+  }
+}
+
+/* Bei etwas höheren Handys etwas größere Level-Karten. */
+@media (max-width:600px) and (min-height:760px){
+  body.phone-mode #levels{max-width:410px !important;}
+  body.phone-mode .levelBtn{
+    width:76px !important;
+    min-height:58px !important;
+    font-size:11px !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -746,6 +849,7 @@ body.phone-mode #progress{min-width:0;border-radius:10px;}
 <div id="powerHud" class="hidden"></div>
 <div id="abilityHud" class="hidden">🐱 POP-KRAFT: E</div>
 
+<div id="coinEventHud" class="hidden">🪙 2× MÜNZEN</div>
 <div id="tacoHud">🌮 Nächster Taco-Regen · 15:00</div>
 
 <button id="settingsBtn" type="button" aria-label="Einstellungen">
@@ -808,6 +912,16 @@ body.phone-mode #progress{min-width:0;border-radius:10px;}
     <input id="adminGiftSkin" type="text" maxlength="40" placeholder="Skin (optional)">
     <button class="adminAction" id="adminGiftSend">🎁 Vergabe senden</button>
     <div id="adminGiftStatus"></div>
+
+    <div class="adminSectionTitle">🪙 2×-MÜNZEN-EVENT</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+      <input id="adminCoinsMinutes" type="number" min="0" max="10080"
+             placeholder="Minuten" inputmode="numeric">
+      <span style="font-weight:800;color:#ffd83d">Doppelte Münzen</span>
+    </div>
+    <button class="adminAction" id="adminCoinsEventStart">🪙 2× Münzen für alle starten</button>
+    <button class="adminAction" id="adminCoinsEventStop">🛑 2× Münzen stoppen</button>
+    <div id="adminCoinsEventStatus"></div>
 
     <div id="adminMessageArea">
       <strong>📢 Server Nachricht schreiben</strong>
@@ -973,6 +1087,17 @@ function useCatAbility(){
 function updateAbilityHud(){
   const hud=document.getElementById("abilityHud");
   if(!hud)return;
+  const now=Date.now();
+
+  if(shadowEquipped()){
+    hud.classList.remove("hidden");
+    if(now<shadowAbilityUntil){
+      hud.textContent="🌑 SCHATTEN · UNVERWUNDBAR · "+((shadowAbilityUntil-now)/1000).toFixed(1)+"s";
+    }else{
+      hud.textContent="🌑 SCHATTEN-FÄHIGKEIT BEREIT · E";
+    }
+    return;
+  }
 
   if(!catEquipped()){
     hud.classList.add("hidden");
@@ -980,9 +1105,6 @@ function updateAbilityHud(){
   }
 
   hud.classList.remove("hidden");
-
-  const now=Date.now();
-
   if(now<catAbilityUntil){
     hud.textContent="🐱 POP-KRAFT AKTIV · "+(Math.ceil((catAbilityUntil-now)/100)/10).toFixed(1)+"s";
   }else if(now<catAbilityReadyAt){
@@ -993,6 +1115,28 @@ function updateAbilityHud(){
 }
 
 
+/* ---------- SCHATTEN-FÄHIGKEIT ---------- */
+const SHADOW_ABILITY_DURATION=5000;
+let shadowAbilityUntil=0;
+
+function shadowEquipped(){
+  return equippedSkin==="shadow";
+}
+
+function shadowAbilityActive(){
+  return shadowEquipped() && Date.now()<shadowAbilityUntil;
+}
+
+function useShadowAbility(){
+  if(!running || !shadowEquipped())return;
+  const now=Date.now();
+  if(now<shadowAbilityUntil)return;
+  shadowAbilityUntil=now+SHADOW_ABILITY_DURATION;
+  player.vy=-4;
+  if(typeof burst==="function")burst(player.x+player.size/2,player.y+player.size/2,45);
+  updateAbilityHud();
+}
+
 /* ---------- 10-Minuten-Sternevent ---------- */
 
 
@@ -1001,6 +1145,34 @@ function updateAbilityHud(){
   In Level 2 sitzt das Portal bewusst bei x=1500 und
   der erste Flug-Hindernisblock beginnt erst deutlich später.
 */
+/* ---------- GLOBALES 2×-MÜNZEN-EVENT ---------- */
+let coinEventUntil=0;
+let coinEventActive=false;
+
+function setCoinEvent(until){
+  coinEventUntil=Number(until)||0;
+  coinEventActive=coinEventUntil>Date.now();
+  updateCoinEventHud();
+}
+
+function updateCoinEventHud(){
+  const hud=document.getElementById("coinEventHud");
+  if(!hud)return;
+  const now=Date.now();
+  if(coinEventActive && now<coinEventUntil){
+    hud.classList.remove("hidden");
+    const sec=Math.max(0,Math.ceil((coinEventUntil-now)/1000));
+    hud.textContent="🪙 2× MÜNZEN · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
+  }else{
+    coinEventActive=false;
+    hud.classList.add("hidden");
+  }
+}
+
+function coinReward(base){
+  return coinEventActive && Date.now()<coinEventUntil ? base*2 : base;
+}
+
 const levels=[
 {
  name:"LEVEL 1",length:5000,
@@ -1714,7 +1886,7 @@ function updateTacos(){
     const sx=t.x-camera+180;
     if(Math.hypot(px-sx,py-t.y)<t.r+22){
       t.collected=true;
-      coins+=TACO_REWARD;
+      coins+=coinReward(TACO_REWARD);
       save();
       updateHUD();
     }
@@ -1754,7 +1926,7 @@ const SKINS = [
   {id:"rainbow", name:"🌈 Regenbogen", price:100, css:"rainbow"},
   {id:"fire", name:"🔥 Feuer", price:75, css:"fire"},
   {id:"ocean", name:"🌊 Ozean", price:75, css:"ocean"},
-  {id:"shadow", name:"🌑 Schatten", price:100, css:"shadowSkin"},
+  {id:"shadow", name:"🌑 Schatten", price:5500, css:"shadowSkin"},
   {id:"sunset", name:"🌅 Sunset", price:125, css:"sunset"}
 ];
 
@@ -2109,7 +2281,7 @@ function win(){
 
   if(firstTime){
     completed.push(levelIndex);
-    coins+=50;
+    coins+=coinReward(50);
     if(levelIndex+1<levels.length){
       unlocked=Math.max(unlocked,levelIndex+2);
     }
@@ -2127,7 +2299,7 @@ function win(){
 
   document.getElementById("resultTitle").textContent="🏆 LEVEL GESCHAFFT!";
   document.getElementById("resultText").textContent=levels[levelIndex].name+" abgeschlossen!";
-  document.getElementById("reward").textContent=firstTime?"🪙 +50 MÜNZEN!":"⭐ Bereits geschafft";
+  document.getElementById("reward").textContent=firstTime?"🪙 +"+coinReward(50)+" MÜNZEN!":"⭐ Bereits geschafft";
 
   // Direkte Sichtbarkeit: unabhängig von alten .hidden-Regeln.
   if(result){
@@ -2192,7 +2364,7 @@ function update(){
 
   if(typeof missedPortal==="function"&&missedPortal())return;
 
-  if(!(typeof popKraftAktiv==="function"&&popKraftAktiv())){
+  if(!(typeof popKraftAktiv==="function"&&popKraftAktiv()) && !shadowAbilityActive()){
     if(mode==="cube"){
       if(cubeCollision()){
         die("Du bist gegen ein Hindernis gekracht!");
@@ -2208,7 +2380,9 @@ function update(){
 
   if(typeof updateTacos==="function")updateTacos();
   if(typeof updateAbilityHud==="function")updateAbilityHud();
+   if(typeof updateCoinEventHud==="function")updateCoinEventHud();
   if(typeof updatePopPowerHud==="function")updatePopPowerHud();
+   if(typeof updateAbilityHud==="function")updateAbilityHud();
   if(typeof updateParticles==="function")updateParticles();
 
   score=Math.floor(camera/5);
@@ -2573,10 +2747,16 @@ function drawPlayer(){
    const g=ctx.createLinearGradient(-23,-23,23,23);
    g.addColorStop(0,"#aaffff");g.addColorStop(.5,"#00d9ff");g.addColorStop(1,"#2350ff");
    ctx.fillStyle=g;
- }else if(currentSkin.id==="shadow"){
+  }else if(currentSkin.id==="shadow"){
    const g=ctx.createLinearGradient(-23,-23,23,23);
-   g.addColorStop(0,"#676e8e");g.addColorStop(.5,"#262a48");g.addColorStop(1,"#070811");
+   g.addColorStop(0,shadowAbilityActive()?"#9b7cff":"#676e8e");
+   g.addColorStop(.5,shadowAbilityActive()?"#4b2b8f":"#262a48");
+   g.addColorStop(1,shadowAbilityActive()?"#140b27":"#070811");
    ctx.fillStyle=g;
+   if(shadowAbilityActive()){
+     ctx.shadowBlur=42;
+     ctx.shadowColor="#9b7cff";
+   }
  }else if(currentSkin.id==="sunset"){
    const g=ctx.createLinearGradient(-23,-23,23,23);
    g.addColorStop(0,"#fff09a");g.addColorStop(.5,"#ff7c52");g.addColorStop(1,"#933cff");
@@ -2863,7 +3043,8 @@ window.addEventListener("keydown",(e)=>{
   if(e.target && (e.target.tagName==="INPUT" || e.target.tagName==="TEXTAREA")) return;
   if(e.code==="KeyE" && !e.repeat){
     e.preventDefault();
-    popKraft();
+    if(shadowEquipped()) useShadowAbility();
+    else popKraft();
   }
 },false);
 
@@ -3068,6 +3249,45 @@ setInterval(renderServerMessage,250);
     const s=document.getElementById("adminStatus");
     if(s)s.textContent="🗑️ Server-Nachricht gelöscht";
   });
+})();
+
+/* ---------- ADMIN 2× MÜNZEN TOOL ---------- */
+(function(){
+  const start=document.getElementById("adminCoinsEventStart");
+  const stop=document.getElementById("adminCoinsEventStop");
+  const minutes=document.getElementById("adminCoinsMinutes");
+  const status=document.getElementById("adminCoinsEventStatus");
+  const ADMIN_KEY="4729";
+  if(!start||!stop||!minutes)return;
+
+  async function send(action,durationMs=0){
+    try{
+      const res=await fetch("/api/admin/coins-event",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-admin-key":ADMIN_KEY},
+        body:JSON.stringify({action,durationMs})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Fehler");
+      setCoinEvent(data.until||0);
+      if(status)status.textContent=action==="start"
+        ?"✅ 2× Münzen für alle aktiviert"
+        :"🛑 2× Münzen beendet";
+    }catch(e){
+      if(status)status.textContent="❌ "+e.message;
+    }
+  }
+
+  start.addEventListener("click",()=>{
+    const min=Math.max(0,Number(minutes.value)||0);
+    if(min<=0){
+      if(status)status.textContent="❌ Dauer eingeben";
+      return;
+    }
+    send("start",Math.round(min*60*1000));
+  });
+
+  stop.addEventListener("click",()=>send("stop"));
 })();
 
 /* ---------- ADMIN GIFT TOOL ---------- */
@@ -3553,6 +3773,10 @@ loop();
           if(msg.type==="connected"){
             playerName=msg.name;
             localStorage.setItem("crPlayerName",playerName);
+          }
+
+          if(msg.type==="coinEvent"){
+            setCoinEvent(msg.until);
           }
 
           if(msg.type==="gift"){
