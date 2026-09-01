@@ -3164,7 +3164,7 @@ setInterval(renderServerMessage,250);
           method:"POST",
           headers:{
             "Content-Type":"application/json",
-            "x-admin-key":"4729"
+            "x-admin-key":"603781"
           },
           body:JSON.stringify({text,minutes:min,seconds:sec})
         });
@@ -3200,7 +3200,7 @@ setInterval(renderServerMessage,250);
           method:"POST",
           headers:{
             "Content-Type":"application/json",
-            "x-admin-key":"4729"
+            "x-admin-key":"603781"
           },
           body:JSON.stringify({text:"",minutes:0,seconds:0})
         });
@@ -3225,7 +3225,7 @@ setInterval(renderServerMessage,250);
 
   if(!playersSelect||!refreshBtn||!sendBtn)return;
 
-  const ADMIN_KEY="4729";
+  const ADMIN_KEY="603781";
 
   async function loadPlayers(){
     try{
@@ -3298,7 +3298,7 @@ setInterval(renderServerMessage,250);
   const coinsInput=document.getElementById("adminGiftCoins");
   const skinInput=document.getElementById("adminGiftSkin");
   const status=document.getElementById("adminGiftStatus");
-  const ADMIN_KEY="4729";
+  const ADMIN_KEY="603781";
 
   if(!send)return;
 
@@ -3340,7 +3340,7 @@ setInterval(renderServerMessage,250);
   const status=document.getElementById("adminQuickEventsStatus");
   if(!box)return;
 
-  const ADMIN_KEY="4729";
+  const ADMIN_KEY="603781";
 
   box.querySelectorAll("[data-quick-coins]").forEach(btn=>{
     btn.addEventListener("click",async()=>{
@@ -3388,7 +3388,7 @@ setInterval(renderServerMessage,250);
   const stop=document.getElementById("adminCoinsEventStop");
   const minutes=document.getElementById("adminCoinsMinutes");
   const status=document.getElementById("adminCoinsEventStatus");
-  const ADMIN_KEY="4729";
+  const ADMIN_KEY="603781";
   if(!start||!stop||!minutes)return;
 
   async function send(action,durationMs=0){
@@ -3440,7 +3440,7 @@ setInterval(renderServerMessage,250);
 
   submit.addEventListener("click",()=>{
     const code=(input.value||"").trim();
-    if(code==="4729"){
+    if(code==="603781"){
       openAdmin();
       input.value="";
       return;
