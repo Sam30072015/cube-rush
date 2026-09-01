@@ -1838,17 +1838,24 @@ function updateTacos(){
       continue;
     }
 
-    // Sammeln nur bei aktivem Spiel.
-    if(!running)continue;
+    // Tacos können auch bei einem laufenden Event sicher eingesammelt werden.
+    // Die Prüfung bleibt vollständig lokal; ein Taco kann nur einmal eingesammelt werden.
+    if(!running || t.collected)continue;
 
     const sx=t.x-camera+180;
     if(Math.hypot(px-sx,py-t.y)<t.r+22){
       t.collected=true;
       const reward=TACO_REWARD;
-      coins+=coinReward(reward);
-      save();
-      updateHUD();
-      showTacoCoinPopup(reward);
+
+      try{
+        coins = Math.max(0, Number(coins)||0) + Number(coinReward(reward)||reward);
+        save();
+        updateHUD();
+        showTacoCoinPopup(reward);
+      }catch(err){
+        // Ein Taco-Fehler darf das Spiel niemals abstürzen lassen.
+        t.collected=false;
+      }
     }
   }
 
@@ -3283,6 +3290,50 @@ setInterval(renderServerMessage,250);
   // Load immediately when the admin section is used/opened.
   setTimeout(loadPlayers,300);
 })();
+/* ---------- ADMIN SKIN-GESCHENK ROBUST ---------- */
+(function(){
+  const send=document.getElementById("adminGiftSend");
+  const playerSel=document.getElementById("adminOnlinePlayers");
+  const playerInput=document.getElementById("adminGiftPlayer");
+  const coinsInput=document.getElementById("adminGiftCoins");
+  const skinInput=document.getElementById("adminGiftSkin");
+  const status=document.getElementById("adminGiftStatus");
+  const ADMIN_KEY="4729";
+
+  if(!send)return;
+
+  send.addEventListener("click",async()=>{
+    const player=String(playerSel?.value || playerInput?.value || "").trim();
+    const coins=Math.max(0,Math.floor(Number(coinsInput?.value)||0));
+    const skin=String(skinInput?.value||"").trim();
+
+    if(!player){
+      if(status)status.textContent="❌ Bitte einen Online-Spieler auswählen";
+      return;
+    }
+    if(coins===0 && !skin){
+      if(status)status.textContent="❌ Münzen oder Skin auswählen";
+      return;
+    }
+
+    try{
+      const res=await fetch("/api/admin/give",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-admin-key":ADMIN_KEY
+        },
+        body:JSON.stringify({player,coins,skin})
+      });
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(data.error||"Geschenk konnte nicht gesendet werden");
+      if(status)status.textContent="✅ Geschenk an "+player+" gesendet";
+    }catch(err){
+      if(status)status.textContent="❌ "+err.message;
+    }
+  });
+})();
+
 /* ---------- ADMIN EVENT-SCHNELLSTART ---------- */
 (function(){
   const box=document.getElementById("adminQuickEvents");
@@ -3705,8 +3756,13 @@ updateHUD();
 musicButtonText();
 
 function loop(){
- update();
- draw();
+ try{
+   update();
+   draw();
+ }catch(err){
+   console.error("Cube Rush frame error:",err);
+   // Spiel weiterlaufen lassen; Event-/Pickup-Fehler stoppen nicht mehr die Animation.
+ }
  requestAnimationFrame(loop);
 }
 loop();
