@@ -1191,6 +1191,55 @@ function useMagmaAbility(){
   updateMagmaHud();
 }
 
+function drawMagmaHeadLava(){
+  if(!magmaEquipped())return;
+  const now=Date.now();
+  if(now>=magmaEruptionUntil)return;
+
+  const elapsed=now-(magmaEruptionUntil-MAGMA_ABILITY_ERUPTION);
+  const cx=player.x+player.size/2;
+  const cy=player.y+3;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+
+  // Kurzer, sichtbarer Lava-Ausbruch direkt aus dem Kopf.
+  const burst=Math.min(1,elapsed/350);
+  ctx.globalAlpha=.95*burst;
+
+  ctx.shadowBlur=22;
+  ctx.shadowColor="#ff5a00";
+  ctx.fillStyle="#ff5a00";
+  ctx.beginPath();
+  ctx.arc(0,-4,8+Math.sin(now/60)*2,0,Math.PI*2);
+  ctx.fill();
+
+  for(let i=0;i<10;i++){
+    const t=(elapsed/700+i*.13)%1;
+    const startX=(i-4.5)*4;
+    const drift=Math.sin(now/180+i)*10;
+    const x=startX+drift*t;
+    const y=-10-55*t-18*t*t;
+    const r=2.5+(i%3);
+
+    ctx.globalAlpha=(1-t)*.9;
+    ctx.fillStyle=i%2===0?"#ff7a00":"#ffb22e";
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // Lava-Kranz am Kopf.
+  ctx.globalAlpha=.55+.2*Math.sin(now/90);
+  ctx.strokeStyle="#ffd36b";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.arc(0,-5,13+Math.sin(now/100)*2,Math.PI*1.05,Math.PI*1.95);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function updateMagmaHud(){
   const h=document.getElementById("abilityHud");
   if(!h)return;
@@ -3216,20 +3265,8 @@ ctx.clearRect(0,0,W,H);
  drawObjects();
  drawTacos();
 
- // Lava-Ausbruch visualisieren.
- if(typeof magmaEquipped==="function" && magmaEquipped() && Date.now()<magmaEruptionUntil){
-   ctx.save();
-   const t=Date.now();
-   for(let i=0;i<14;i++){
-     const x=((i*83+Math.sin(t/180+i)*20)%W+W)%W;
-     const h=28+((i*17)%70);
-     ctx.fillStyle=i%2===0?"#ff6a00":"#ff2200";
-     ctx.shadowBlur=18;
-     ctx.shadowColor="#ff6a00";
-     ctx.fillRect(x,GROUND-h,7,18+(i%4)*4);
-   }
-   ctx.restore();
- }
+ // Lava-Ausbruch direkt aus dem Kopf des Magma-Blocks.
+ if(typeof drawMagmaHeadLava==="function")drawMagmaHeadLava();
 
  drawPlayer();
 }
