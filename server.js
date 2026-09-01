@@ -41,8 +41,14 @@ wss.on("connection", ws=>{
     try{ msg=JSON.parse(raw.toString()); }catch{return;}
 
     if(msg.type==="identify"){
-      const name=cleanName(msg.name);
-      if(!name)return;
+      let name=cleanName(msg.name);
+      if(!name) name="Spieler-"+Math.random().toString(36).slice(2,8).toUpperCase();
+
+      // Avoid two live connections using the same name.
+      if(players.has(name) && players.get(name)!==ws){
+        name = name + "-" + Math.random().toString(36).slice(2,5).toUpperCase();
+      }
+
       if(ws.playerName) players.delete(ws.playerName);
       ws.playerName=name;
       players.set(name,ws);
@@ -59,6 +65,26 @@ wss.on("connection", ws=>{
 });
 
 /* Admin: give coins/skin to a named online player. */
+app.post("/api/admin/coins-event",(req,res)=>{
+  if(req.headers["x-admin-key"]!==ADMIN_KEY){
+    return res.status(401).json({error:"Unauthorized"});
+  }
+  const action=String(req.body.action||"");
+  if(action==="start"){
+    const durationMs=Math.max(1000,Math.min(10080*60*1000,Math.floor(Number(req.body.durationMs)||0)));
+    const until=Date.now()+durationMs;
+    const message={type:"coinEvent",until};
+    broadcast(message);
+    return res.json({ok:true,...message});
+  }
+  if(action==="stop"){
+    const message={type:"coinEvent",until:0};
+    broadcast(message);
+    return res.json({ok:true,...message});
+  }
+  return res.status(400).json({error:"Invalid action"});
+});
+
 app.post("/api/admin/give", (req,res)=>{
   if(req.headers["x-admin-key"] !== ADMIN_KEY){
     return res.status(401).json({error:"Unauthorized"});
@@ -108,7 +134,7 @@ app.get("/api/status", (req,res)=>{
   res.json({onlinePlayers:[...players.keys()]});
 });
 
-app.use((req,res)=>{
+app.get("*", (req,res)=>{
   res.sendFile(path.join(__dirname,"public","index.html"));
 });
 
