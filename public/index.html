@@ -3035,6 +3035,25 @@ function drawObjects(){
      continue;
    }
 
+   if(type==="trollWall"){
+     if(x<-200||x>W+200)continue;
+     ctx.save();
+     ctx.fillStyle="#7dff5b";
+     ctx.strokeStyle="#ffffff";
+     ctx.lineWidth=3;
+     ctx.shadowBlur=18;
+     ctx.shadowColor="#7dff5b";
+     ctx.fillRect(x,o[2],o[3],o[4]);
+     ctx.strokeRect(x,o[2],o[3],o[4]);
+     ctx.fillStyle="#0b3612";
+     ctx.font="900 18px Arial";
+     ctx.textAlign="center";
+     ctx.textBaseline="middle";
+     ctx.fillText("FAKE",x+o[3]/2,o[2]+o[4]/2);
+     ctx.restore();
+     continue;
+   }
+
    if(type==="wall"){
      if(x<-200||x>W+200)continue;
      ctx.save();
