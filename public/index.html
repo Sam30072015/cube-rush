@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -3557,25 +3558,29 @@ setInterval(renderServerMessage,250);
   laptop?.addEventListener("click",()=>applyMode("laptop"));
   phone?.addEventListener("click",()=>applyMode("phone"));
 
+  let lastMobileJump=0;
+
   function doMobileJump(e){
     if(e){
       e.preventDefault();
       e.stopPropagation();
     }
 
+    const now=Date.now();
+    if(now-lastMobileJump<180)return;
+    lastMobileJump=now;
+
     if(!running)return;
 
     if(mode==="cube"){
-      // Genau ein Sprung pro Bodenkontakt.
-      if(player && player.grounded && !mobileJumpLocked){
-        mobileJumpLocked=true;
+      // Genau ein Sprung, wenn der Würfel gerade am Boden ist.
+      if(player && player.grounded){
         jump();
       }
-      return;
+    }else{
+      // Im Flugzeug steigt der Spieler nur während des Drückens.
+      spaceHeld=true;
     }
-
-    // Im Flugzeug: gedrückt halten zum Steigen.
-    spaceHeld=true;
   }
 
   function releaseMobileJump(e){
@@ -3584,26 +3589,27 @@ setInterval(renderServerMessage,250);
       e.stopPropagation();
     }
     spaceHeld=false;
-    // Bei Würfel bleibt der Lock bis zum tatsächlichen Landen aktiv.
   }
 
   if(jumpBtn){
-    // Pointer Events (iPad/Android/Browser)
     jumpBtn.addEventListener("pointerdown",doMobileJump,{passive:false});
     jumpBtn.addEventListener("pointerup",releaseMobileJump,{passive:false});
     jumpBtn.addEventListener("pointercancel",releaseMobileJump,{passive:false});
 
-    // Touch-Fallback für Browser, die Pointer Events nicht sauber liefern.
     jumpBtn.addEventListener("touchstart",doMobileJump,{passive:false});
     jumpBtn.addEventListener("touchend",releaseMobileJump,{passive:false});
     jumpBtn.addEventListener("touchcancel",releaseMobileJump,{passive:false});
 
-    // Click-Fallback. Ein zweiter Klick während des Sprungs wird ignoriert,
-    // weil player.grounded dann false ist.
     jumpBtn.addEventListener("click",doMobileJump,{passive:false});
 
+    jumpBtn.onclick=function(e){
+      doMobileJump(e);
+    };
+
     jumpBtn.style.pointerEvents="auto";
-    jumpBtn.style.touchAction="manipulation";
+    jumpBtn.style.touchAction="none";
+    jumpBtn.style.webkitUserSelect="none";
+    jumpBtn.style.userSelect="none";
   }
 })();
 /* ---------- FIRST MUSIC UNLOCK ---------- */
