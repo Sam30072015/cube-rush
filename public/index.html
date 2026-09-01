@@ -785,6 +785,55 @@ body.phone-mode #coinEventHud{
   padding:2px 7px !important;
 }
 
+
+#mobilePop{
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+  position:fixed;
+  right:22px;
+  bottom:126px;
+  z-index:100;
+  width:82px;
+  height:58px;
+  border-radius:18px;
+  border:3px solid rgba(255,255,255,.9);
+  background:linear-gradient(145deg,#ff78d4,#a44dff);
+  color:#fff;
+  font-size:30px;
+  font-weight:900;
+  line-height:1;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.22),
+    0 5px 0 #17143b,
+    0 10px 22px rgba(0,0,0,.28),
+    0 0 24px rgba(164,77,255,.42);
+  touch-action:none;
+  cursor:pointer;
+}
+#mobilePop:active{
+  transform:translateY(3px);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,.22),
+    0 2px 0 #17143b,
+    0 7px 14px rgba(0,0,0,.24);
+}
+body.phone-mode #mobilePop.cat-visible{display:flex}
+
+@media(max-width:650px){
+  body.phone-mode #mobilePop{
+    width:74px;
+    height:52px;
+    right:16px;
+    bottom:108px;
+    font-size:27px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -835,6 +884,7 @@ body.phone-mode #coinEventHud{
 </div>
 
 <button id="mobileJump" type="button" aria-label="Springen">↑</button>
+<button id="mobilePop" type="button" aria-label="Pop-Kraft">🐱</button>
 <div id="hud">
 <div id="score">Punkte: 0</div>
 <div class="gold" id="coins">🪙 Münzen: 0</div>
@@ -3006,6 +3056,16 @@ function popKraft(){
 
 function updatePopHud(){
   const h=document.getElementById("abilityHud");
+  const mobilePop=document.getElementById("mobilePop");
+
+  if(mobilePop){
+    const showMobile=typeof deviceMode!=="undefined"
+      && deviceMode==="phone"
+      && popKatzeAusgeruestet();
+    mobilePop.classList.toggle("cat-visible",showMobile);
+    mobilePop.disabled=!showMobile;
+  }
+
   if(!h)return;
   if(!popKatzeAusgeruestet()){
     h.classList.add("hidden");
@@ -3022,6 +3082,14 @@ function updatePopHud(){
     h.textContent="🐱 POP-KRAFT BEREIT · E";
   }
 }
+
+const mobilePop=document.getElementById("mobilePop");
+mobilePop?.addEventListener("click",(e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  popKraft();
+  updatePopHud();
+});
 
 // Einziger E-Handler: verhindert doppelte/konkurrierende Tastatur-Handler.
 window.addEventListener("keydown",(e)=>{
@@ -3587,6 +3655,7 @@ setInterval(renderServerMessage,250);
     deviceMode=modeChoice;
     localStorage.setItem("crDeviceMode",modeChoice);
     document.body.classList.toggle("phone-mode",modeChoice==="phone");
+     if(typeof updatePopHud==="function")updatePopHud();
     if(overlay)overlay.style.display="none";
   }
 
