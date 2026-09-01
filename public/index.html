@@ -787,6 +787,34 @@ body.world3-unlocked .screen#menu #levels{
   }
 }
 
+
+
+/* ---------- LEVEL-MENÜ: BIS ZUM ENDE VON WELT 3 SCROLLBAR ---------- */
+.screen#menu{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  justify-content:flex-start !important;
+  align-items:center !important;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  padding-top:18px !important;
+  padding-bottom:36px !important;
+}
+.screen#menu #levels{
+  height:auto !important;
+  min-height:0 !important;
+  width:min(1120px,96vw) !important;
+  padding-bottom:28px !important;
+}
+@media(max-width:700px){
+  .screen#menu{max-height:100dvh !important;}
+  .screen#menu #levels{width:96vw !important;}
+}
+@media(min-width:701px){
+  .screen#menu{max-height:100vh !important;}
+  .screen#menu #levels{width:min(1120px,92vw) !important;}
+}
+
 </style>
 </head>
 <body>
@@ -1074,6 +1102,12 @@ function world2Unlocked(){
 function world3Unlocked(){
   // Welt 3 öffnet sich direkt nach LEVEL 20.
   return completed.includes(19);
+}
+
+// Welt-3-Freischaltung aus älteren Spielständen wiederherstellen.
+if(completed.includes(19)){
+  unlocked=Math.max(unlocked,21);
+  localStorage.setItem("crUnlocked",String(unlocked));
 }
 
 function save(){
@@ -2087,15 +2121,26 @@ function updateShop(){
 /* ---------- menu ---------- */
 function repairUnlocks(){
   if(!Array.isArray(completed)) completed=[];
+
+  // Jedes geschaffte Level schaltet genau das nächste Level frei.
   for(const done of completed){
-    const next=Number(done)+2;
-    if(next>=2 && next<=20) unlocked=Math.max(unlocked,next);
+    const level=Number(done);
+    if(Number.isInteger(level) && level>=0 && level<29){
+      unlocked=Math.max(unlocked,level+2);
+    }
   }
-  // Level 10 geschafft = Level 11 dauerhaft offen.
-  if(completed.includes(9)) unlocked=Math.max(unlocked,11);
-  unlocked=Math.min(20,Math.max(1,unlocked));
+
+  // Wer Level 20 bereits geschafft hat, bekommt Level 21 automatisch.
+  if(completed.includes(19)){
+    unlocked=Math.max(unlocked,21);
+  }
+
+  // Maximal 30 Level.
+  unlocked=Math.min(30,Math.max(1,unlocked));
+
   localStorage.setItem("crUnlocked",String(unlocked));
-}
+  localStorage.setItem("crCompleted",JSON.stringify(completed));
+}  
 
 repairUnlocks();
 
