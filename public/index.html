@@ -709,6 +709,98 @@ body.phone-mode #coinEventHud{top:108px;max-width:92vw;font-size:12px;padding:5p
   }
 }
 
+
+/* ---------- HANDY HUD NOCH KLEINER UND HÖHER ---------- */
+body.phone-mode #hud{
+  top:1px;
+  left:6px;
+  right:6px;
+  font-size:11px;
+}
+body.phone-mode #score{
+  display:none !important;
+}
+body.phone-mode #percent{
+  display:none !important;
+}
+body.phone-mode #bar{
+  top:43px !important;
+  left:18% !important;
+  right:18% !important;
+  height:5px !important;
+}
+body.phone-mode #eventHud{
+  top:24px !important;
+  font-size:10px !important;
+  padding:2px 7px !important;
+}
+body.phone-mode #tacoHud{
+  top:46px !important;
+  font-size:10px !important;
+  padding:2px 7px !important;
+}
+body.phone-mode #coinEventHud{
+  top:68px !important;
+  font-size:10px !important;
+  padding:2px 7px !important;
+}
+body.phone-mode #level{
+  display:none !important;
+}
+body.phone-mode #mode{
+  display:none !important;
+}
+body.phone-mode #settingsScore{
+  display:flex;
+  justify-content:space-between;
+}
+@media (orientation: landscape) and (max-width:1000px){
+  body.phone-mode #hud{
+    top:1px;
+    font-size:10px;
+  }
+  body.phone-mode #bar{
+    top:39px !important;
+    height:4px !important;
+  }
+  body.phone-mode #eventHud{top:21px !important;font-size:9px !important}
+  body.phone-mode #tacoHud{top:40px !important;font-size:9px !important}
+  body.phone-mode #coinEventHud{top:59px !important;font-size:9px !important}
+}
+
+
+/* ---------- WÄHREND DES SPIELENS: PUNKTE + PROZENT AUSBLENDEN ---------- */
+#score,
+#percent{
+  display:none !important;
+}
+
+/* Handy: Fortschrittsanzeige klein und weit oben */
+body.phone-mode #bar{
+  top:34px !important;
+  left:20% !important;
+  right:20% !important;
+  height:4px !important;
+}
+
+body.phone-mode #eventHud{
+  top:18px !important;
+  font-size:9px !important;
+  padding:2px 7px !important;
+}
+
+body.phone-mode #tacoHud{
+  top:38px !important;
+  font-size:9px !important;
+  padding:2px 7px !important;
+}
+
+body.phone-mode #coinEventHud{
+  top:58px !important;
+  font-size:9px !important;
+  padding:2px 7px !important;
+}
+
 </style>
 </head>
 <body>
@@ -783,6 +875,12 @@ body.phone-mode #coinEventHud{top:108px;max-width:92vw;font-size:12px;padding:5p
 <div id="settingsPanel" aria-hidden="true">
   <div id="settingsBox">
     <h2>⚙️ Einstellungen</h2>
+<div class="settingRow" id="settingsScore">
+      <span>🏆 Punkte</span>
+      <strong id="settingsScoreValue">0</strong>
+    </div>
+
+
 
     <div class="settingRow">
       <span>👤 Spielername</span>
@@ -3581,6 +3679,15 @@ loop();
 </script>
 
 <script>
+function updateSettingsScore(){
+  const scoreEl=document.getElementById("score");
+  const settingsScore=document.getElementById("settingsScoreValue");
+  if(scoreEl && settingsScore){
+    settingsScore.textContent=scoreEl.textContent.replace(/^Punkte:\s*/,"");
+  }
+}
+setInterval(updateSettingsScore,500);
+
 /* ---------- PERSISTENTER SPIELERNAME ---------- */
 (function(){
   const setup=document.getElementById("nameSetup");
