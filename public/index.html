@@ -722,6 +722,10 @@ body.phone-mode #coinEventHud{
 }
 body.phone-mode #tacoCoinPopup{font-size:13px;padding:6px 10px}
 
+
+/* ---------- WELT 3 · MAGMA CORE ---------- */
+body.world3-neon #game{filter:saturate(1.2) contrast(1.08)}
+.world3-neon .levelBtn{font-family:Arial Black,Arial,sans-serif}
 </style>
 </head>
 <body>
@@ -1003,6 +1007,13 @@ function world2Unlocked(){
   for(let i=0;i<10;i++){
     if(!completed.includes(i)) return false;
   }
+
+function world3Unlocked(){
+  for(let i=10;i<20;i++){
+    if(!completed.includes(i)) return false;
+  }
+  return true;
+}
   return true;
 }
 
@@ -1446,7 +1457,17 @@ const levels=[
   ["block",7820,76,120],["spike",8170,46,50],["saw",8470,410,40],
   ["spike",8780,46,50]
  ]
-}
+},
+{name:"LEVEL 21",length:6200,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31]]},
+{name:"LEVEL 22",length:6600,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120]]},
+{name:"LEVEL 23",length:7000,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50]]},
+{name:"LEVEL 24",length:7400,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42]]},
+{name:"LEVEL 25",length:7800,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120]]},
+{name:"LEVEL 26",length:8200,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50]]},
+{name:"LEVEL 27",length:8600,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50]]},
+{name:"LEVEL 28",length:9000,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50],["mine",8200,370,35],["doubleSaw",8480,410,42]]},
+{name:"LEVEL 29",length:9400,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50],["mine",8200,370,35],["doubleSaw",8480,410,42],["block",8780,84,125],["mine",9070,310,31]]},
+{name:"LEVEL 30",length:10000,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50],["mine",8200,370,35],["doubleSaw",8480,410,42],["block",8780,84,125],["mine",9070,310,31],["saw",9350,410,42],["spike",9650,46,50]]}
 ];
 
 /* ---------- unique music per level ---------- */
@@ -2097,6 +2118,49 @@ function updateMenu(){
 
   box.appendChild(w2);
 
+  const w3=document.createElement("div");
+  w3.style.width="100%";
+  w3.style.marginTop="18px";
+
+  const open3=world3Unlocked();
+  w3.innerHTML='<h2 style="color:#ff7a18;text-shadow:0 0 14px #ff7a18;margin:14px 0 10px;font-size:25px">🌋 WELT 3 · MAGMA CORE</h2>';
+
+  if(!open3){
+    const locked=document.createElement("div");
+    locked.style.color="#aab0d5";
+    locked.style.padding="12px";
+    locked.innerHTML="🔒 Welt 3 wird freigeschaltet, wenn du <b>alle 10 Level aus Welt 2</b> geschafft hast.";
+    w3.appendChild(locked);
+  }else{
+    const g3=document.createElement("div");
+    g3.style.display="flex";
+    g3.style.flexWrap="wrap";
+    g3.style.justifyContent="center";
+    g3.style.gap="10px";
+
+    for(let i=20;i<30;i++){
+      const b=document.createElement("button");
+      b.type="button";
+      b.className="levelBtn";
+
+      if(i>=unlocked){
+        b.classList.add("lock");
+        b.innerHTML="🔒<br>LEVEL "+(i+1)+"<br>GESPERRT";
+      }else if(completed.includes(i)){
+        b.classList.add("done");
+        b.innerHTML="⭐<br>LEVEL "+(i+1)+"<br>GESCHAFFT";
+      }else{
+        b.innerHTML="▶<br>LEVEL "+(i+1)+"<br>+50 🪙";
+      }
+
+      if(i<unlocked)b.addEventListener("click",()=>startLevel(i));
+      g3.appendChild(b);
+    }
+    w3.appendChild(g3);
+  }
+
+  box.appendChild(w3);
+
   if(document.getElementById("shopBalance")) updateShop();
 }
 
@@ -2114,7 +2178,8 @@ function startLevel(i){
  if(typeof stopMusic==="function")
 musicOn=musicWasOn;
  levelIndex=i;
-  document.body.classList.toggle("world2-cartoon",i>=10);
+  document.body.classList.toggle("world2-cartoon",i>=10 && i<20);
+  document.body.classList.toggle("world3-neon",i>=20);
  camera=0;score=0;mode="cube";running=true;spaceHeld=false;particles=[];
  player.x=180;player.y=GROUND-player.size;player.vy=0;player.grounded=true;player.rot=0;
  portalUsed=levels[i].objects.filter(o=>o[0]==="portal").map(()=>false);
@@ -2133,7 +2198,7 @@ musicOn=musicWasOn;
 function updateHUD(){
  document.getElementById("coins").textContent="🪙 Münzen: "+coins;
  updateAbilityHud();
- document.getElementById("level").textContent=(levelIndex<10?"WELT 1 · ":"WELT 2 · ")+levels[levelIndex].name;
+ document.getElementById("level").textContent=(levelIndex<10?"WELT 1 · ":(levelIndex<20?"WELT 2 · ":"WELT 3 · "))+levels[levelIndex].name;
  document.getElementById("mode").textContent=mode==="ship"?"MODUS: ✈️ FLUGZEUG":"MODUS: 🟨 WÜRFEL";
 }
 
@@ -2189,6 +2254,14 @@ function cubeCollision(){
          player.grounded=true;
        }else return true;
      }
+   }
+
+   if(o[0]==="mine"){
+     const r=o[3],cy=o[2];
+     const qx=Math.max(p.x,Math.min(x,p.x+p.w));
+     const qy=Math.max(p.y,Math.min(cy,p.y+p.h));
+     const dx=x-qx,dy=cy-qy;
+     if(dx*dx+dy*dy<r*r)return true;
    }
 
    if(o[0]==="saw"){
@@ -2382,10 +2455,15 @@ function update(){
 
 
 function drawBackground(){
- const world2=levelIndex>=10;
+ const world3=levelIndex>=20;
+ const world2=levelIndex>=10 && levelIndex<20;
  const g=ctx.createLinearGradient(0,0,0,H);
 
- if(world2){
+ if(world3){
+   g.addColorStop(0,"#2b0800");
+   g.addColorStop(.45,"#7a2100");
+   g.addColorStop(1,"#16000f");
+ }else if(world2){
    g.addColorStop(0,"#12051f");
    g.addColorStop(.45,"#35105c");
    g.addColorStop(1,"#071d32");
@@ -2425,6 +2503,30 @@ function drawBackground(){
    }
  }
 
+ if(world3){
+   for(let i=0;i<10;i++){
+     let x=(i*240-camera*.18)%(W+260);
+     if(x<0)x+=W+260;
+     const h=80+(i%4)*35;
+     ctx.fillStyle=(i%2===0)?"#4b1100":"#2b0a16";
+     ctx.beginPath();
+     ctx.moveTo(x,GROUND);
+     ctx.lineTo(x+45,GROUND-h);
+     ctx.lineTo(x+95,GROUND);
+     ctx.closePath();
+     ctx.fill();
+   }
+   ctx.fillStyle="#ff7a18";
+   for(let i=0;i<12;i++){
+     let x=(i*173-camera*.09)%(W+200);
+     if(x<0)x+=W+200;
+     const y=70+(i%5)*55;
+     ctx.beginPath();
+     ctx.arc(x,y,2+(i%3),0,Math.PI*2);
+     ctx.fill();
+   }
+ }
+
  /* distant skyline */
  for(let i=0;i<12;i++){
    let x=(i*210-camera*.24)%(W+260);
@@ -2453,11 +2555,12 @@ function drawBackground(){
 }
 
 function drawGround(){
- const world2=levelIndex>=10;
+ const world3=levelIndex>=20;
+ const world2=levelIndex>=10 && levelIndex<20;
  ctx.save();
  ctx.shadowBlur=22;
- ctx.shadowColor=world2?"#ff3fd4":"#00eaff";
- ctx.fillStyle=world2?"#ff3fd4":"#00eaff";
+ ctx.shadowColor=world3?"#ff6a00":(world2?"#ff3fd4":"#00eaff");
+ ctx.fillStyle=world3?"#ff6a00":(world2?"#ff3fd4":"#00eaff");
  ctx.fillRect(0,GROUND,W,5);
  ctx.restore();
 
@@ -2636,6 +2739,35 @@ function drawObjects(){
      ctx.strokeStyle="#aa4cff";
      ctx.lineWidth=3;
      ctx.strokeRect(x,y,o[2],o[3]);
+     ctx.restore();
+     continue;
+   }
+
+   if(type==="mine"){
+     if(x<-100||x>W+100)continue;
+     const y=o[2],r=o[3];
+     ctx.save();
+     ctx.translate(x,y);
+     ctx.rotate(Date.now()*.0015);
+     ctx.shadowBlur=24;
+     ctx.shadowColor="#ff6a00";
+     ctx.fillStyle="#ff6a00";
+     ctx.strokeStyle="#ffd18a";
+     ctx.lineWidth=2;
+     ctx.beginPath();
+     for(let i=0;i<12;i++){
+       const a=i*Math.PI/6;
+       const rr=i%2===0?r:r*.72;
+       const px=Math.cos(a)*rr,py=Math.sin(a)*rr;
+       if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+     }
+     ctx.closePath();
+     ctx.fill();
+     ctx.stroke();
+     ctx.fillStyle="#3a0d00";
+     ctx.beginPath();
+     ctx.arc(0,0,r*.38,0,Math.PI*2);
+     ctx.fill();
      ctx.restore();
      continue;
    }
@@ -3887,16 +4019,7 @@ setInterval(updateSettingsScore,500);
     }catch(e){}
   }
 
-  // Regelmäßig melden, dass der Spieler noch verbunden ist.
-  const cubeRushHeartbeat=setInterval(()=>{
-    try{
-      if(ws && ws.readyState===WebSocket.OPEN){
-        ws.send(JSON.stringify({type:"heartbeat"}));
-      }
-    }catch(e){}
-  },10000);
-
-window.cubeRushServer={
+  window.cubeRushServer={
     connect:connectServer,
     setPlayerName(name){
       playerName=(name||"").trim();
