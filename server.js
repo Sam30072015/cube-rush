@@ -4,7 +4,7 @@ const express = require("express");
 const WebSocket = require("ws");
 
 const PORT = Number(process.env.PORT || 3000);
-const ADMIN_KEY = process.env.ADMIN_KEY || "4729";
+const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 
 const app = express();
 
@@ -224,7 +224,7 @@ app.post("/api/admin/message", (req, res) => {
 
   const duration = (minutes * 60 + seconds) * 1000;
 
-  /* Nachricht für alle löschen */
+  /* Servernachricht für alle löschen */
   if (
     req.body.clear === true ||
     (!text && duration === 0)
@@ -283,12 +283,6 @@ app.get("/api/status", (req, res) => {
    SPIEL AUSLIEFERN
    ========================================= */
 
-/*
-   WICHTIG:
-   Nicht app.get("*") verwenden.
-   Das verursacht bei neueren Express/path-to-regexp-Versionen
-   den Render-Fehler "Missing parameter name at index 1: *".
-*/
 app.use((req, res) => {
   res.sendFile(
     path.join(__dirname, "public", "index.html")
