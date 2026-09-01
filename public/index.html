@@ -2253,24 +2253,35 @@ function repairUnlocks(){
   // Jedes geschaffte Level schaltet genau das nächste Level frei.
   for(const done of completed){
     const level=Number(done);
-    if(Number.isInteger(level) && level>=0 && level<29){
+    if(Number.isInteger(level) && level>=0 && level<30){
       unlocked=Math.max(unlocked,level+2);
     }
   }
 
   // Wer Level 20 bereits geschafft hat, bekommt Level 21 automatisch.
-  if(completed.includes(19)){
+  if(completed.includes(19) || unlocked>=20){
     unlocked=Math.max(unlocked,21);
   }
 
-  // Maximal 30 Level.
-  unlocked=Math.min(30,Math.max(1,unlocked));
+  // Sobald Level 30 freigeschaltet ist, wird das Boss-Level ebenfalls geöffnet.
+  if(completed.includes(29) || unlocked>=30){
+    unlocked=Math.max(unlocked,31);
+  }
+
+  // 30 normale Level + 1 Boss-Level.
+  unlocked=Math.min(31,Math.max(1,unlocked));
 
   localStorage.setItem("crUnlocked",String(unlocked));
   localStorage.setItem("crCompleted",JSON.stringify(completed));
 }  
 
 repairUnlocks();
+
+// Alte Spielstände mit freigeschaltetem Level 30 bekommen den Boss sofort.
+if(unlocked>=30 && unlocked<31){
+  unlocked=31;
+  localStorage.setItem("crUnlocked","31");
+}
 
 function updateMenu(){
   repairUnlocks();
