@@ -560,6 +560,129 @@ body.phone-mode #mobileJump{display:flex}
 #adminOnlinePlayers{width:100%;box-sizing:border-box;margin:7px 0;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
 #adminGiftCoins,#adminGiftSkin{width:100%;box-sizing:border-box;margin:5px 0;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
 #adminGiftStatus{min-height:22px;margin:7px 0;font-weight:900}
+
+/* ---------- HANDY HUD · 3 KARTEN ---------- */
+body.phone-mode #hud{
+  top:10px;
+  left:10px;
+  right:10px;
+  z-index:50;
+  display:grid;
+  grid-template-columns:1.15fr .9fr .95fr;
+  gap:8px;
+  align-items:stretch;
+}
+body.phone-mode #hud > div{min-width:0;}
+body.phone-mode #score{display:none;}
+body.phone-mode #mode{display:none;}
+
+body.phone-mode #eventHud{
+  position:relative;
+  top:auto;
+  left:auto;
+  transform:none;
+  grid-column:1;
+  grid-row:1;
+  min-height:64px;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #00eaff;
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(4,57,88,.97),rgba(7,24,43,.94));
+  color:#fff;
+  font-size:15px;
+  line-height:1.15;
+  text-align:center;
+  white-space:normal;
+  box-shadow:0 0 20px rgba(0,234,255,.28);
+}
+
+body.phone-mode #coins{
+  grid-column:2;
+  grid-row:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:64px;
+  padding:8px 10px;
+  border:2px solid #ffd83d;
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(78,54,0,.95),rgba(24,19,2,.92));
+  box-shadow:0 0 20px rgba(255,216,61,.28);
+  color:#ffd83d;
+  font-size:20px;
+  text-shadow:0 0 10px rgba(255,216,61,.55);
+}
+
+body.phone-mode #percent{
+  grid-column:3;
+  grid-row:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:64px;
+  padding:8px 10px;
+  border:2px solid #6cff00;
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(12,74,32,.96),rgba(7,25,18,.94));
+  color:#fff;
+  font-size:21px;
+  font-weight:900;
+  text-shadow:none;
+}
+body.phone-mode #percent::before{
+  content:"📈 Fortschritt";
+  font-size:13px;
+  margin-bottom:2px;
+}
+body.phone-mode #level{
+  position:absolute;
+  top:0;
+  left:50%;
+  transform:translate(-50%,-54px);
+  padding:5px 9px;
+  border:2px solid #6cff00;
+  border-radius:12px;
+  background:rgba(10,18,35,.92);
+  color:#fff;
+  font-size:11px;
+  text-shadow:none;
+}
+body.phone-mode #bar{
+  position:absolute;
+  top:78px;
+  left:1px;
+  right:1px;
+  width:auto;
+  height:8px;
+  border:1px solid rgba(255,255,255,.55);
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:none;
+  background:rgba(0,0,0,.4);
+}
+body.phone-mode #progress{min-width:0;border-radius:10px;}
+
+@media (max-width:520px){
+  body.phone-mode #hud{
+    grid-template-columns:1.2fr .9fr .9fr;
+    gap:6px;
+  }
+  body.phone-mode #eventHud,
+  body.phone-mode #coins,
+  body.phone-mode #percent{
+    min-height:58px;
+    border-radius:15px;
+    font-size:14px;
+  }
+  body.phone-mode #coins{font-size:17px;}
+  body.phone-mode #percent{font-size:18px;}
+  body.phone-mode #percent::before{font-size:11px;}
+  body.phone-mode #bar{top:71px;}
+}
 </style>
 </head>
 <body>
