@@ -817,6 +817,10 @@ body.world3-unlocked .screen#menu #levels{
 
 
 .magmaSkin{background:linear-gradient(145deg,#ffd36b 0%,#ff7a00 45%,#7a0012 100%)}
+
+/* ---------- LUCK · GREEN WORLD ---------- */
+body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
+.world4-luck .levelBtn{font-family:Arial Black,Arial,sans-serif}
 </style>
 </head>
 <body>
@@ -1071,15 +1075,13 @@ let particles=[];
 let portalUsed=[];
 let musicTimer=null;
 let audio=null;
-let bossStartTime=0;
-const BOSS_DURATION=240000;
 let musicGain=null;
 let musicOn=true;
 let musicPreference=true;
 
 /* ---------- saved progress ---------- */
 let coins=Number(localStorage.getItem("crCoins"))||0;
-let unlocked=Math.min(31,Math.max(1,Number(localStorage.getItem("crUnlocked")||1)));
+let unlocked=Math.min(20,Math.max(1,Number(localStorage.getItem("crUnlocked")||1)));
 if(unlocked>10){
   // World 2 access is only valid after all ten World-1 levels are completed.
   let tmpCompleted=[];
@@ -1087,7 +1089,7 @@ if(unlocked>10){
   const allWorld1=Array.from({length:10},(_,i)=>tmpCompleted.includes(i)).every(Boolean);
   if(!allWorld1) unlocked=10;
 }
-let currentLevel=Math.max(0,Math.min(30,Number(localStorage.getItem("crCurrentLevel"))||0));
+let currentLevel=Math.max(0,Math.min(19,Number(localStorage.getItem("crCurrentLevel"))||0));
 let completed=[];
 try{
   completed=JSON.parse(localStorage.getItem("crCompleted"))||[];
@@ -1108,9 +1110,18 @@ function world3Unlocked(){
   return completed.includes(19);
 }
 
+function world4Unlocked(){
+  // Welt 4 "LUCK" öffnet sich direkt nach LEVEL 30.
+  return completed.includes(29);
+}
+
 // Welt-3-Freischaltung aus älteren Spielständen wiederherstellen.
 if(completed.includes(19)){
   unlocked=Math.max(unlocked,21);
+  localStorage.setItem("crUnlocked",String(unlocked));
+}
+if(completed.includes(29)){
+  unlocked=Math.max(unlocked,31);
   localStorage.setItem("crUnlocked",String(unlocked));
 }
 
@@ -1675,7 +1686,15 @@ const levels=[
 {name:"LEVEL 28",length:9000,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50],["mine",8200,370,35],["doubleSaw",8480,410,42]]},
 {name:"LEVEL 29",length:9400,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50],["mine",8200,370,35],["doubleSaw",8480,410,42],["block",8780,84,125],["mine",9070,310,31]]},
 {name:"LEVEL 30",length:10000,world:3,objects:[["mine",650,390,34],["spike",900,46,50],["block",1180,80,115],["mine",1450,340,31],["portal",1700,445,"ship"],["wall",2000,0,88,165],["wall",2230,375,88,165],["mine",2460,270,30],["wall",2530,95,88,185],["wall",2760,350,88,190],["portal",3150,445,"cube"],["mine",3500,390,34],["doubleSaw",3800,410,40],["mine",4080,320,30],["block",4380,80,120],["spike",4720,46,50],["mine",5000,370,34],["saw",5320,410,40],["movingBar",5600,285,130,12],["mine",5900,300,31],["block",6150,80,120],["spike",6450,46,50],["mine",6750,380,34],["saw",7040,410,42],["block",7330,82,120],["mine",7620,300,30],["spike",7900,46,50],["mine",8200,370,35],["doubleSaw",8480,410,42],["block",8780,84,125],["mine",9070,310,31],["saw",9350,410,42],["spike",9650,46,50]]},
-{name:"BOSS-LEVEL",length:1,world:3,boss:true,objects:[]}
+{name:"LEVEL 31",length:10600,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50]]},
+{name:"LEVEL 32",length:10700,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50]]},
+{name:"LEVEL 33",length:10800,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50]]},
+{name:"LEVEL 34",length:10900,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50],["mine",8750,340,31],["saw",8940,410,43],["spike",9130,46,50]]},
+{name:"LEVEL 35",length:11000,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50],["mine",8750,340,31],["saw",8940,410,43],["spike",9130,46,50]]},
+{name:"LEVEL 36",length:11100,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50],["mine",8750,340,31],["saw",8940,410,43],["spike",9130,46,50]]},
+{name:"LEVEL 37",length:11200,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50],["mine",8750,340,31],["saw",8940,410,43],["spike",9130,46,50],["mine",9350,380,35],["doubleSaw",9550,410,43],["block",9740,84,125]]},
+{name:"LEVEL 38",length:11300,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50],["mine",8750,340,31],["saw",8940,410,43],["spike",9130,46,50],["mine",9350,380,35],["doubleSaw",9550,410,43],["block",9740,84,125]]},
+{name:"LEVEL 39",length:11400,world:4,objects:[["spike",580,46,50],["spike",720,46,50],["mine",880,390,32],["block",1080,82,120],["saw",1330,410,42],["mine",1490,330,30],["portal",1710,445,"ship"],["wall",1940,0,74,150],["wall",2100,390,74,150],["wall",2260,90,74,185],["mine",2390,290,30],["wall",2420,350,74,190],["wall",2580,0,74,150],["wall",2740,390,74,150],["movingBar",2890,280,145,12],["portal",3080,445,"cube"],["spike",3360,46,52],["mine",3520,375,33],["doubleSaw",3700,410,42],["block",3900,84,125],["spike",4160,46,50],["mine",4320,300,31],["saw",4500,410,42],["block",4680,84,120],["mine",4870,360,33],["spike",5070,46,50],["saw",5260,410,42],["mine",5440,290,30],["block",5620,84,125],["spike",5900,46,50],["mine",6080,380,34],["saw",6280,410,42],["block",6460,84,120],["mine",6640,315,31],["spike",6810,46,50],["doubleSaw",6990,410,42],["mine",7170,370,34],["block",7360,84,125],["spike",7640,46,50],["mine",7820,300,31],["saw",8000,410,42],["block",8180,84,120],["spike",8460,46,50],["mine",8750,340,31],["saw",8940,410,43],["spike",9130,46,50],["mine",9350,380,35],["doubleSaw",9550,410,43],["block",9740,84,125],["mine",9950,310,32],["saw",10160,410,43],["spike",10360,46,52]]}
 ];
 
 /* ---------- unique music per level ---------- */
@@ -2253,35 +2272,24 @@ function repairUnlocks(){
   // Jedes geschaffte Level schaltet genau das nächste Level frei.
   for(const done of completed){
     const level=Number(done);
-    if(Number.isInteger(level) && level>=0 && level<30){
+    if(Number.isInteger(level) && level>=0 && level<29){
       unlocked=Math.max(unlocked,level+2);
     }
   }
 
   // Wer Level 20 bereits geschafft hat, bekommt Level 21 automatisch.
-  if(completed.includes(19) || unlocked>=20){
+  if(completed.includes(19)){
     unlocked=Math.max(unlocked,21);
   }
 
-  // Sobald Level 30 freigeschaltet ist, wird das Boss-Level ebenfalls geöffnet.
-  if(completed.includes(29) || unlocked>=30){
-    unlocked=Math.max(unlocked,31);
-  }
-
-  // 30 normale Level + 1 Boss-Level.
-  unlocked=Math.min(31,Math.max(1,unlocked));
+  // Maximal 40 Level.
+  unlocked=Math.min(40,Math.max(1,unlocked));
 
   localStorage.setItem("crUnlocked",String(unlocked));
   localStorage.setItem("crCompleted",JSON.stringify(completed));
 }  
 
 repairUnlocks();
-
-// Alte Spielstände mit freigeschaltetem Level 30 bekommen den Boss sofort.
-if(unlocked>=30 && unlocked<31){
-  unlocked=31;
-  localStorage.setItem("crUnlocked","31");
-}
 
 function updateMenu(){
   repairUnlocks();
@@ -2405,30 +2413,53 @@ function updateMenu(){
       g3.appendChild(b);
     }
     w3.appendChild(g3);
-
-    const bossBtn=document.createElement("button");
-    bossBtn.type="button";
-    bossBtn.className="levelBtn";
-    bossBtn.style.marginTop="12px";
-    bossBtn.style.borderColor="#ff4b00";
-
-    if(unlocked<31){
-      bossBtn.classList.add("lock");
-      bossBtn.innerHTML="🔒<br>👑 BOSS-LEVEL<br>GESCHLOSSEN";
-    }else if(completed.includes(30)){
-      bossBtn.classList.add("done");
-      bossBtn.innerHTML="👑<br>BOSS-LEVEL<br>GESCHAFFT";
-    }else{
-      bossBtn.innerHTML="👑<br>BOSS-LEVEL · 4 MINUTEN<br>SEHR SCHWER";
-    }
-
-    if(unlocked>=31){
-      bossBtn.addEventListener("click",()=>startLevel(30));
-    }
-    w3.appendChild(bossBtn);
   }
 
   box.appendChild(w3);
+
+  const w4=document.createElement("div");
+  w4.style.width="100%";
+  w4.style.marginTop="18px";
+
+  const open4=world4Unlocked();
+  w4.innerHTML='<h2 style="color:#58ff67;text-shadow:0 0 14px #58ff67;margin:14px 0 10px;font-size:25px">🍀 LUCK · GREEN WORLD</h2>';
+
+  if(!open4){
+    const locked=document.createElement("div");
+    locked.style.color="#aab0d5";
+    locked.style.padding="12px";
+    locked.innerHTML="🔒 LUCK wird freigeschaltet, wenn du <b>Level 30</b> geschafft hast.";
+    w4.appendChild(locked);
+  }else{
+    const g4=document.createElement("div");
+    g4.style.display="flex";
+    g4.style.flexWrap="wrap";
+    g4.style.justifyContent="center";
+    g4.style.gap="10px";
+
+    for(let i=30;i<40;i++){
+      const b=document.createElement("button");
+      b.type="button";
+      b.className="levelBtn";
+
+      if(i>=unlocked){
+        b.classList.add("lock");
+        b.innerHTML="🔒<br>LEVEL "+(i+1)+"<br>GESPERRT";
+      }else if(completed.includes(i)){
+        b.classList.add("done");
+        b.innerHTML="⭐<br>LEVEL "+(i+1)+"<br>GESCHAFFT";
+      }else{
+        b.innerHTML="▶<br>LEVEL "+(i+1)+"<br>+50 🪙";
+      }
+
+      if(i<unlocked)b.addEventListener("click",()=>startLevel(i));
+      g4.appendChild(b);
+    }
+
+    w4.appendChild(g4);
+  }
+
+  box.appendChild(w4);
 
   if(document.getElementById("shopBalance")) updateShop();
 }
@@ -2447,9 +2478,9 @@ function startLevel(i){
  if(typeof stopMusic==="function")
 musicOn=musicWasOn;
  levelIndex=i;
-  bossStartTime=levels[i].boss ? Date.now() : 0;
   document.body.classList.toggle("world2-cartoon",i>=10 && i<20);
-  document.body.classList.toggle("world3-neon",i>=20);
+  document.body.classList.toggle("world3-neon",i>=20 && i<30);
+  document.body.classList.toggle("world4-luck",i>=30);
  camera=0;score=0;mode="cube";running=true;spaceHeld=false;particles=[];
  player.x=180;player.y=GROUND-player.size;player.vy=0;player.grounded=true;player.rot=0;
  portalUsed=levels[i].objects.filter(o=>o[0]==="portal").map(()=>false);
@@ -2468,7 +2499,7 @@ musicOn=musicWasOn;
 function updateHUD(){
  document.getElementById("coins").textContent="🪙 Münzen: "+coins;
  updateAbilityHud();
- document.getElementById("level").textContent=(levels[levelIndex].boss?"🌋 WELT 3 · BOSS":(levelIndex<10?"WELT 1 · ":(levelIndex<20?"WELT 2 · ":"WELT 3 · "))+levels[levelIndex].name);
+ document.getElementById("level").textContent=(levelIndex<10?"WELT 1 · ":(levelIndex<20?"WELT 2 · ":(levelIndex<30?"WELT 3 · ":"LUCK · ")))+levels[levelIndex].name;
  document.getElementById("mode").textContent=mode==="ship"?"MODUS: ✈️ FLUGZEUG":"MODUS: 🟨 WÜRFEL";
 }
 
@@ -2642,157 +2673,23 @@ function win(){
 }
 
 
-function bossTime(){
-  return levels[levelIndex] && levels[levelIndex].boss
-    ? Date.now()-bossStartTime
-    : 0;
-}
-
-function bossHazardHit(){
-  if(!levels[levelIndex].boss)return false;
-
-  const t=bossTime()/1000;
-  const px=player.x+player.size/2;
-  const py=player.y+player.size/2;
-
-  // Drei bewegte Laser-Bahnen.
-  for(let i=0;i<3;i++){
-    const y=95+i*140+Math.sin(t*(1.1+i*.18)+i)*50;
-    if(px>20 && px<W-30 && Math.abs(py-y)<18)return true;
-  }
-
-  // Boden-Hindernisse: diese kann man mit dem Sprungbutton überspringen.
-  for(let i=0;i<6;i++){
-    const x=((i*175+t*(95+i*10))%(W+120))-60;
-    const h=34+(i%3)*10;
-    if(px+15>x && px-15<x+34 && py+18>GROUND-h){
-      return true;
-    }
-  }
-
-  // Feuerbälle.
-  for(let i=0;i<8;i++){
-    const x=((i*127+t*(120+i*9))%W+W)%W;
-    const y=((t*(115+i*14)+i*71)%390)+50;
-    const dx=px-x,dy=py-y;
-    if(dx*dx+dy*dy<25*25)return true;
-  }
-
-  return false;
-}
-
-function drawBoss(){
-  if(!levels[levelIndex].boss)return;
-
-  const t=bossTime()/1000;
-  const bx=W-120;
-  const by=135+Math.sin(t*1.2)*32;
-
-  // Boss-Kern
-  ctx.save();
-  ctx.translate(bx,by);
-  ctx.shadowBlur=32;
-  ctx.shadowColor="#ff4b00";
-  ctx.fillStyle="#ff4b00";
-  ctx.beginPath();
-  ctx.arc(0,0,60,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.fillStyle="#300006";
-  ctx.beginPath();
-  ctx.arc(0,0,36,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.strokeStyle="#ffd36b";
-  ctx.lineWidth=5;
-  for(let i=0;i<8;i++){
-    const a=t*1.4+i*Math.PI/4;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a)*48,Math.sin(a)*48);
-    ctx.lineTo(Math.cos(a)*80,Math.sin(a)*80);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Laser-Bahnen
-  for(let i=0;i<3;i++){
-    const y=95+i*140+Math.sin(t*(1.1+i*.18)+i)*50;
-    ctx.save();
-    ctx.shadowBlur=18;
-    ctx.shadowColor="#ff2400";
-    ctx.fillStyle="#ff3b16";
-    ctx.fillRect(20,y-4,W-40,8);
-    ctx.fillStyle="#ffd36b";
-    ctx.fillRect(20,y-1,W-40,3);
-    ctx.restore();
-  }
-
-  // Große Bodenstacheln – mit Sprungbutton überspringbar.
-  for(let i=0;i<6;i++){
-    const x=((i*175+t*(95+i*10))%(W+120))-60;
-    const h=34+(i%3)*10;
-    ctx.save();
-    ctx.shadowBlur=16;
-    ctx.shadowColor="#ff6a00";
-    ctx.fillStyle="#ff6a00";
-    ctx.beginPath();
-    ctx.moveTo(x,GROUND);
-    ctx.lineTo(x+17,GROUND-h);
-    ctx.lineTo(x+34,GROUND);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle="#ffd36b";
-    ctx.lineWidth=2;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // Feuerbälle
-  for(let i=0;i<8;i++){
-    const x=((i*127+t*(120+i*9))%W+W)%W;
-    const y=((t*(115+i*14)+i*71)%390)+50;
-    ctx.save();
-    ctx.fillStyle=i%2?"#ff7a00":"#ff2100";
-    ctx.shadowBlur=15;
-    ctx.shadowColor="#ff5a00";
-    ctx.beginPath();
-    ctx.arc(x,y,9+(i%3),0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Boss-Timer
-  const remaining=Math.max(0,BOSS_DURATION-(Date.now()-bossStartTime));
-  ctx.save();
-  ctx.font="900 18px Arial";
-  ctx.textAlign="center";
-  ctx.fillStyle="#fff";
-  ctx.strokeStyle="#300006";
-  ctx.lineWidth=5;
-  const secs=Math.ceil(remaining/1000);
-  const min=Math.floor(secs/60);
-  const sec=String(secs%60).padStart(2,"0");
-  ctx.strokeText("👑 BOSS · "+min+":"+sec,W/2,38);
-  ctx.fillText("👑 BOSS · "+min+":"+sec,W/2,38);
-  ctx.restore();
-}
-
 /* ---------- update ---------- */
 function update(){
+  // Frame-Zeit normalisieren: Auf 120-Hz-Handys läuft das Spiel nicht doppelt so schnell.
   const nowFrame=performance.now();
   gameFrameScale=Math.max(0.5,Math.min(1.5,(nowFrame-lastGameFrameTime)/16.6667));
   lastGameFrameTime=nowFrame;
 
-  if(typeof updateTacos==="function")updateTacos();
+  // Taco-Event läuft unabhängig vom Spieler weiter – auch wenn man stirbt.
+  // Dadurch fallen Tacos weiter, verschwinden nach 5 Sekunden und der Countdown
+  // wird nicht zurückgesetzt.
+  if(typeof updateTacos==="function") updateTacos();
+
   if(!running)return;
 
-  const isBoss=!!levels[levelIndex].boss;
-
-  // Normaler Spieler-Physik-Loop gilt auch im Boss-Level.
   if(mode==="cube"){
     player.vy+=CUBE_GRAVITY*gameFrameScale;
     player.y+=player.vy*gameFrameScale;
-
     if(player.y+player.size>=GROUND){
       player.y=GROUND-player.size;
       player.vy=0;
@@ -2800,7 +2697,6 @@ function update(){
     }else{
       player.grounded=false;
     }
-
     if(!player.grounded)player.rot+=.13*gameFrameScale;
     else player.rot=Math.round(player.rot/(Math.PI/2))*(Math.PI/2);
   }else{
@@ -2810,60 +2706,42 @@ function update(){
     player.rot=player.vy*.04;
   }
 
-  if(isBoss){
-    // 4-Minuten-Boss-Arena. Kamera bewegt sich nur optisch.
-    if(Date.now()-bossStartTime>=BOSS_DURATION){
-      win();
-      return;
-    }
+  camera+=((typeof popKraftAktiv==="function"&&popKraftAktiv())?SPEED*1.35:SPEED)*gameFrameScale;
 
-    camera+=SPEED*1.1*gameFrameScale;
+  // ZUERST das Ziel prüfen. Nichts anderes darf den Abschluss blockieren.
+  if(camera>=levels[levelIndex].length*0.97){
+    camera=levels[levelIndex].length;
+    win();
+    return;
+  }
 
-    if(bossHazardHit()){
-      die("💀 Der Boss hat dich erwischt!");
-      return;
-    }
-  }else{
-    const speedBoost=(typeof popKraftAktiv==="function"&&popKraftAktiv())?1.35:1;
-    camera+=SPEED*speedBoost*gameFrameScale;
-
-    if(camera>=levels[levelIndex].length*0.97){
-      camera=levels[levelIndex].length;
-      win();
-      return;
-    }
-
-    let pi=0;
-    for(const o of levels[levelIndex].objects){
-      if(o[0]!=="portal")continue;
-
-      if(!portalUsed[pi]&&portalHit(o)){
-        portalUsed[pi]=true;
-
-        if(mode!==o[3]){
-          mode=o[3];
-          player.vy=-5.5;
-          updateHUD();
-        }
+  let pi=0;
+  for(const o of levels[levelIndex].objects){
+    if(o[0]!=="portal")continue;
+    if(!portalUsed[pi]&&portalHit(o)){
+      portalUsed[pi]=true;
+      if(mode!==o[3]){
+        mode=o[3];
+        player.vy=-5.5;
+        updateHUD();
       }
-      pi++;
     }
+    pi++;
+  }
 
-    if(typeof missedPortal==="function"&&missedPortal())return;
+  if(typeof missedPortal==="function"&&missedPortal())return;
 
-    if(!(typeof popKraftAktiv==="function"&&popKraftAktiv()) &&
-       !(typeof magmaObstaclesCleared==="function"&&magmaObstaclesCleared())){
-
-      if(mode==="cube"){
-        if(cubeCollision()){
-          die("Du bist gegen ein Hindernis gekracht!");
-          return;
-        }
-      }else{
-        if(shipCollision()){
-          die("Das Flugzeug hat ein Hindernis berührt!");
-          return;
-        }
+  if(!(typeof popKraftAktiv==="function"&&popKraftAktiv()) &&
+     !(typeof magmaObstaclesCleared==="function"&&magmaObstaclesCleared())){
+    if(mode==="cube"){
+      if(cubeCollision()){
+        die("Du bist gegen ein Hindernis gekracht!");
+        return;
+      }
+    }else{
+      if(shipCollision()){
+        die("Das Flugzeug hat ein Hindernis berührt!");
+        return;
       }
     }
   }
@@ -2875,21 +2753,23 @@ function update(){
 
   score=Math.floor(camera/5);
   document.getElementById("score").textContent="Punkte: "+score;
-
-  const pct=isBoss
-    ? Math.min(100,Math.floor((Date.now()-bossStartTime)/BOSS_DURATION*100))
-    : Math.min(100,Math.floor(camera/levels[levelIndex].length*100));
-
+  const pct=Math.min(100,Math.floor(camera/levels[levelIndex].length*100));
   document.getElementById("percent").textContent=pct+"%";
   document.getElementById("progress").style.width=pct+"%";
 }
 
+
 function drawBackground(){
- const world3=levelIndex>=20;
+ const world4=levelIndex>=30;
+ const world3=levelIndex>=20 && levelIndex<30;
  const world2=levelIndex>=10 && levelIndex<20;
  const g=ctx.createLinearGradient(0,0,0,H);
 
- if(world3){
+ if(world4){
+   g.addColorStop(0,"#03210a");
+   g.addColorStop(.45,"#087a2a");
+   g.addColorStop(1,"#021507");
+ }else if(world3){
    g.addColorStop(0,"#2b0800");
    g.addColorStop(.45,"#7a2100");
    g.addColorStop(1,"#16000f");
@@ -2957,6 +2837,37 @@ function drawBackground(){
    }
  }
 
+ if(world4){
+   // Grün leuchtende "Luck"-Welt mit Bäumen, Blättern und Lichtpunkten.
+   for(let i=0;i<9;i++){
+     let x=(i*250-camera*.14)%(W+280);
+     if(x<0)x+=W+280;
+     const h=90+(i%4)*30;
+     ctx.fillStyle=i%2===0?"#0b3d1c":"#0f5a25";
+     ctx.fillRect(x+38,GROUND-h+55,18,h-55);
+     ctx.beginPath();
+     ctx.arc(x+47,GROUND-h+35,42,0,Math.PI*2);
+     ctx.fill();
+     ctx.beginPath();
+     ctx.arc(x+18,GROUND-h+58,28,0,Math.PI*2);
+     ctx.fill();
+     ctx.beginPath();
+     ctx.arc(x+76,GROUND-h+58,28,0,Math.PI*2);
+     ctx.fill();
+   }
+   ctx.fillStyle="#a6ff7a";
+   for(let i=0;i<18;i++){
+     let x=(i*137-camera*.07)%(W+160);
+     if(x<0)x+=W+160;
+     const y=55+(i%6)*45;
+     ctx.globalAlpha=.35+.05*(i%5);
+     ctx.beginPath();
+     ctx.arc(x,y,2+(i%3),0,Math.PI*2);
+     ctx.fill();
+   }
+   ctx.globalAlpha=1;
+ }
+
  /* distant skyline */
  for(let i=0;i<12;i++){
    let x=(i*210-camera*.24)%(W+260);
@@ -2985,12 +2896,13 @@ function drawBackground(){
 }
 
 function drawGround(){
- const world3=levelIndex>=20;
+ const world4=levelIndex>=30;
+ const world3=levelIndex>=20 && levelIndex<30;
  const world2=levelIndex>=10 && levelIndex<20;
  ctx.save();
  ctx.shadowBlur=22;
- ctx.shadowColor=world3?"#ff6a00":(world2?"#ff3fd4":"#00eaff");
- ctx.fillStyle=world3?"#ff6a00":(world2?"#ff3fd4":"#00eaff");
+ ctx.shadowColor=world4?"#58ff67":(world3?"#ff6a00":(world2?"#ff3fd4":"#00eaff"));
+ ctx.fillStyle=world4?"#58ff67":(world3?"#ff6a00":(world2?"#ff3fd4":"#00eaff"));
  ctx.fillRect(0,GROUND,W,5);
  ctx.restore();
 
@@ -3454,7 +3366,6 @@ ctx.clearRect(0,0,W,H);
  drawWorld2CartoonDecor();
  drawBackground();
  drawGround();
- if(levels[levelIndex] && levels[levelIndex].boss)drawBoss();
  drawObjects();
  drawTacos();
 
