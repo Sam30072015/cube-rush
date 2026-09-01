@@ -900,7 +900,7 @@ const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
 const W=1200,H=650,GROUND=540;
-const CUBE_GRAVITY=0.68,CUBE_JUMP=-13.5;
+const CUBE_GRAVITY=0.68,CUBE_JUMP=-11.5;
 const SHIP_GRAVITY=0.42,SHIP_LIFT=-0.52;
 const SPEED=6;
 
@@ -2020,6 +2020,7 @@ musicOn=musicWasOn;
  levelIndex=i;
   document.body.classList.toggle("world2-cartoon",i>=10);
  camera=0;score=0;mode="cube";running=true;spaceHeld=false;particles=[];
+ if(typeof mobileJumpLocked!=="undefined")mobileJumpLocked=false;
  player.x=180;player.y=GROUND-player.size;player.vy=0;player.grounded=true;player.rot=0;
  portalUsed=levels[i].objects.filter(o=>o[0]==="portal").map(()=>false);
 
@@ -2222,6 +2223,9 @@ function update(){
       player.y=GROUND-player.size;
       player.vy=0;
       player.grounded=true;
+
+      // Neuer Sprung ist erst nach dem Landen erlaubt.
+      if(typeof mobileJumpLocked!=="undefined") mobileJumpLocked=false;
     }else{
       player.grounded=false;
     }
@@ -3523,8 +3527,8 @@ setInterval(renderServerMessage,250);
     e.preventDefault();
     e.stopPropagation();
     spaceHeld=false;
-    // Erst wenn der Würfel wieder auf dem Boden ist, darf erneut gesprungen werden.
-    mobileJumpLocked=false;
+    // Während des Sprungs NICHT wieder freigeben.
+    // Die Freigabe passiert erst beim Landen.
   },{passive:false});
   jumpBtn?.addEventListener("pointercancel",e=>{
     e.preventDefault();
