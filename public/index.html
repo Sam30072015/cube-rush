@@ -2655,17 +2655,29 @@ function bossHazardHit(){
   const px=player.x+player.size/2;
   const py=player.y+player.size/2;
 
+  // Drei bewegte Laser-Bahnen.
   for(let i=0;i<3;i++){
-    const y=90+i*145+Math.sin(t*(1.15+i*.17)+i)*55;
-    if(Math.abs(py-y)<20)return true;
+    const y=95+i*140+Math.sin(t*(1.1+i*.18)+i)*50;
+    if(px>20 && px<W-30 && Math.abs(py-y)<18)return true;
   }
 
-  for(let i=0;i<9;i++){
-    const x=((i*127+t*(120+i*10))%W+W)%W;
-    const y=((t*(110+i*15)+i*67)%420)+45;
+  // Boden-Hindernisse: diese kann man mit dem Sprungbutton überspringen.
+  for(let i=0;i<6;i++){
+    const x=((i*175+t*(95+i*10))%(W+120))-60;
+    const h=34+(i%3)*10;
+    if(px+15>x && px-15<x+34 && py+18>GROUND-h){
+      return true;
+    }
+  }
+
+  // Feuerbälle.
+  for(let i=0;i<8;i++){
+    const x=((i*127+t*(120+i*9))%W+W)%W;
+    const y=((t*(115+i*14)+i*71)%390)+50;
     const dx=px-x,dy=py-y;
     if(dx*dx+dy*dy<25*25)return true;
   }
+
   return false;
 }
 
@@ -2673,12 +2685,13 @@ function drawBoss(){
   if(!levels[levelIndex].boss)return;
 
   const t=bossTime()/1000;
-  const bx=W-115;
-  const by=145+Math.sin(t*1.2)*35;
+  const bx=W-120;
+  const by=135+Math.sin(t*1.2)*32;
 
+  // Boss-Kern
   ctx.save();
   ctx.translate(bx,by);
-  ctx.shadowBlur=30;
+  ctx.shadowBlur=32;
   ctx.shadowColor="#ff4b00";
   ctx.fillStyle="#ff4b00";
   ctx.beginPath();
@@ -2701,30 +2714,67 @@ function drawBoss(){
   }
   ctx.restore();
 
+  // Laser-Bahnen
   for(let i=0;i<3;i++){
-    const y=90+i*145+Math.sin(t*(1.15+i*.17)+i)*55;
+    const y=95+i*140+Math.sin(t*(1.1+i*.18)+i)*50;
     ctx.save();
     ctx.shadowBlur=18;
     ctx.shadowColor="#ff2400";
     ctx.fillStyle="#ff3b16";
-    ctx.fillRect(35,y-5,W-85,10);
+    ctx.fillRect(20,y-4,W-40,8);
     ctx.fillStyle="#ffd36b";
-    ctx.fillRect(35,y-2,W-85,4);
+    ctx.fillRect(20,y-1,W-40,3);
     ctx.restore();
   }
 
-  for(let i=0;i<9;i++){
-    const x=((i*127+t*(120+i*10))%W+W)%W;
-    const y=((t*(110+i*15)+i*67)%420)+45;
+  // Große Bodenstacheln – mit Sprungbutton überspringbar.
+  for(let i=0;i<6;i++){
+    const x=((i*175+t*(95+i*10))%(W+120))-60;
+    const h=34+(i%3)*10;
+    ctx.save();
+    ctx.shadowBlur=16;
+    ctx.shadowColor="#ff6a00";
+    ctx.fillStyle="#ff6a00";
+    ctx.beginPath();
+    ctx.moveTo(x,GROUND);
+    ctx.lineTo(x+17,GROUND-h);
+    ctx.lineTo(x+34,GROUND);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle="#ffd36b";
+    ctx.lineWidth=2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Feuerbälle
+  for(let i=0;i<8;i++){
+    const x=((i*127+t*(120+i*9))%W+W)%W;
+    const y=((t*(115+i*14)+i*71)%390)+50;
     ctx.save();
     ctx.fillStyle=i%2?"#ff7a00":"#ff2100";
     ctx.shadowBlur=15;
     ctx.shadowColor="#ff5a00";
     ctx.beginPath();
-    ctx.arc(x,y,10,0,Math.PI*2);
+    ctx.arc(x,y,9+(i%3),0,Math.PI*2);
     ctx.fill();
     ctx.restore();
   }
+
+  // Boss-Timer
+  const remaining=Math.max(0,BOSS_DURATION-(Date.now()-bossStartTime));
+  ctx.save();
+  ctx.font="900 18px Arial";
+  ctx.textAlign="center";
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="#300006";
+  ctx.lineWidth=5;
+  const secs=Math.ceil(remaining/1000);
+  const min=Math.floor(secs/60);
+  const sec=String(secs%60).padStart(2,"0");
+  ctx.strokeText("👑 BOSS · "+min+":"+sec,W/2,38);
+  ctx.fillText("👑 BOSS · "+min+":"+sec,W/2,38);
+  ctx.restore();
 }
 
 /* ---------- update ---------- */
@@ -2733,20 +2783,13 @@ function update(){
   gameFrameScale=Math.max(0.5,Math.min(1.5,(nowFrame-lastGameFrameTime)/16.6667));
   lastGameFrameTime=nowFrame;
 
-  // Taco-Event läuft unabhängig vom Spieler weiter.
   if(typeof updateTacos==="function")updateTacos();
-
   if(!running)return;
 
   const isBoss=!!levels[levelIndex].boss;
 
-  if(isBoss){
-    // Boss dauert exakt 4 Minuten.
-    if(Date.now()-bossStartTime>=BOSS_DURATION){
-      win();
-      return;
-    }
-  }else if(mode==="cube"){
+  // Normaler Spieler-Physik-Loop gilt auch im Boss-Level.
+  if(mode==="cube"){
     player.vy+=CUBE_GRAVITY*gameFrameScale;
     player.y+=player.vy*gameFrameScale;
 
@@ -2768,7 +2811,12 @@ function update(){
   }
 
   if(isBoss){
-    // Leichte Kamerabewegung nur als Optik.
+    // 4-Minuten-Boss-Arena. Kamera bewegt sich nur optisch.
+    if(Date.now()-bossStartTime>=BOSS_DURATION){
+      win();
+      return;
+    }
+
     camera+=SPEED*1.1*gameFrameScale;
 
     if(bossHazardHit()){
