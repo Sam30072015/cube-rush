@@ -726,6 +726,67 @@ body.phone-mode #tacoCoinPopup{font-size:13px;padding:6px 10px}
 /* ---------- WELT 3 · MAGMA CORE ---------- */
 body.world3-neon #game{filter:saturate(1.2) contrast(1.08)}
 .world3-neon .levelBtn{font-family:Arial Black,Arial,sans-serif}
+
+
+/* ---------- MENÜ: BIS ZU WELT 3 SCROLLBAR ---------- */
+html,body{
+  overflow:hidden;
+}
+.screen#menu{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  justify-content:flex-start !important;
+  align-items:center !important;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  padding-top:18px !important;
+  padding-bottom:28px !important;
+}
+.screen#menu #levels{
+  width:min(1120px,96vw);
+  padding-bottom:20px;
+}
+@media(max-width:700px){
+  .screen#menu{
+    max-height:100dvh;
+  }
+  .screen#menu #levels{
+    width:96vw;
+  }
+}
+@media(min-width:701px){
+  .screen#menu{
+    max-height:100vh;
+  }
+  .screen#menu #levels{
+    width:min(1120px,92vw);
+  }
+}
+
+
+/* ---------- LEVEL-KASTEN WÄCHST MIT WELT 3 ---------- */
+.screen#menu #menuBox,
+.screen#menu .menuBox,
+.screen#menu #levels{
+  height:auto !important;
+  min-height:0 !important;
+}
+
+.screen#menu #levels{
+  padding-bottom:28px !important;
+}
+
+/* Wenn Welt 3 geöffnet ist, etwas mehr Platz für alle Level geben. */
+body.world3-unlocked .screen#menu #levels{
+  min-height:780px !important;
+}
+
+@media(max-width:700px){
+  body.world3-unlocked .screen#menu #levels{
+    min-height:1200px !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -1011,10 +1072,8 @@ function world2Unlocked(){
 }
 
 function world3Unlocked(){
-  for(let i=10;i<20;i++){
-    if(!completed.includes(i)) return false;
-  }
-  return true;
+  // Welt 3 öffnet sich direkt nach LEVEL 20.
+  return completed.includes(19);
 }
 
 function save(){
@@ -2042,6 +2101,11 @@ repairUnlocks();
 
 function updateMenu(){
   repairUnlocks();
+
+  document.body.classList.toggle(
+    "world3-unlocked",
+    typeof world3Unlocked==="function" && world3Unlocked()
+  );
   if(!Array.isArray(completed)) completed=[];
   document.getElementById("menuCoins").textContent="🪙 Münzen: "+coins;
 
@@ -2129,7 +2193,7 @@ function updateMenu(){
     const locked=document.createElement("div");
     locked.style.color="#aab0d5";
     locked.style.padding="12px";
-    locked.innerHTML="🔒 Welt 3 wird freigeschaltet, wenn du <b>alle 10 Level aus Welt 2</b> geschafft hast.";
+    locked.innerHTML="🔒 Welt 3 wird freigeschaltet, wenn du <b>Level 20</b> geschafft hast.";
     w3.appendChild(locked);
   }else{
     const g3=document.createElement("div");
