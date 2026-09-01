@@ -900,7 +900,7 @@ const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
 const W=1200,H=650,GROUND=540;
-const CUBE_GRAVITY=0.68,CUBE_JUMP=-11.5;
+const CUBE_GRAVITY=0.68,CUBE_JUMP=-13.5;
 const SHIP_GRAVITY=0.42,SHIP_LIFT=-0.52;
 const SPEED=6;
 
@@ -1621,6 +1621,7 @@ const TACO_LAND_LIFETIME=5000;           // 5 Sekunden am Boden
 const TACO_REWARD=25;
 
 let gameFrameScale=1;
+let mobileJumpLocked=false;
 let lastGameFrameTime=performance.now();
 
 let tacoEventActive=false;
@@ -2020,7 +2021,6 @@ musicOn=musicWasOn;
  levelIndex=i;
   document.body.classList.toggle("world2-cartoon",i>=10);
  camera=0;score=0;mode="cube";running=true;spaceHeld=false;particles=[];
- if(typeof mobileJumpLocked!=="undefined")mobileJumpLocked=false;
  player.x=180;player.y=GROUND-player.size;player.vy=0;player.grounded=true;player.rot=0;
  portalUsed=levels[i].objects.filter(o=>o[0]==="portal").map(()=>false);
 
@@ -2223,9 +2223,6 @@ function update(){
       player.y=GROUND-player.size;
       player.vy=0;
       player.grounded=true;
-
-      // Neuer Sprung ist erst nach dem Landen erlaubt.
-      if(typeof mobileJumpLocked!=="undefined") mobileJumpLocked=false;
     }else{
       player.grounded=false;
     }
@@ -3503,14 +3500,16 @@ setInterval(renderServerMessage,250);
   laptop?.addEventListener("click",()=>applyMode("laptop"));
   phone?.addEventListener("click",()=>applyMode("phone"));
 
-  let mobileJumpLocked=false;
-  function mobileJump(e){
-    e.preventDefault();
-    e.stopPropagation();
+  function doMobileJump(e){
+    if(e){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if(!running)return;
 
-    // Ein Tastendruck = genau ein Sprung. In der Luft gibt es keinen zweiten Sprung.
-    if(mode==="cube" && typeof jump==="function"){
+    if(mode==="cube"){
+      // Genau ein Sprung pro Bodenkontakt.
       if(player && player.grounded && !mobileJumpLocked){
         mobileJumpLocked=true;
         jump();
@@ -3518,29 +3517,38 @@ setInterval(renderServerMessage,250);
       return;
     }
 
+    // Im Flugzeug: gedrückt halten zum Steigen.
     spaceHeld=true;
-    mobileJumpLocked=true;
   }
 
-  jumpBtn?.addEventListener("pointerdown",mobileJump,{passive:false});
-  jumpBtn?.addEventListener("pointerup",e=>{
-    e.preventDefault();
-    e.stopPropagation();
+  function releaseMobileJump(e){
+    if(e){
+      e.preventDefault();
+      e.stopPropagation();
+    }
     spaceHeld=false;
-    // Während des Sprungs NICHT wieder freigeben.
-    // Die Freigabe passiert erst beim Landen.
-  },{passive:false});
-  jumpBtn?.addEventListener("pointercancel",e=>{
-    e.preventDefault();
-    spaceHeld=false;
-    mobileJumpLocked=false;
-  },{passive:false});
-  jumpBtn?.addEventListener("pointerleave",()=>{
-    spaceHeld=false;
-  });
+    // Bei Würfel bleibt der Lock bis zum tatsächlichen Landen aktiv.
+  }
+
+  if(jumpBtn){
+    // Pointer Events (iPad/Android/Browser)
+    jumpBtn.addEventListener("pointerdown",doMobileJump,{passive:false});
+    jumpBtn.addEventListener("pointerup",releaseMobileJump,{passive:false});
+    jumpBtn.addEventListener("pointercancel",releaseMobileJump,{passive:false});
+
+    // Touch-Fallback für Browser, die Pointer Events nicht sauber liefern.
+    jumpBtn.addEventListener("touchstart",doMobileJump,{passive:false});
+    jumpBtn.addEventListener("touchend",releaseMobileJump,{passive:false});
+    jumpBtn.addEventListener("touchcancel",releaseMobileJump,{passive:false});
+
+    // Click-Fallback. Ein zweiter Klick während des Sprungs wird ignoriert,
+    // weil player.grounded dann false ist.
+    jumpBtn.addEventListener("click",doMobileJump,{passive:false});
+
+    jumpBtn.style.pointerEvents="auto";
+    jumpBtn.style.touchAction="manipulation";
+  }
 })();
-
-
 /* ---------- FIRST MUSIC UNLOCK ---------- */
 (function(){
   const unlockMusic=async()=>{
