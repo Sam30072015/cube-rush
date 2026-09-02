@@ -13,7 +13,6 @@ app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// name -> websocket
 const players = new Map();
 let poopEventUntil = 0;
 
@@ -69,9 +68,6 @@ wss.on("connection", (ws) => {
           Math.random().toString(36).slice(2, 8).toUpperCase();
       }
 
-      // Pro Spielernamen nur eine aktive Verbindung.
-      // Dadurch bekommt ein Spieler bei "An alle"
-      // nicht mehrfach dieselben Münzen.
       const oldSocket = players.get(name);
 
       if (oldSocket && oldSocket !== ws) {
@@ -130,7 +126,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-// Entfernt tote/offline Spieler
 setInterval(() => {
   const now = Date.now();
 
@@ -173,30 +168,26 @@ app.post("/api/admin/coins-event", (req, res) => {
 
     const until = Date.now() + durationMs;
 
-    const message = {
+    broadcast({
       type: "coinEvent",
       until
-    };
-
-    broadcast(message);
+    });
 
     return res.json({
       ok: true,
-      ...message
+      until
     });
   }
 
   if (action === "stop") {
-    const message = {
+    broadcast({
       type: "coinEvent",
       until: 0
-    };
-
-    broadcast(message);
+    });
 
     return res.json({
       ok: true,
-      ...message
+      until: 0
     });
   }
 
@@ -207,7 +198,7 @@ app.post("/api/admin/coins-event", (req, res) => {
 
 
 /* =========================================================
-   ADMIN: MÜNZEN AN EINEN SPIELER
+   ADMIN: MÜNZEN GEBEN
    ========================================================= */
 
 app.post("/api/admin/give", (req, res) => {
@@ -222,7 +213,7 @@ app.post("/api/admin/give", (req, res) => {
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error: "Player and a coin amount are required"
+      error: "Player and coin amount required"
     });
   }
 
@@ -232,26 +223,21 @@ app.post("/api/admin/give", (req, res) => {
     !target ||
     target.readyState !== WebSocket.OPEN
   ) {
-    if (players.get(player) === target) {
-      players.delete(player);
-    }
-
     return res.status(404).json({
       error: "Player is not online"
     });
   }
 
-  // EXAKT die eingegebene Menge senden
   send(target, {
     type: "gift",
     target: player,
-    coins: coins
+    coins
   });
 
   return res.json({
     ok: true,
-    player: player,
-    coins: coins
+    player,
+    coins
   });
 });
 
@@ -271,22 +257,21 @@ app.post("/api/admin/give-all", (req, res) => {
 
   if (coins <= 0) {
     return res.status(400).json({
-      error: "A coin amount greater than 0 is required"
+      error: "Coin amount must be greater than 0"
     });
   }
 
   let count = 0;
 
-  // Jeder Socket bekommt GENAU die eingegebene Anzahl.
   const message = JSON.stringify({
     type: "giftAll",
-    coins: coins
+    coins
   });
 
   for (const [name, ws] of players) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
-      count += 1;
+      count++;
     } else {
       players.delete(name);
     }
@@ -294,8 +279,55 @@ app.post("/api/admin/give-all", (req, res) => {
 
   return res.json({
     ok: true,
-    coins: coins,
-    count: count
+    coins,
+    count
+  });
+});
+
+
+/* =========================================================
+   ADMIN: MÜNZEN ABZIEHEN
+   ========================================================= */
+
+app.post("/api/admin/take", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({
+      error: "Unauthorized"
+    });
+  }
+
+  const player = cleanName(req.body?.player);
+  const coins = amountFrom(req.body);
+
+  if (!player || coins <= 0) {
+    return res.status(400).json({
+      error: "Player and coin amount required"
+    });
+  }
+
+  const target = players.get(player);
+
+  if (
+    !target ||
+    target.readyState !== WebSocket.OPEN
+  ) {
+    return res.status(404).json({
+      error: "Player is not online"
+    });
+  }
+
+  // Minus-Meldung an den Spieler.
+  // Der Client zieht die Münzen ab und setzt niemals unter 0.
+  send(target, {
+    type: "takeCoins",
+    target: player,
+    coins
+  });
+
+  return res.json({
+    ok: true,
+    player,
+    coins
   });
 });
 
@@ -396,7 +428,7 @@ app.post("/api/admin/message", (req, res) => {
 
   const message = {
     type: "serverMessage",
-    text: text,
+    text,
     endsAt: Date.now() + duration
   };
 
@@ -427,7 +459,7 @@ app.get("/api/status", (req, res) => {
 
 
 /* =========================================================
-   RENDER / HTML FALLBACK
+   RENDER FALLBACK
    ========================================================= */
 
 app.use((req, res) => {
