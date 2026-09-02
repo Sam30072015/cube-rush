@@ -9,6 +9,7 @@ const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 const SECOND_ADMIN_KEY = "6301";
 
 const app = express();
+
 app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -20,13 +21,21 @@ const players = new Map();
 let poopEventUntil = 0;
 let coinEventUntil = 0;
 
+// Mehrere Servernachrichten gleichzeitig
 let serverMessages = [];
 
-// Event-Anfragen vom zweiten Admin
+// Event-Anfragen von Admin 2
 const eventRequests = new Map();
 
+
+/* =========================================================
+   HILFSFUNKTIONEN
+   ========================================================= */
+
 function cleanName(name) {
-  return String(name || "").trim().slice(0, 40);
+  return String(name || "")
+    .trim()
+    .slice(0, 40);
 }
 
 function send(ws, payload) {
@@ -96,6 +105,7 @@ wss.on("connection", (ws) => {
             .toUpperCase();
       }
 
+      // Nur eine aktive Verbindung pro Spielername
       const oldSocket = players.get(name);
 
       if (oldSocket && oldSocket !== ws) {
@@ -116,17 +126,21 @@ wss.on("connection", (ws) => {
       ws.playerName = name;
       players.set(name, ws);
 
+      // Beim Verbinden aktuelle Events und Nachrichten senden
       send(ws, {
         type: "connected",
         name,
+
         poopEventUntil:
           poopEventUntil > Date.now()
             ? poopEventUntil
             : 0,
+
         coinEventUntil:
           coinEventUntil > Date.now()
             ? coinEventUntil
             : 0,
+
         serverMessages
       });
 
@@ -183,7 +197,7 @@ setInterval(() => {
 
 
 /* =========================================================
-   HAUPT-ADMIN 603781
+   ADMIN 603781
    ========================================================= */
 
 
@@ -196,18 +210,23 @@ app.post("/api/admin/coins-event", (req, res) => {
     });
   }
 
-  const action = String(req.body?.action || "");
+  const action = String(
+    req.body?.action || ""
+  );
 
   if (action === "start") {
     const durationMs = Math.max(
       1000,
       Math.min(
         10080 * 60 * 1000,
-        Math.floor(Number(req.body?.durationMs) || 0)
+        Math.floor(
+          Number(req.body?.durationMs) || 0
+        )
       )
     );
 
-    coinEventUntil = Date.now() + durationMs;
+    coinEventUntil =
+      Date.now() + durationMs;
 
     broadcast({
       type: "coinEvent",
@@ -249,18 +268,25 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  const player = cleanName(req.body?.player);
+  const player = cleanName(
+    req.body?.player
+  );
+
   const coins = amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error: "Player and a coin amount are required"
+      error:
+        "Player and a coin amount are required"
     });
   }
 
   const target = players.get(player);
 
-  if (!target || target.readyState !== WebSocket.OPEN) {
+  if (
+    !target ||
+    target.readyState !== WebSocket.OPEN
+  ) {
     return res.status(404).json({
       error: "Player is not online"
     });
@@ -293,7 +319,8 @@ app.post("/api/admin/give-all", (req, res) => {
 
   if (coins <= 0) {
     return res.status(400).json({
-      error: "A coin amount greater than 0 is required"
+      error:
+        "A coin amount greater than 0 is required"
     });
   }
 
@@ -304,6 +331,7 @@ app.post("/api/admin/give-all", (req, res) => {
     coins
   });
 
+  // Pro Spielername gibt es durch die Map nur eine Verbindung.
   for (const [name, ws] of players) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
@@ -330,18 +358,25 @@ app.post("/api/admin/take", (req, res) => {
     });
   }
 
-  const player = cleanName(req.body?.player);
+  const player = cleanName(
+    req.body?.player
+  );
+
   const coins = amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error: "Player and a coin amount are required"
+      error:
+        "Player and a coin amount are required"
     });
   }
 
   const target = players.get(player);
 
-  if (!target || target.readyState !== WebSocket.OPEN) {
+  if (
+    !target ||
+    target.readyState !== WebSocket.OPEN
+  ) {
     return res.status(404).json({
       error: "Player is not online"
     });
@@ -370,18 +405,23 @@ app.post("/api/admin/poop-event", (req, res) => {
     });
   }
 
-  const action = String(req.body?.action || "");
+  const action = String(
+    req.body?.action || ""
+  );
 
   if (action === "start") {
     const durationMs = Math.max(
       60000,
       Math.min(
         10080 * 60 * 1000,
-        Math.floor(Number(req.body?.durationMs) || 0)
+        Math.floor(
+          Number(req.body?.durationMs) || 0
+        )
       )
     );
 
-    poopEventUntil = Date.now() + durationMs;
+    poopEventUntil =
+      Date.now() + durationMs;
 
     broadcast({
       type: "poopEvent",
@@ -416,7 +456,11 @@ app.post("/api/admin/poop-event", (req, res) => {
 
 /* =========================================================
    SERVERNACHRICHTEN
+   Mehrere gleichzeitig möglich
    ========================================================= */
+
+
+/* ---------- Nachricht senden ---------- */
 
 app.post("/api/admin/message", (req, res) => {
   if (!anyAdminOK(req)) {
@@ -425,20 +469,26 @@ app.post("/api/admin/message", (req, res) => {
     });
   }
 
-  const text = String(req.body?.text || "")
+  const text = String(
+    req.body?.text || ""
+  )
     .trim()
     .slice(0, 120);
 
   const minutes = Math.max(
     0,
-    Math.floor(Number(req.body?.minutes) || 0)
+    Math.floor(
+      Number(req.body?.minutes) || 0
+    )
   );
 
   const seconds = Math.max(
     0,
     Math.min(
       59,
-      Math.floor(Number(req.body?.seconds) || 0)
+      Math.floor(
+        Number(req.body?.seconds) || 0
+      )
     )
   );
 
@@ -447,22 +497,30 @@ app.post("/api/admin/message", (req, res) => {
 
   if (!text || duration <= 0) {
     return res.status(400).json({
-      error: "Text and duration required"
+      error:
+        "Text and duration required"
     });
   }
 
   const message = {
     id:
       Date.now().toString() +
-      Math.random().toString(36).slice(2, 8),
+      "-" +
+      Math.random()
+        .toString(36)
+        .slice(2, 10),
 
     type: "serverMessage",
 
     text,
 
-    endsAt: Date.now() + duration
+    createdAt: Date.now(),
+
+    endsAt:
+      Date.now() + duration
   };
 
+  // NICHT ersetzen – neue Nachricht hinzufügen
   serverMessages.push(message);
 
   broadcast(message);
@@ -476,65 +534,74 @@ app.post("/api/admin/message", (req, res) => {
 
 /* ---------- Alle Nachrichten löschen ---------- */
 
-app.post("/api/admin/message/clear", (req, res) => {
-  if (!anyAdminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
+app.post(
+  "/api/admin/message/clear",
+  (req, res) => {
+    if (!anyAdminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    serverMessages = [];
+
+    broadcast({
+      type: "serverMessagesClear"
+    });
+
+    return res.json({
+      ok: true
     });
   }
-
-  serverMessages = [];
-
-  broadcast({
-    type: "serverMessagesClear"
-  });
-
-  return res.json({
-    ok: true
-  });
-});
+);
 
 
 /* ---------- Einzelne Nachricht löschen ---------- */
 
-app.post("/api/admin/message/delete", (req, res) => {
-  if (!anyAdminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
-  }
+app.post(
+  "/api/admin/message/delete",
+  (req, res) => {
+    if (!anyAdminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
 
-  const id = String(req.body?.id || "");
-
-  if (!id) {
-    return res.status(400).json({
-      error: "Message id required"
-    });
-  }
-
-  serverMessages =
-    serverMessages.filter(
-      (message) =>
-        String(message.id) !== id
+    const id = String(
+      req.body?.id || ""
     );
 
-  broadcast({
-    type: "serverMessageDelete",
-    id
-  });
+    if (!id) {
+      return res.status(400).json({
+        error:
+          "Message id required"
+      });
+    }
 
-  return res.json({
-    ok: true
-  });
-});
+    serverMessages =
+      serverMessages.filter(
+        (message) =>
+          String(message.id) !== id
+      );
+
+    broadcast({
+      type: "serverMessageDelete",
+      id
+    });
+
+    return res.json({
+      ok: true
+    });
+  }
+);
 
 
 /* =========================================================
-   ZWEITES ADMIN-PANEL 6301
+   ZWEITER ADMIN 6301
    ========================================================= */
 
 
-/* ---------- Event anfragen ---------- */
+/* ---------- Event-Anfrage senden ---------- */
 
 app.post(
   "/api/second-admin/event-request",
@@ -558,22 +625,38 @@ app.post(
       });
     }
 
+    const durationMs = Math.max(
+      1000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(
+          Number(req.body?.durationMs) || 0
+        )
+      )
+    );
+
     const requestId =
       Date.now().toString() +
+      "-" +
       Math.random()
         .toString(36)
-        .slice(2, 8);
+        .slice(2, 10);
 
     const request = {
       id: requestId,
       event,
+      durationMs,
       createdAt: Date.now()
     };
 
-    eventRequests.set(requestId, request);
+    eventRequests.set(
+      requestId,
+      request
+    );
 
-    // Anfrage nur an alle Haupt-Admins senden.
-    // Das Haupt-Admin-Panel filtert über den Admin-Code.
+    // Anfrage an verbundene Clients schicken.
+    // Das Spiel/Admin-Panel entscheidet, ob es eine Anfrage
+    // darstellen soll.
     broadcast({
       type: "adminEventRequest",
       request
@@ -587,7 +670,7 @@ app.post(
 );
 
 
-/* ---------- Anfrage beantworten ---------- */
+/* ---------- Haupt-Admin erlaubt/verbietet ---------- */
 
 app.post(
   "/api/admin/event-request/respond",
@@ -606,6 +689,17 @@ app.post(
       req.body?.decision || ""
     );
 
+    const request =
+      eventRequests.get(
+        requestId
+      );
+
+    if (!request) {
+      return res.status(404).json({
+        error: "Request not found"
+      });
+    }
+
     if (
       decision !== "allow" &&
       decision !== "deny"
@@ -615,22 +709,20 @@ app.post(
       });
     }
 
-    const request =
-      eventRequests.get(requestId);
-
-    if (!request) {
-      return res.status(404).json({
-        error: "Request not found"
-      });
-    }
-
-    eventRequests.delete(requestId);
+    eventRequests.delete(
+      requestId
+    );
 
     if (decision === "deny") {
       broadcast({
-        type: "adminEventRequestResult",
+        type:
+          "adminEventRequestResult",
+
         requestId,
-        allowed: false
+
+        allowed: false,
+
+        event: request.event
       });
 
       return res.json({
@@ -639,19 +731,11 @@ app.post(
       });
     }
 
+    // Erst HIER startet das Event wirklich.
     if (request.event === "coins") {
-      const durationMs = Math.max(
-        1000,
-        Math.min(
-          10080 * 60 * 1000,
-          Math.floor(
-            Number(req.body?.durationMs) || 0
-          )
-        )
-      );
-
       coinEventUntil =
-        Date.now() + durationMs;
+        Date.now() +
+        request.durationMs;
 
       broadcast({
         type: "coinEvent",
@@ -660,18 +744,9 @@ app.post(
     }
 
     if (request.event === "poop") {
-      const durationMs = Math.max(
-        60000,
-        Math.min(
-          10080 * 60 * 1000,
-          Math.floor(
-            Number(req.body?.durationMs) || 0
-          )
-        )
-      );
-
       poopEventUntil =
-        Date.now() + durationMs;
+        Date.now() +
+        request.durationMs;
 
       broadcast({
         type: "poopEvent",
@@ -680,9 +755,13 @@ app.post(
     }
 
     broadcast({
-      type: "adminEventRequestResult",
+      type:
+        "adminEventRequestResult",
+
       requestId,
+
       allowed: true,
+
       event: request.event
     });
 
@@ -743,25 +822,86 @@ app.post(
 );
 
 
+/* ---------- Status für Admin 2 ---------- */
+
+app.get(
+  "/api/second-admin/status",
+  (req, res) => {
+    if (!secondAdminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    // Alte Anfragen, die sehr lange offen sind,
+    // entfernen, damit die Map nicht unendlich wächst.
+    const now = Date.now();
+
+    for (
+      const [id, request]
+      of eventRequests
+    ) {
+      if (
+        now -
+          Number(
+            request.createdAt || 0
+          ) >
+        10 * 60 * 1000
+      ) {
+        eventRequests.delete(id);
+      }
+    }
+
+    res.json({
+      ok: true,
+
+      coinEventUntil:
+        coinEventUntil >
+        Date.now()
+          ? coinEventUntil
+          : 0,
+
+      poopEventUntil:
+        poopEventUntil >
+        Date.now()
+          ? poopEventUntil
+          : 0,
+
+      messages:
+        serverMessages,
+
+      pendingRequests: [
+        ...eventRequests.values()
+      ]
+    });
+  }
+);
+
+
 /* =========================================================
    ONLINE SPIELER
    ========================================================= */
 
-app.get("/api/status", (req, res) => {
-  if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
+app.get(
+  "/api/status",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    res.json({
+      onlinePlayers: [
+        ...players.keys()
+      ]
     });
   }
-
-  res.json({
-    onlinePlayers: [...players.keys()]
-  });
-});
+);
 
 
 /* =========================================================
-   ABGELAUFENE NACHRICHTEN ENTFERNEN
+   ABGELAUFENE SERVERNACHRICHTEN AUFRÄUMEN
    ========================================================= */
 
 setInterval(() => {
@@ -773,15 +913,20 @@ setInterval(() => {
   serverMessages =
     serverMessages.filter(
       (message) =>
-        Number(message.endsAt || 0) > now
+        Number(
+          message.endsAt || 0
+        ) > now
     );
 
   if (
     serverMessages.length !== oldLength
   ) {
     broadcast({
-      type: "serverMessagesUpdate",
-      messages: serverMessages
+      type:
+        "serverMessagesUpdate",
+
+      messages:
+        serverMessages
     });
   }
 }, 1000);
