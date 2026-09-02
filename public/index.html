@@ -4820,8 +4820,6 @@ setInterval(renderServerMessages,250);
   }
 
   async function loadRequests(){
-    if(!panel.classList.contains("open")) return;
-
     try{
       const res=await fetch("/api/admin/event-requests",{
         headers:{"x-admin-key":ADMIN_KEY}
@@ -4971,7 +4969,7 @@ setInterval(renderServerMessages,250);
   function startPolling(){
     if(timer) clearInterval(timer);
     loadRequests();
-    timer=setInterval(loadRequests,3000);
+    timer=setInterval(loadRequests,2000);
   }
 
   window.startEventRequestPolling=startPolling;
