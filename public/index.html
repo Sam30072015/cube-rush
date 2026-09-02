@@ -2226,6 +2226,13 @@ let poopEventActive=false;
 let poopEventEndsAt=0;
 const POOP_REWARD=100;
 
+// Kackhaufen sind nur Hintergrund-Deko.
+// Das Bild wird einmal erstellt und danach nur noch gezeichnet,
+// damit das Event nicht durch 38 Emoji-Zeichnungen pro Frame laggt.
+let poopBackgroundCanvas=null;
+let poopBackgroundW=0;
+let poopBackgroundH=0;
+
 const TACO_IMAGE=new Image();
 
 function updatePoopEventHud(){
@@ -2236,22 +2243,44 @@ function updatePoopEventHud(){
   }
 }
 
+function rebuildPoopBackground(){
+  if(!Number.isFinite(W)||!Number.isFinite(H)||W<=0||H<=0)return;
+
+  poopBackgroundCanvas=document.createElement("canvas");
+  poopBackgroundCanvas.width=Math.max(1,Math.floor(W));
+  poopBackgroundCanvas.height=Math.max(1,Math.floor(H));
+  poopBackgroundW=W;
+  poopBackgroundH=H;
+
+  const c=poopBackgroundCanvas.getContext("2d");
+  c.clearRect(0,0,poopBackgroundCanvas.width,poopBackgroundCanvas.height);
+  c.globalAlpha=.82;
+  c.textAlign="center";
+  c.textBaseline="middle";
+
+  // Feste Deko-Positionen: nichts fällt und nichts bewegt sich.
+  const count=26;
+  for(let i=0;i<count;i++){
+    const x=40+((i*137)%(Math.max(1,W-80)));
+    const y=50+((i*83)%(Math.max(1,H-100)));
+    const size=22+(i%4)*7;
+    c.font=`${size}px Arial`;
+    c.fillText("💩",x,y);
+  }
+
+  c.globalAlpha=1;
+}
+
 function drawPoopEventBackground(){
   if(!poopEventActive || Date.now()>=poopEventEndsAt)return;
+  if(!poopBackgroundCanvas || poopBackgroundW!==W || poopBackgroundH!==H){
+    rebuildPoopBackground();
+  }
+  if(!poopBackgroundCanvas)return;
 
   ctx.save();
   ctx.globalAlpha=.82;
-  const count=38;
-  for(let i=0;i<count;i++){
-    let x=((i*137-camera*.06)%(W+140)+W+140)%(W+140)-70;
-    const y=45+(i*83)%430;
-    const size=22+(i%4)*7;
-    ctx.font=`${size}px Arial`;
-    ctx.textAlign="center";
-    ctx.textBaseline="middle";
-    ctx.fillText("💩",x,y);
-  }
-  ctx.globalAlpha=1;
+  ctx.drawImage(poopBackgroundCanvas,0,0);
   ctx.restore();
 }
 
@@ -2259,8 +2288,9 @@ function startPoopEvent(until){
   poopEventActive=true;
   poopEventEndsAt=Number(until)||0;
 
-  // Kackhaufen sind bei diesem Event nur Hintergrund-Deko.
-  // Es regnet nichts herunter und nichts kann eingesammelt werden.
+  // Einmalig den Hintergrund vorbereiten. Danach gibt es keine
+  // fallenden Kackhaufen und keine Sammel-Kollisionen.
+  rebuildPoopBackground();
 
   updatePoopEventHud();
   updateShop();
