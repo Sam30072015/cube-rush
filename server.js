@@ -69,12 +69,17 @@ wss.on("connection", (ws) => {
           Math.random().toString(36).slice(2, 8).toUpperCase();
       }
 
-      // Verhindert zwei aktive Verbindungen mit gleichem Namen.
-      if (players.has(name) && players.get(name) !== ws) {
-        name =
-          name +
-          "-" +
-          Math.random().toString(36).slice(2, 5).toUpperCase();
+      // Pro Spielernamen nur eine aktive Verbindung.
+      // Dadurch bekommt ein Spieler bei "An alle"
+      // nicht mehrfach dieselben Münzen.
+      const oldSocket = players.get(name);
+
+      if (oldSocket && oldSocket !== ws) {
+        try {
+          oldSocket.terminate();
+        } catch {}
+
+        players.delete(name);
       }
 
       if (
@@ -125,7 +130,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-// Entfernt Spieler, die nicht mehr erreichbar sind.
+// Entfernt tote/offline Spieler
 setInterval(() => {
   const now = Date.now();
 
@@ -236,23 +241,23 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  // Der Spieler bekommt EXAKT die eingegebene Anzahl Münzen.
+  // EXAKT die eingegebene Menge senden
   send(target, {
     type: "gift",
     target: player,
-    coins
+    coins: coins
   });
 
   return res.json({
     ok: true,
-    player,
-    coins
+    player: player,
+    coins: coins
   });
 });
 
 
 /* =========================================================
-   ADMIN: MÜNZEN AN ALLE SPIELER
+   ADMIN: MÜNZEN AN ALLE
    ========================================================= */
 
 app.post("/api/admin/give-all", (req, res) => {
@@ -272,9 +277,10 @@ app.post("/api/admin/give-all", (req, res) => {
 
   let count = 0;
 
+  // Jeder Socket bekommt GENAU die eingegebene Anzahl.
   const message = JSON.stringify({
     type: "giftAll",
-    coins
+    coins: coins
   });
 
   for (const [name, ws] of players) {
@@ -288,8 +294,8 @@ app.post("/api/admin/give-all", (req, res) => {
 
   return res.json({
     ok: true,
-    coins,
-    count
+    coins: coins,
+    count: count
   });
 });
 
@@ -318,12 +324,10 @@ app.post("/api/admin/poop-event", (req, res) => {
 
     poopEventUntil = Date.now() + durationMs;
 
-    const message = {
+    broadcast({
       type: "poopEvent",
       until: poopEventUntil
-    };
-
-    broadcast(message);
+    });
 
     return res.json({
       ok: true,
@@ -392,7 +396,7 @@ app.post("/api/admin/message", (req, res) => {
 
   const message = {
     type: "serverMessage",
-    text,
+    text: text,
     endsAt: Date.now() + duration
   };
 
