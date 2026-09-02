@@ -1150,6 +1150,14 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
   <div id="adminBox">
     <h2>🛠️ Admin Panel</h2>
     <p id="adminStatus">Lokaler Spiel-Admin</p>
+
+    <div class="adminSectionTitle">🔔 EVENT-ANFRAGEN</div>
+    <div id="adminEventRequests"
+         style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+      <div id="adminEventRequestsEmpty"
+           style="opacity:.8">Keine offenen Event-Anfragen.</div>
+    </div>
+
     <div class="adminGrid">
       <button class="adminAction" id="adminCoins">+1000 Münzen</button>
       <button class="adminAction" id="adminUnlock">Alle Level öffnen</button>
@@ -4690,15 +4698,17 @@ setInterval(renderServerMessage,250);
   coinsStart?.addEventListener("click",async()=>{
     const minutes=Math.max(1,Number(coinsMin.value)||0);
     try{
-      const data=await api("/api/admin/coins-event",{action:"start",durationMs:minutes*60000});
-      if(typeof setCoinEvent==="function")setCoinEvent(data.until||0);
-      if(status)status.textContent="✅ 2× Münzen für "+minutes+" Minuten gestartet";
+      await api("/api/second-admin/coins-event",{
+        action:"start",
+        durationMs:minutes*60000
+      });
+      if(status)status.textContent="🕐 Anfrage an Haupt-Admin gesendet";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
   });
 
   coinsStop?.addEventListener("click",async()=>{
     try{
-      const data=await api("/api/admin/coins-event",{action:"stop"});
+      const data=await api("/api/second-admin/coins-event",{action:"stop"});
       if(typeof setCoinEvent==="function")setCoinEvent(data.until||0);
       if(status)status.textContent="🛑 2× Münzen gestoppt";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
@@ -4707,19 +4717,210 @@ setInterval(renderServerMessage,250);
   poopStart?.addEventListener("click",async()=>{
     const minutes=Math.max(1,Number(poopMin.value)||0);
     try{
-      const data=await api("/api/admin/poop-event",{action:"start",durationMs:minutes*60000});
-      if(typeof startPoopEvent==="function")startPoopEvent(data.until||0);
-      if(status)status.textContent="✅ Kackhaufen-Event gestartet";
+      await api("/api/second-admin/poop-event",{
+        action:"start",
+        durationMs:minutes*60000
+      });
+      if(status)status.textContent="🕐 Anfrage an Haupt-Admin gesendet";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
   });
 
   poopStop?.addEventListener("click",async()=>{
     try{
-      const data=await api("/api/admin/poop-event",{action:"stop"});
+      const data=await api("/api/second-admin/poop-event",{action:"stop"});
       if(typeof stopPoopEvent==="function")stopPoopEvent();
       if(status)status.textContent="🛑 Kackhaufen-Event gestoppt";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
   });
+})();
+
+
+/* ---------- EVENT-ANFRAGEN: HAUPT-ADMIN ---------- */
+(function(){
+  const box=document.getElementById("adminEventRequests");
+  const panel=document.getElementById("adminPanel");
+  const ADMIN_KEY="603781";
+
+  if(!box || !panel)return;
+
+  let timer=null;
+
+  function eventName(type){
+    return type==="coins"
+      ? "🪙 2× Münzen"
+      : type==="poop"
+        ? "💩 Kackhaufen"
+        : "🎉 Event";
+  }
+
+  async function loadRequests(){
+    if(!panel.classList.contains("open")) return;
+
+    try{
+      const res=await fetch("/api/admin/event-requests",{
+        headers:{"x-admin-key":ADMIN_KEY}
+      });
+
+      if(!res.ok) return;
+
+      const data=await res.json();
+      const requests=Array.isArray(data.requests)
+        ? data.requests
+        : [];
+
+      box.innerHTML="";
+
+      if(!requests.length){
+        box.innerHTML=
+          '<div id="adminEventRequestsEmpty" style="opacity:.8">Keine offenen Event-Anfragen.</div>';
+        return;
+      }
+
+      requests.forEach(request=>{
+        const card=document.createElement("div");
+        card.style.cssText=
+          "padding:10px;border:2px solid rgba(255,255,255,.18);border-radius:12px;background:rgba(0,0,0,.16)";
+
+        const minutes=Math.max(
+          1,
+          Math.round(Number(request.durationMs||0)/60000)
+        );
+
+        const title=document.createElement("div");
+        title.style.cssText="font-weight:900;margin-bottom:6px";
+        title.textContent=
+          "🔔 "+eventName(request.event)+" · "+minutes+" Min";
+
+        const text=document.createElement("div");
+        text.style.cssText="font-size:13px;opacity:.8;margin-bottom:8px";
+        text.textContent=
+          "Admin 2 möchte dieses Event starten.";
+
+        const actions=document.createElement("div");
+        actions.style.cssText=
+          "display:grid;grid-template-columns:1fr 1fr;gap:8px";
+
+        const approve=document.createElement("button");
+        approve.className="adminAction";
+        approve.textContent="✅ Erlauben";
+
+        const reject=document.createElement("button");
+        reject.className="adminAction";
+        reject.textContent="❌ Ablehnen";
+
+        approve.addEventListener("click",async()=>{
+          approve.disabled=true;
+          reject.disabled=true;
+
+          try{
+            const res=await fetch(
+              "/api/admin/event-requests/approve",
+              {
+                method:"POST",
+                headers:{
+                  "Content-Type":"application/json",
+                  "x-admin-key":ADMIN_KEY
+                },
+                body:JSON.stringify({id:request.id})
+              }
+            );
+
+            const data=await res.json().catch(()=>({}));
+
+            if(!res.ok){
+              throw new Error(data.error||"Fehler");
+            }
+
+            const status=document.getElementById("adminStatus");
+            if(status){
+              status.textContent=
+                "✅ "+eventName(request.event)+" gestartet";
+            }
+
+            await loadRequests();
+          }catch(e){
+            approve.disabled=false;
+            reject.disabled=false;
+
+            const status=document.getElementById("adminStatus");
+            if(status){
+              status.textContent="❌ "+e.message;
+            }
+          }
+        });
+
+        reject.addEventListener("click",async()=>{
+          approve.disabled=true;
+          reject.disabled=true;
+
+          try{
+            const res=await fetch(
+              "/api/admin/event-requests/reject",
+              {
+                method:"POST",
+                headers:{
+                  "Content-Type":"application/json",
+                  "x-admin-key":ADMIN_KEY
+                },
+                body:JSON.stringify({id:request.id})
+              }
+            );
+
+            const data=await res.json().catch(()=>({}));
+
+            if(!res.ok){
+              throw new Error(data.error||"Fehler");
+            }
+
+            const status=document.getElementById("adminStatus");
+            if(status){
+              status.textContent=
+                "❌ Event-Anfrage abgelehnt";
+            }
+
+            await loadRequests();
+          }catch(e){
+            approve.disabled=false;
+            reject.disabled=false;
+
+            const status=document.getElementById("adminStatus");
+            if(status){
+              status.textContent="❌ "+e.message;
+            }
+          }
+        });
+
+        actions.appendChild(approve);
+        actions.appendChild(reject);
+
+        card.appendChild(title);
+        card.appendChild(text);
+        card.appendChild(actions);
+
+        box.appendChild(card);
+      });
+    }catch{}
+  }
+
+  function startPolling(){
+    if(timer) clearInterval(timer);
+    loadRequests();
+    timer=setInterval(loadRequests,2000);
+  }
+
+  function stopPolling(){
+    if(timer){
+      clearInterval(timer);
+      timer=null;
+    }
+  }
+
+  // Beim Öffnen des ersten Admin-Panels sofort prüfen.
+  // Regelmäßig prüfen. Es wird nur geladen, solange Panel 1 geöffnet ist.
+  startPolling();
+
+  const close=document.getElementById("adminClose");
+  close?.addEventListener("click",stopPolling);
 })();
 
 /* ---------- ADMIN CODE 4729 ---------- */
