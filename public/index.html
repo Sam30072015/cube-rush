@@ -1301,6 +1301,14 @@ let musicOn=true;
 let musicPreference=true;
 
 /* ---------- saved progress ---------- */
+// Einmaliger globaler Münz-Reset für diese Spielversion.
+// Alle alten Münzstände werden auf 0 gesetzt. Danach funktionieren
+// normale Belohnungen und Admin-Geschenke wieder ganz normal.
+const COIN_RESET_KEY="crCoinReset_v1";
+if(localStorage.getItem(COIN_RESET_KEY)!=="done"){
+  localStorage.setItem("crCoins","0");
+  localStorage.setItem(COIN_RESET_KEY,"done");
+}
 let coins=Number(localStorage.getItem("crCoins"))||0;
 let unlocked=Math.min(20,Math.max(1,Number(localStorage.getItem("crUnlocked")||1)));
 if(unlocked>10){
