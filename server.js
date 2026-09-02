@@ -28,11 +28,8 @@ function send(ws, payload) {
 
 function broadcast(payload) {
   const data = JSON.stringify(payload);
-
   for (const ws of wss.clients) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-    }
+    if (ws.readyState === WebSocket.OPEN) ws.send(data);
   }
 }
 
@@ -50,7 +47,6 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (raw) => {
     let msg;
-
     try {
       msg = JSON.parse(raw.toString());
     } catch {
@@ -63,9 +59,7 @@ wss.on("connection", (ws) => {
       let name = cleanName(msg.name);
 
       if (!name) {
-        name =
-          "Spieler-" +
-          Math.random().toString(36).slice(2, 8).toUpperCase();
+        name = "Spieler-" + Math.random().toString(36).slice(2, 8).toUpperCase();
       }
 
       const oldSocket = players.get(name);
@@ -78,10 +72,7 @@ wss.on("connection", (ws) => {
         players.delete(name);
       }
 
-      if (
-        ws.playerName &&
-        players.get(ws.playerName) === ws
-      ) {
+      if (ws.playerName && players.get(ws.playerName) === ws) {
         players.delete(ws.playerName);
       }
 
@@ -91,36 +82,25 @@ wss.on("connection", (ws) => {
       send(ws, {
         type: "connected",
         name,
-        poopEventUntil:
-          poopEventUntil > Date.now()
-            ? poopEventUntil
-            : 0
+        poopEventUntil: poopEventUntil > Date.now() ? poopEventUntil : 0
       });
 
       return;
     }
 
     if (msg.type === "heartbeat") {
-      send(ws, {
-        type: "heartbeatAck"
-      });
+      send(ws, { type: "heartbeatAck" });
     }
   });
 
   ws.on("close", () => {
-    if (
-      ws.playerName &&
-      players.get(ws.playerName) === ws
-    ) {
+    if (ws.playerName && players.get(ws.playerName) === ws) {
       players.delete(ws.playerName);
     }
   });
 
   ws.on("error", () => {
-    if (
-      ws.playerName &&
-      players.get(ws.playerName) === ws
-    ) {
+    if (ws.playerName && players.get(ws.playerName) === ws) {
       players.delete(ws.playerName);
     }
   });
@@ -150,9 +130,7 @@ setInterval(() => {
 
 app.post("/api/admin/coins-event", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const action = String(req.body?.action || "");
@@ -173,10 +151,7 @@ app.post("/api/admin/coins-event", (req, res) => {
       until
     });
 
-    return res.json({
-      ok: true,
-      until
-    });
+    return res.json({ ok: true, until });
   }
 
   if (action === "stop") {
@@ -203,9 +178,7 @@ app.post("/api/admin/coins-event", (req, res) => {
 
 app.post("/api/admin/give", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const player = cleanName(req.body?.player);
@@ -213,16 +186,17 @@ app.post("/api/admin/give", (req, res) => {
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error: "Player and coin amount required"
+      error: "Player and a coin amount are required"
     });
   }
 
   const target = players.get(player);
 
-  if (
-    !target ||
-    target.readyState !== WebSocket.OPEN
-  ) {
+  if (!target || target.readyState !== WebSocket.OPEN) {
+    if (players.get(player) === target) {
+      players.delete(player);
+    }
+
     return res.status(404).json({
       error: "Player is not online"
     });
@@ -248,16 +222,14 @@ app.post("/api/admin/give", (req, res) => {
 
 app.post("/api/admin/give-all", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const coins = amountFrom(req.body);
 
   if (coins <= 0) {
     return res.status(400).json({
-      error: "Coin amount must be greater than 0"
+      error: "A coin amount greater than 0 is required"
     });
   }
 
@@ -291,9 +263,7 @@ app.post("/api/admin/give-all", (req, res) => {
 
 app.post("/api/admin/take", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const player = cleanName(req.body?.player);
@@ -301,25 +271,24 @@ app.post("/api/admin/take", (req, res) => {
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error: "Player and coin amount required"
+      error: "Player and a coin amount are required"
     });
   }
 
   const target = players.get(player);
 
-  if (
-    !target ||
-    target.readyState !== WebSocket.OPEN
-  ) {
+  if (!target || target.readyState !== WebSocket.OPEN) {
+    if (players.get(player) === target) {
+      players.delete(player);
+    }
+
     return res.status(404).json({
       error: "Player is not online"
     });
   }
 
-  // Minus-Meldung an den Spieler.
-  // Der Client zieht die Münzen ab und setzt niemals unter 0.
   send(target, {
-    type: "takeCoins",
+    type: "giftSubtract",
     target: player,
     coins
   });
@@ -338,9 +307,7 @@ app.post("/api/admin/take", (req, res) => {
 
 app.post("/api/admin/poop-event", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const action = String(req.body?.action || "");
@@ -393,14 +360,10 @@ app.post("/api/admin/poop-event", (req, res) => {
 
 app.post("/api/admin/message", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const text = String(
-    req.body?.text || ""
-  )
+  const text = String(req.body?.text || "")
     .trim()
     .slice(0, 120);
 
@@ -417,8 +380,7 @@ app.post("/api/admin/message", (req, res) => {
     )
   );
 
-  const duration =
-    (minutes * 60 + seconds) * 1000;
+  const duration = (minutes * 60 + seconds) * 1000;
 
   if (!text || duration <= 0) {
     return res.status(400).json({
@@ -464,11 +426,7 @@ app.get("/api/status", (req, res) => {
 
 app.use((req, res) => {
   res.sendFile(
-    path.join(
-      __dirname,
-      "public",
-      "index.html"
-    )
+    path.join(__dirname, "public", "index.html")
   );
 });
 
