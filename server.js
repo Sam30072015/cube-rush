@@ -7,14 +7,14 @@ const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 
 const app = express();
-
 app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const players = new Map(); // name -> websocket
+// Spielername -> WebSocket
+const players = new Map();
 
 function cleanName(name) {
   return String(name || "").trim().slice(0, 40);
@@ -36,9 +36,17 @@ function broadcast(payload) {
   }
 }
 
+function adminOK(req) {
+  return req.headers["x-admin-key"] === ADMIN_KEY;
+}
+
+function amountFrom(body) {
+  return Math.max(0, Math.floor(Number(body?.coins) || 0));
+}
+
 wss.on("connection", (ws) => {
-  ws.lastSeen = Date.now();
   ws.playerName = "";
+  ws.lastHeartbeat = Date.now();
 
   ws.on("message", (raw) => {
     let msg;
@@ -49,16 +57,9 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    // Spieler meldet, dass er noch online ist
-    if (msg.type === "heartbeat") {
-      ws.lastSeen = Date.now();
-      return;
-    }
+    ws.lastHeartbeat = Date.now();
 
-    // Spielername registrieren
     if (msg.type === "identify") {
-      ws.lastSeen = Date.now();
-
       let name = cleanName(msg.name);
 
       if (!name) {
@@ -67,7 +68,7 @@ wss.on("connection", (ws) => {
           Math.random().toString(36).slice(2, 8).toUpperCase();
       }
 
-      // Verhindert doppelte Namen bei gleichzeitig verbundenen Spielern
+      // Verhindert zwei aktive Verbindungen mit gleichem Namen.
       if (players.has(name) && players.get(name) !== ws) {
         name =
           name +
@@ -75,7 +76,10 @@ wss.on("connection", (ws) => {
           Math.random().toString(36).slice(2, 5).toUpperCase();
       }
 
-      if (ws.playerName) {
+      if (
+        ws.playerName &&
+        players.get(ws.playerName) === ws
+      ) {
         players.delete(ws.playerName);
       }
 
@@ -89,9 +93,14 @@ wss.on("connection", (ws) => {
 
       return;
     }
+
+    if (msg.type === "heartbeat") {
+      send(ws, {
+        type: "heartbeatAck"
+      });
+    }
   });
 
-  // Spieler wirklich entfernen, wenn Verbindung geschlossen wird
   ws.on("close", () => {
     if (
       ws.playerName &&
@@ -111,49 +120,44 @@ wss.on("connection", (ws) => {
   });
 });
 
-/* =========================================
-   OFFLINE-SPIELER AUFRÄUMEN
-   ========================================= */
-
+// Entfernt Spieler, die nicht mehr erreichbar sind.
 setInterval(() => {
   const now = Date.now();
 
-  for (const [name, ws] of players.entries()) {
-    if (now - (ws.lastSeen || 0) > 30000) {
+  for (const [name, ws] of players) {
+    if (
+      ws.readyState !== WebSocket.OPEN ||
+      now - (ws.lastHeartbeat || 0) > 30000
+    ) {
       players.delete(name);
 
       try {
         ws.terminate();
-      } catch (e) {}
+      } catch {}
     }
   }
 }, 15000);
 
-/* =========================================
-   ADMIN: 2× MÜNZEN EVENT
-   ========================================= */
+
+/* =========================================================
+   ADMIN: 2x MÜNZEN EVENT
+   ========================================================= */
 
 app.post("/api/admin/coins-event", (req, res) => {
-  if (
-    req.headers["x-admin-key"] !== ADMIN_KEY
-  ) {
+  if (!adminOK(req)) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
-  const action = String(
-    req.body.action || ""
-  );
+  const action = String(req.body?.action || "");
 
   if (action === "start") {
     const durationMs = Math.max(
       1000,
       Math.min(
         10080 * 60 * 1000,
-        Math.floor(
-          Number(req.body.durationMs) || 0
-        )
+        Math.floor(Number(req.body?.durationMs) || 0)
       )
     );
 
@@ -164,7 +168,6 @@ app.post("/api/admin/coins-event", (req, res) => {
       until
     };
 
-    // An alle Spieler senden
     broadcast(message);
 
     return res.json({
@@ -192,43 +195,24 @@ app.post("/api/admin/coins-event", (req, res) => {
   });
 });
 
-/* =========================================
-   ADMIN: SPIELER BELOHNEN
-   ========================================= */
+
+/* =========================================================
+   ADMIN: MÜNZEN AN EINEN SPIELER
+   ========================================================= */
 
 app.post("/api/admin/give", (req, res) => {
-  if (
-    req.headers["x-admin-key"] !== ADMIN_KEY
-  ) {
+  if (!adminOK(req)) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
-  const player = cleanName(
-    req.body.player
-  );
+  const player = cleanName(req.body?.player);
+  const coins = amountFrom(req.body);
 
-  const coins = Math.max(
-    0,
-    Math.floor(
-      Number(req.body.coins) || 0
-    )
-  );
-
-  const skin = String(
-    req.body.skin || ""
-  )
-    .trim()
-    .slice(0, 40);
-
-  if (
-    !player ||
-    (coins === 0 && !skin)
-  ) {
+  if (!player || coins <= 0) {
     return res.status(400).json({
-      error:
-        "Player and coins or skin required"
+      error: "Player and a coin amount are required"
     });
   }
 
@@ -238,83 +222,105 @@ app.post("/api/admin/give", (req, res) => {
     !target ||
     target.readyState !== WebSocket.OPEN
   ) {
+    if (players.get(player) === target) {
+      players.delete(player);
+    }
+
     return res.status(404).json({
       error: "Player is not online"
     });
   }
 
+  // Der Spieler bekommt EXAKT die eingegebene Anzahl Münzen.
   send(target, {
     type: "gift",
     target: player,
-    coins,
-    skin
+    coins: coins
   });
 
   return res.json({
     ok: true,
-    player,
-    coins,
-    skin
+    player: player,
+    coins: coins
   });
 });
 
-/* =========================================
-   ADMIN: SERVERNACHRICHT
-   ========================================= */
+
+/* =========================================================
+   ADMIN: MÜNZEN AN ALLE SPIELER
+   ========================================================= */
+
+app.post("/api/admin/give-all", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({
+      error: "Unauthorized"
+    });
+  }
+
+  const coins = amountFrom(req.body);
+
+  if (coins <= 0) {
+    return res.status(400).json({
+      error: "A coin amount greater than 0 is required"
+    });
+  }
+
+  let count = 0;
+
+  const message = JSON.stringify({
+    type: "giftAll",
+    coins: coins
+  });
+
+  for (const [name, ws] of players) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+      count += 1;
+    } else {
+      players.delete(name);
+    }
+  }
+
+  return res.json({
+    ok: true,
+    coins: coins,
+    count: count
+  });
+});
+
+
+/* =========================================================
+   ADMIN: SERVER-NACHRICHT
+   ========================================================= */
 
 app.post("/api/admin/message", (req, res) => {
-  if (
-    req.headers["x-admin-key"] !== ADMIN_KEY
-  ) {
+  if (!adminOK(req)) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
   const text = String(
-    req.body.text || ""
+    req.body?.text || ""
   )
     .trim()
     .slice(0, 120);
 
   const minutes = Math.max(
     0,
-    Math.floor(
-      Number(req.body.minutes) || 0
-    )
+    Math.floor(Number(req.body?.minutes) || 0)
   );
 
   const seconds = Math.max(
     0,
     Math.min(
       59,
-      Math.floor(
-        Number(req.body.seconds) || 0
-      )
+      Math.floor(Number(req.body?.seconds) || 0)
     )
   );
 
   const duration =
     (minutes * 60 + seconds) * 1000;
-
-  // Servernachricht für alle löschen
-  if (
-    req.body.clear === true ||
-    (!text && duration === 0)
-  ) {
-    const message = {
-      type: "serverMessage",
-      text: "",
-      endsAt: 0
-    };
-
-    broadcast(message);
-
-    return res.json({
-      ok: true,
-      ...message
-    });
-  }
 
   if (!text || duration <= 0) {
     return res.status(400).json({
@@ -324,11 +330,10 @@ app.post("/api/admin/message", (req, res) => {
 
   const message = {
     type: "serverMessage",
-    text,
+    text: text,
     endsAt: Date.now() + duration
   };
 
-  // Nachricht an alle Spieler
   broadcast(message);
 
   return res.json({
@@ -337,35 +342,27 @@ app.post("/api/admin/message", (req, res) => {
   });
 });
 
-/* =========================================
-   ADMIN: ONLINE-SPIELER
-   ========================================= */
+
+/* =========================================================
+   ADMIN: ONLINE SPIELER
+   ========================================================= */
 
 app.get("/api/status", (req, res) => {
-  if (
-    req.headers["x-admin-key"] !== ADMIN_KEY
-  ) {
+  if (!adminOK(req)) {
     return res.status(401).json({
       error: "Unauthorized"
     });
   }
 
   res.json({
-    onlinePlayers: [
-      ...players.keys()
-    ]
+    onlinePlayers: [...players.keys()]
   });
 });
 
-/* =========================================
-   SPIEL AUSLIEFERN
-   =========================================
 
-   WICHTIG:
-   Kein app.get("*"), weil das bei
-   neueren Express-Versionen den
-   PathError verursacht.
-   */
+/* =========================================================
+   RENDER / HTML FALLBACK
+   ========================================================= */
 
 app.use((req, res) => {
   res.sendFile(
@@ -377,9 +374,10 @@ app.use((req, res) => {
   );
 });
 
-/* =========================================
+
+/* =========================================================
    SERVER START
-   ========================================= */
+   ========================================================= */
 
 server.listen(PORT, () => {
   console.log(
