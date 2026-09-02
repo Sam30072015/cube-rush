@@ -13,8 +13,9 @@ app.use(express.static(path.join(__dirname, "public")));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Spielername -> WebSocket
+// name -> websocket
 const players = new Map();
+let poopEventUntil = 0;
 
 function cleanName(name) {
   return String(name || "").trim().slice(0, 40);
@@ -88,7 +89,11 @@ wss.on("connection", (ws) => {
 
       send(ws, {
         type: "connected",
-        name
+        name,
+        poopEventUntil:
+          poopEventUntil > Date.now()
+            ? poopEventUntil
+            : 0
       });
 
       return;
@@ -235,13 +240,13 @@ app.post("/api/admin/give", (req, res) => {
   send(target, {
     type: "gift",
     target: player,
-    coins: coins
+    coins
   });
 
   return res.json({
     ok: true,
-    player: player,
-    coins: coins
+    player,
+    coins
   });
 });
 
@@ -269,7 +274,7 @@ app.post("/api/admin/give-all", (req, res) => {
 
   const message = JSON.stringify({
     type: "giftAll",
-    coins: coins
+    coins
   });
 
   for (const [name, ws] of players) {
@@ -283,8 +288,65 @@ app.post("/api/admin/give-all", (req, res) => {
 
   return res.json({
     ok: true,
-    coins: coins,
-    count: count
+    coins,
+    count
+  });
+});
+
+
+/* =========================================================
+   ADMIN: KACKHAUFEN EVENT
+   ========================================================= */
+
+app.post("/api/admin/poop-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({
+      error: "Unauthorized"
+    });
+  }
+
+  const action = String(req.body?.action || "");
+
+  if (action === "start") {
+    const durationMs = Math.max(
+      60000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(Number(req.body?.durationMs) || 0)
+      )
+    );
+
+    poopEventUntil = Date.now() + durationMs;
+
+    const message = {
+      type: "poopEvent",
+      until: poopEventUntil
+    };
+
+    broadcast(message);
+
+    return res.json({
+      ok: true,
+      until: poopEventUntil
+    });
+  }
+
+  if (action === "stop") {
+    poopEventUntil = 0;
+
+    broadcast({
+      type: "poopEvent",
+      until: 0
+    });
+
+    return res.json({
+      ok: true,
+      until: 0
+    });
+  }
+
+  return res.status(400).json({
+    error: "Invalid action"
   });
 });
 
@@ -330,7 +392,7 @@ app.post("/api/admin/message", (req, res) => {
 
   const message = {
     type: "serverMessage",
-    text: text,
+    text,
     endsAt: Date.now() + duration
   };
 
