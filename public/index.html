@@ -1303,15 +1303,13 @@ let musicPreference=true;
 
 /* ---------- saved progress ---------- */
 let coins=Number(localStorage.getItem("crCoins"))||0;
-let unlocked=Math.min(20,Math.max(1,Number(localStorage.getItem("crUnlocked")||1)));
+let unlocked=Math.min(40,Math.max(1,Number(localStorage.getItem("crUnlocked")||1)));
 if(unlocked>10){
-  // World 2 access is only valid after all ten World-1 levels are completed.
-  let tmpCompleted=[];
-  try{tmpCompleted=JSON.parse(localStorage.getItem("crCompleted"))||[]}catch(e){tmpCompleted=[]}
-  const allWorld1=Array.from({length:10},(_,i)=>tmpCompleted.includes(i)).every(Boolean);
-  if(!allWorld1) unlocked=10;
+  // Alte Spielstände: eine hohe Unlock-Zahl darf nicht mehr
+  // zurück auf Welt 1/2 gesetzt werden. Die echten abgeschlossenen
+  // Level werden weiter unten mit repairUnlocks() wiederhergestellt.
 }
-let currentLevel=Math.max(0,Math.min(19,Number(localStorage.getItem("crCurrentLevel"))||0));
+let currentLevel=Math.max(0,Math.min(39,Number(localStorage.getItem("crCurrentLevel"))||0));
 let completed=[];
 try{
   completed=JSON.parse(localStorage.getItem("crCompleted"))||[];
@@ -2847,7 +2845,7 @@ function repairUnlocks(){
   // Jedes geschaffte Level schaltet genau das nächste Level frei.
   for(const done of completed){
     const level=Number(done);
-    if(Number.isInteger(level) && level>=0 && level<29){
+    if(Number.isInteger(level) && level>=0 && level<39){
       unlocked=Math.max(unlocked,level+2);
     }
   }
@@ -3215,7 +3213,7 @@ function win(){
     completed.push(levelIndex);
     coins+=coinReward(50);
     if(levelIndex+1<levels.length){
-      unlocked=Math.max(unlocked,levelIndex+2);
+      unlocked=Math.max(unlocked,Math.min(levels.length,levelIndex+2));
     }
     try{save();}catch(e){
       localStorage.setItem("crCoins",String(coins));
@@ -4739,8 +4737,8 @@ setInterval(renderServerMessage,250);
   });
 
   document.getElementById("adminUnlock")?.addEventListener("click",()=>{
-    unlocked=Math.max(unlocked,20);
-    localStorage.setItem("crUnlocked","20");
+    unlocked=Math.max(unlocked,40);
+    localStorage.setItem("crUnlocked",String(unlocked));
     if(typeof updateMenu==="function")updateMenu();
     status.textContent="✅ Alle Level geöffnet";
   });
