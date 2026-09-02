@@ -1163,6 +1163,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button class="adminAction" id="adminGiftSend">🪙 An Spieler senden</button>
       <button class="adminAction" id="adminGiftSendAll">🪙 An alle senden</button>
+      <button class="adminAction" id="adminGiftTake">➖ Münzen abziehen</button>
     </div>
     <div id="adminGiftStatus"></div>
 
@@ -4391,6 +4392,7 @@ setInterval(renderServerMessage,250);
   const refreshBtn=document.getElementById("adminRefreshPlayers");
   const sendBtn=document.getElementById("adminGiftSend");
   const sendAllBtn=document.getElementById("adminGiftSendAll");
+  const takeBtn=document.getElementById("adminGiftTake");
   const coinsInput=document.getElementById("adminGiftCoins");
   const status=document.getElementById("adminGiftStatus");
   const playersStatus=document.getElementById("adminPlayersStatus");
@@ -4502,8 +4504,52 @@ setInterval(renderServerMessage,250);
     }
   }
 
+  async function takeCoinsFromPlayer(){
+    if(giftSending)return;
+    const player=playersSelect.value;
+    const amount=Math.max(0,Math.floor(Number(coinsInput.value)||0));
+
+    if(!player){
+      status.textContent="❌ Erst einen Online-Spieler auswählen";
+      return;
+    }
+    if(amount<=0){
+      status.textContent="❌ Erst eine Münzanzahl eingeben";
+      return;
+    }
+
+    giftSending=true;
+    sendBtn.disabled=true;
+    if(sendAllBtn)sendAllBtn.disabled=true;
+    if(takeBtn)takeBtn.disabled=true;
+    try{
+      const res=await fetch("/api/admin/take",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-admin-key":ADMIN_KEY
+        },
+        body:JSON.stringify({player,coins:amount})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Abzug fehlgeschlagen");
+
+      status.textContent="✅ "+player+" wurden "+amount+" Münzen abgezogen";
+      coinsInput.value="";
+      loadPlayers();
+    }catch(e){
+      status.textContent="❌ "+e.message;
+    }finally{
+      giftSending=false;
+      sendBtn.disabled=false;
+      if(sendAllBtn)sendAllBtn.disabled=false;
+      if(takeBtn)takeBtn.disabled=false;
+    }
+  }
+
   sendBtn.addEventListener("click",sendCoinsToPlayer);
   sendAllBtn?.addEventListener("click",sendCoinsToAll);
+  takeBtn?.addEventListener("click",takeCoinsFromPlayer);
 
   // Load immediately when the admin section is used/opened.
   setTimeout(loadPlayers,300);
@@ -5102,6 +5148,17 @@ setInterval(updateSettingsScore,500);
               if(typeof updateMenu==="function") updateMenu();
               if(typeof updateHUD==="function") updateHUD();
               showTacoCoinPopup?.("🪙 +"+receivedCoins+" Münzen");
+            }
+          }
+
+          if(msg.type==="giftSubtract"){
+            const removedCoins=Math.max(0,Number(msg.coins)||0);
+            if(removedCoins>0){
+              coins = Math.max(0,Number(coins)||0) - removedCoins;
+              localStorage.setItem("crCoins",String(coins));
+              if(typeof updateMenu==="function") updateMenu();
+              if(typeof updateHUD==="function") updateHUD();
+              showTacoCoinPopup?.("➖ "+removedCoins+" Münzen");
             }
           }
 
