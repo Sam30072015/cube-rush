@@ -4689,7 +4689,7 @@ setInterval(renderServerMessage,250);
 
   msgDelete?.addEventListener("click",async()=>{
     try{
-      await api("/api/admin/message/delete");
+      await api("/api/admin/message/delete",{});
       if(typeof deleteServerMessage==="function")deleteServerMessage();
       if(status)status.textContent="🗑️ Nachricht gelöscht";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
@@ -4908,12 +4908,16 @@ setInterval(renderServerMessage,250);
     timer=setInterval(loadRequests,2000);
   }
 
+  window.startEventRequestPolling=startPolling;
+
   function stopPolling(){
     if(timer){
       clearInterval(timer);
       timer=null;
     }
   }
+
+  window.stopEventRequestPolling=stopPolling;
 
   // Beim Öffnen des ersten Admin-Panels sofort prüfen.
   // Regelmäßig prüfen. Es wird nur geladen, solange Panel 1 geöffnet ist.
@@ -4938,6 +4942,9 @@ setInterval(renderServerMessage,250);
     panel.setAttribute("aria-hidden","false");
     input.value="";
     status.textContent="Admin-Modus aktiv";
+    if(typeof window.startEventRequestPolling==="function"){
+      window.startEventRequestPolling();
+    }
   }
 
   submit.addEventListener("click",()=>{
@@ -4964,6 +4971,9 @@ setInterval(renderServerMessage,250);
   close?.addEventListener("click",()=>{
     panel.classList.remove("open");
     panel.setAttribute("aria-hidden","true");
+    if(typeof window.stopEventRequestPolling==="function"){
+      window.stopEventRequestPolling();
+    }
   });
 
   panel.addEventListener("click",e=>{
