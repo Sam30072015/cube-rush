@@ -533,7 +533,7 @@ body.phone-mode #mobileJump{display:flex}
   #mobileJump{width:78px;height:78px;right:16px;bottom:16px;font-size:48px}
 }
 
-#adminGiftPlayer,#adminGiftCoins,#adminGiftSkin{
+#adminGiftPlayer,#adminGiftCoins{
   width:100%;box-sizing:border-box;margin:5px 0;padding:11px;
   border-radius:11px;border:2px solid rgba(255,255,255,.2);
   background:#090b18;color:#fff;
@@ -541,7 +541,7 @@ body.phone-mode #mobileJump{display:flex}
 #adminGiftStatus{min-height:22px;margin-top:7px;font-weight:900}
 
 #adminOnlinePlayers{width:100%;box-sizing:border-box;margin:7px 0;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
-#adminGiftCoins,#adminGiftSkin{width:100%;box-sizing:border-box;margin:5px 0;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
+#adminGiftCoins{width:100%;box-sizing:border-box;margin:5px 0;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
 #adminGiftStatus{min-height:22px;margin:7px 0;font-weight:900}
 
 /* ---------- HANDY HUD POSITION ---------- */
@@ -821,6 +821,76 @@ body.world3-unlocked .screen#menu #levels{
 /* ---------- LUCK · GREEN WORLD ---------- */
 body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 .world4-luck .levelBtn{font-family:Arial Black,Arial,sans-serif}
+
+/* ---------- WELT 4 / MENÜ: GENUG ABSTAND + SHOP UNTER DEN LEVELN ---------- */
+#levels{
+  width:min(1120px,96vw) !important;
+  height:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+  margin:0 auto 28px !important;
+  padding:8px 6px 18px !important;
+}
+
+#levels > div{
+  margin-bottom:26px !important;
+}
+
+#shopOpen{
+  display:block !important;
+  margin:30px auto 18px !important;
+  position:relative !important;
+  z-index:5 !important;
+}
+
+@media(max-width:700px){
+  .screen#menu{
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    justify-content:flex-start !important;
+    align-items:center !important;
+    padding-top:14px !important;
+    padding-bottom:40px !important;
+    touch-action:pan-y !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+
+  #levels{
+    width:94vw !important;
+    margin-bottom:34px !important;
+  }
+
+  #levels > div{
+    margin-bottom:34px !important;
+  }
+
+  #shopOpen{
+    margin:40px auto 24px !important;
+  }
+}
+
+@media(min-width:701px){
+  .screen#menu{
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    justify-content:flex-start !important;
+    align-items:center !important;
+    padding-bottom:40px !important;
+  }
+
+  #levels{
+    width:min(1120px,92vw) !important;
+  }
+
+  #levels > div{
+    margin-bottom:28px !important;
+  }
+
+  #shopOpen{
+    margin-top:34px !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -949,10 +1019,12 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
       <option value="">Spieler auswählen</option>
     </select>
 
-    <div class="adminSectionTitle">🎁 Diesem Spieler geben</div>
-    <input id="adminGiftCoins" type="number" min="0" max="1000000" placeholder="Münzen">
-    <input id="adminGiftSkin" type="text" maxlength="40" placeholder="Skin (optional)">
-    <button class="adminAction" id="adminGiftSend">🎁 Vergabe senden</button>
+    <div class="adminSectionTitle">🪙 Münzen senden</div>
+    <input id="adminGiftCoins" type="number" min="1" max="1000000" placeholder="z. B. 100 Münzen" inputmode="numeric">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="adminAction" id="adminGiftSend">🪙 An Spieler senden</button>
+      <button class="adminAction" id="adminGiftSendAll">🪙 An alle senden</button>
+    </div>
     <div id="adminGiftStatus"></div>
 
     <div class="adminSectionTitle">🪙 2×-MÜNZEN-EVENT</div>
@@ -3762,8 +3834,8 @@ setInterval(renderServerMessage,250);
   const playersSelect=document.getElementById("adminOnlinePlayers");
   const refreshBtn=document.getElementById("adminRefreshPlayers");
   const sendBtn=document.getElementById("adminGiftSend");
+  const sendAllBtn=document.getElementById("adminGiftSendAll");
   const coinsInput=document.getElementById("adminGiftCoins");
-  const skinInput=document.getElementById("adminGiftSkin");
   const status=document.getElementById("adminGiftStatus");
   const playersStatus=document.getElementById("adminPlayersStatus");
 
@@ -3798,24 +3870,23 @@ setInterval(renderServerMessage,250);
   refreshBtn.addEventListener("click",loadPlayers);
   let giftSending=false;
 
-  sendBtn.addEventListener("click",async()=>{
+  async function sendCoinsToPlayer(){
     if(giftSending)return;
-    giftSending=true;
-    sendBtn.disabled=true;
-
     const player=playersSelect.value;
-    const coins=Math.max(0,Math.floor(Number(coinsInput.value)||0));
-    const skin=skinInput.value.trim();
+    const amount=Math.max(0,Math.floor(Number(coinsInput.value)||0));
 
     if(!player){
       status.textContent="❌ Erst einen Online-Spieler auswählen";
       return;
     }
-    if(coins===0&&!skin){
-      status.textContent="❌ Münzen oder Skin eingeben";
+    if(amount<=0){
+      status.textContent="❌ Erst eine Münzanzahl eingeben";
       return;
     }
 
+    giftSending=true;
+    sendBtn.disabled=true;
+    if(sendAllBtn)sendAllBtn.disabled=true;
     try{
       const res=await fetch("/api/admin/give",{
         method:"POST",
@@ -3823,22 +3894,60 @@ setInterval(renderServerMessage,250);
           "Content-Type":"application/json",
           "x-admin-key":ADMIN_KEY
         },
-        body:JSON.stringify({player,coins,skin})
+        body:JSON.stringify({player,coins:amount})
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Vergabe fehlgeschlagen");
 
-      status.textContent="✅ "+player+" hat "+coins+" Münzen"+(skin?" + "+skin:"")+" bekommen";
+      status.textContent="✅ "+player+" hat genau "+amount+" Münzen bekommen";
       coinsInput.value="";
-      skinInput.value="";
       loadPlayers();
     }catch(e){
       status.textContent="❌ "+e.message;
     }finally{
       giftSending=false;
       sendBtn.disabled=false;
+      if(sendAllBtn)sendAllBtn.disabled=false;
     }
-  });
+  }
+
+  async function sendCoinsToAll(){
+    if(giftSending)return;
+    const amount=Math.max(0,Math.floor(Number(coinsInput.value)||0));
+    if(amount<=0){
+      status.textContent="❌ Erst eine Münzanzahl eingeben";
+      return;
+    }
+
+    giftSending=true;
+    sendBtn.disabled=true;
+    if(sendAllBtn)sendAllBtn.disabled=true;
+    try{
+      const res=await fetch("/api/admin/give-all",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-admin-key":ADMIN_KEY
+        },
+        body:JSON.stringify({coins:amount})
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Vergabe fehlgeschlagen");
+
+      status.textContent="✅ "+amount+" Münzen wurden an alle "+(Number(data.count)||0)+" Online-Spieler gesendet";
+      coinsInput.value="";
+      loadPlayers();
+    }catch(e){
+      status.textContent="❌ "+e.message;
+    }finally{
+      giftSending=false;
+      sendBtn.disabled=false;
+      if(sendAllBtn)sendAllBtn.disabled=false;
+    }
+  }
+
+  sendBtn.addEventListener("click",sendCoinsToPlayer);
+  sendAllBtn?.addEventListener("click",sendCoinsToAll);
 
   // Load immediately when the admin section is used/opened.
   setTimeout(loadPlayers,300);
@@ -4358,6 +4467,12 @@ setInterval(updateSettingsScore,500);
       ws = new WebSocket(wsProtocol + "//" + location.host);
       ws.addEventListener("open", ()=>{
         ws.send(JSON.stringify({type:"identify",name:playerName}));
+        if(ws._cubeRushHeartbeat) clearInterval(ws._cubeRushHeartbeat);
+        ws._cubeRushHeartbeat=setInterval(()=>{
+          try{
+            if(ws && ws.readyState===1) ws.send(JSON.stringify({type:"heartbeat"}));
+          }catch(e){}
+        },10000);
       });
       ws.addEventListener("message", ev=>{
         try{
@@ -4371,33 +4486,22 @@ setInterval(updateSettingsScore,500);
           if(msg.type==="gift"){
             if(msg.target===playerName){
               const receivedCoins=Math.max(0,Number(msg.coins)||0);
-
-              // Geschenkte Münzen sind exakt die vom Admin gesendete Menge.
-              // Das 2×-Münzen-Event wird auf Admin-Geschenke NICHT angewendet.
               coins = Math.max(0,Number(coins)||0) + receivedCoins;
-
-              let receivedSkin="";
-              if(msg.skin && typeof ownedSkins!=="undefined"){
-                receivedSkin=String(msg.skin).trim();
-                if(receivedSkin && !ownedSkins.includes(receivedSkin)){
-                  ownedSkins.push(receivedSkin);
-                }
-              }
-
-              if(typeof save==="function") save();
+              localStorage.setItem("crCoins",String(coins));
               if(typeof updateMenu==="function") updateMenu();
               if(typeof updateHUD==="function") updateHUD();
+              showTacoCoinPopup?.(receivedCoins>0 ? "🪙 +"+receivedCoins+" Münzen" : "");
+            }
+          }
 
-              // Der geschenkte Skin ist danach im Shop als "AUSRÜSTEN" verfügbar.
-              if(typeof updateShop==="function") updateShop();
-
-              if(receivedCoins>0 || receivedSkin){
-                const giftText =
-                  (receivedCoins>0 ? "🪙 +"+receivedCoins+" Münzen" : "") +
-                  (receivedCoins>0 && receivedSkin ? " · " : "") +
-                  (receivedSkin ? "🎁 Skin: "+receivedSkin : "");
-                showTacoCoinPopup?.(giftText);
-              }
+          if(msg.type==="giftAll"){
+            const receivedCoins=Math.max(0,Number(msg.coins)||0);
+            if(receivedCoins>0){
+              coins = Math.max(0,Number(coins)||0) + receivedCoins;
+              localStorage.setItem("crCoins",String(coins));
+              if(typeof updateMenu==="function") updateMenu();
+              if(typeof updateHUD==="function") updateHUD();
+              showTacoCoinPopup?.("🪙 +"+receivedCoins+" Münzen");
             }
           }
 
@@ -4416,8 +4520,13 @@ setInterval(updateSettingsScore,500);
           }
         }catch(e){}
       });
-      ws.addEventListener("close",()=>setTimeout(connectServer,2500));
-    }catch(e){}
+      ws.addEventListener("close",()=>{
+        if(ws && ws._cubeRushHeartbeat) clearInterval(ws._cubeRushHeartbeat);
+        setTimeout(connectServer,2500);
+      });
+    }catch(e){
+      setTimeout(connectServer,2500);
+    }
   }
 
   window.cubeRushServer={
