@@ -855,7 +855,6 @@ body.world3-unlocked .screen#menu #levels{
 .magmaSkin{background:linear-gradient(145deg,#ffd36b 0%,#ff7a00 45%,#7a0012 100%)}
 .poopSkin{background:linear-gradient(145deg,#7a4a19 0%,#4d2b0c 55%,#241307 100%);position:relative;overflow:hidden}
 .poopSkin::after{content:"💩";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:62px;filter:drop-shadow(0 0 8px rgba(0,0,0,.55))}
-#poopEventBanner{display:none;margin:0 0 14px;padding:10px 14px;border-radius:14px;border:3px solid #8d5b28;background:rgba(70,35,8,.92);color:#ffe3b0;font-weight:900;text-align:center;box-shadow:0 0 18px rgba(121,76,23,.5)}
 
 
 /* ---------- LUCK · GREEN WORLD ---------- */
@@ -1076,7 +1075,6 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
   <div class="shopPanel">
     <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
     <div class="shopBalance" id="shopBalance">🪙 Münzen: 0</div>
-    <div id="poopEventBanner">💩 KACKHAUFEN-EVENT AKTIV · EVENT-SKIN KOSTENLOS AUSREIZBAR</div>
 
     <div class="skinGrid" id="skinGrid"></div>
 
@@ -1203,15 +1201,6 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
     </div>
     <div id="adminQuickEventsStatus"></div>
 
-    <div class="adminSectionTitle">💩 KACKHAUFEN-EVENT</div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
-      <input id="adminPoopMinutes" type="number" min="1" max="10080"
-             placeholder="Minuten" inputmode="numeric">
-      <span style="font-weight:800;color:#ffd27a">💩 Event</span>
-    </div>
-    <button class="adminAction" id="adminPoopEventStart">💩 Kackhaufen-Event starten</button>
-    <button class="adminAction" id="adminPoopEventStop">🛑 Kackhaufen-Event stoppen</button>
-    <div id="adminPoopEventStatus"></div>
 
     <div id="adminMessageArea">
       <strong>📢 Server Nachricht schreiben</strong>
@@ -1250,10 +1239,6 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
     <button class="adminAction" id="admin2CoinsStart">🪙 2× Münzen starten</button>
     <button class="adminAction" id="admin2CoinsStop">🛑 2× Münzen stoppen</button>
 
-    <div class="adminSectionTitle" style="font-size:18px;margin-top:12px">💩 KACKHAUFEN-EVENT</div>
-    <input id="admin2PoopMinutes" type="number" min="1" max="10080" placeholder="Minuten" inputmode="numeric">
-    <button class="adminAction" id="admin2PoopStart">💩 Kackhaufen starten</button>
-    <button class="adminAction" id="admin2PoopStop">🛑 Kackhaufen stoppen</button>
 
     <button id="admin2Close">Schließen</button>
   </div>
@@ -4678,49 +4663,6 @@ setInterval(renderServerMessages,250);
   stop.addEventListener("click",()=>send("stop"));
 })();
 
-/* ---------- ADMIN KACKHAUFEN-EVENT ---------- */
-(function(){
-  const start=document.getElementById("adminPoopEventStart");
-  const stop=document.getElementById("adminPoopEventStop");
-  const minutes=document.getElementById("adminPoopMinutes");
-  const status=document.getElementById("adminPoopEventStatus");
-  const ADMIN_KEY="603781";
-  if(!start||!stop||!minutes)return;
-
-  async function send(action,durationMs=0){
-    try{
-      const res=await fetch("/api/admin/poop-event",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","x-admin-key":ADMIN_KEY},
-        body:JSON.stringify({action,durationMs})
-      });
-      const data=await res.json();
-      if(!res.ok)throw new Error(data.error||"Fehler");
-
-      if(action==="start"){
-        startPoopEvent(data.until||0);
-        if(status)status.textContent="✅ Kackhaufen-Event für alle aktiviert";
-      }else{
-        stopPoopEvent();
-        if(status)status.textContent="🛑 Kackhaufen-Event beendet";
-      }
-    }catch(e){
-      if(status)status.textContent="❌ "+e.message;
-    }
-  }
-
-  start.addEventListener("click",()=>{
-    const min=Math.max(1,Number(minutes.value)||0);
-    if(min<=0){
-      if(status)status.textContent="❌ Bitte Minuten eingeben";
-      return;
-    }
-    send("start",min*60000);
-  });
-
-  stop.addEventListener("click",()=>send("stop"));
-})();
-
 /* ---------- ADMIN PANEL 2 · CODE 6301 ---------- */
 (function(){
   const panel=document.getElementById("adminPanel2");
@@ -4734,9 +4676,6 @@ setInterval(renderServerMessages,250);
   const coinsMin=document.getElementById("admin2CoinsMinutes");
   const coinsStart=document.getElementById("admin2CoinsStart");
   const coinsStop=document.getElementById("admin2CoinsStop");
-  const poopMin=document.getElementById("admin2PoopMinutes");
-  const poopStart=document.getElementById("admin2PoopStart");
-  const poopStop=document.getElementById("admin2PoopStop");
   if(!panel)return;
   const KEY="6301";
 
@@ -4808,26 +4747,6 @@ setInterval(renderServerMessages,250);
       if(status)status.textContent="🛑 2× Münzen gestoppt";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
   });
-
-  poopStart?.addEventListener("click",async()=>{
-    const minutes=Math.max(1,Number(poopMin.value)||0);
-    try{
-      await api("/api/second-admin/event-request",{
-        event:"poop",
-        action:"start",
-        durationMs:minutes*60000
-      });
-      if(status)status.textContent="🕐 Anfrage an Haupt-Admin gesendet";
-    }catch(e){if(status)status.textContent="❌ "+e.message;}
-  });
-
-  poopStop?.addEventListener("click",async()=>{
-    try{
-      const data=await api("/api/second-admin/event-stop",{event:"poop"});
-      if(typeof stopPoopEvent==="function")stopPoopEvent();
-      if(status)status.textContent="🛑 Kackhaufen-Event gestoppt";
-    }catch(e){if(status)status.textContent="❌ "+e.message;}
-  });
 })();
 
 
@@ -4844,9 +4763,7 @@ setInterval(renderServerMessages,250);
   function eventName(type){
     return type==="coins"
       ? "🪙 2× Münzen"
-      : type==="poop"
-        ? "💩 Kackhaufen"
-        : "🎉 Event";
+      : "🎉 Event";
   }
 
   async function loadRequests(){
@@ -5512,12 +5429,6 @@ setInterval(updateSettingsScore,500);
 
           if(msg.type==="coinEvent"){
             setCoinEvent(msg.until||0);
-          }
-
-          if(msg.type==="poopEvent"){
-            const until=Number(msg.until)||0;
-            if(until> Date.now()) startPoopEvent(until);
-            else stopPoopEvent();
           }
 
           if(msg.type==="serverMessage"){
