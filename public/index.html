@@ -110,6 +110,33 @@ button{border:0;border-radius:12px;padding:14px 23px;margin:7px;background:#6cff
 .shadowSkin{background:linear-gradient(135deg,#505574,#171a2d,#05050a)}
 .sunset{background:linear-gradient(135deg,#ffed9a,#ff8a3d,#ff3c8f,#6f42ff)}
 
+.trailPreview{
+  width:120px;
+  height:45px;
+  margin:0 auto 12px;
+  border-radius:14px;
+  border:2px solid #fff;
+  position:relative;
+  overflow:hidden;
+  background:#080d25;
+}
+.trailPreview::before,.trailPreview::after{
+  content:"";
+  position:absolute;
+  left:12px;
+  right:12px;
+  height:10px;
+  border-radius:999px;
+  transform:rotate(-8deg);
+}
+.trailPreview::before{top:12px;opacity:.95}
+.trailPreview::after{top:25px;opacity:.55}
+.trail-half::before,.trail-half::after{background:linear-gradient(90deg,#8fa3ff,#d7e0ff,#ffffff)}
+.trail-normal::before,.trail-normal::after{background:linear-gradient(90deg,#00eaff,#65ff9a,#fff23d)}
+.trail-double::before,.trail-double::after{background:linear-gradient(90deg,#ff31de,#ff8b2b,#ffe600,#67ff6a,#24ddff)}
+.trailMultiplier{color:#fff;font-weight:900;margin:6px 0}
+.trailCard{border-color:#4d6aa8}
+
 
 #powerHud{
   position:fixed;
@@ -954,6 +981,46 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
   }
 }
 
+
+
+/* ---------- SHOP IMMER WEIT UNTERHALB DER WELTEN ---------- */
+#menu{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  justify-content:flex-start !important;
+  align-items:center !important;
+  height:100vh !important;
+  max-height:100vh !important;
+  box-sizing:border-box !important;
+  -webkit-overflow-scrolling:touch !important;
+  touch-action:pan-y !important;
+  padding-bottom:80px !important;
+}
+
+#levels{
+  flex:0 0 auto !important;
+}
+
+#shopOpen{
+  flex:0 0 auto !important;
+  position:relative !important;
+  margin-top:420px !important;
+  margin-bottom:90px !important;
+}
+
+@media(max-width:700px){
+  #menu{
+    height:100dvh !important;
+    max-height:100dvh !important;
+    padding-bottom:100px !important;
+  }
+
+  #shopOpen{
+    margin-top:520px !important;
+    margin-bottom:100px !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -998,6 +1065,10 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
     <div class="shopBalance" id="shopBalance">🪙 Münzen: 0</div>
 
     <div class="skinGrid" id="skinGrid"></div>
+
+    <h3 class="shopTitle" style="font-size:28px;margin:28px 0 6px">✨ SPUREN-SHOP</h3>
+    <div style="color:#cbd3ff;font-weight:700;margin-bottom:14px">Rüste eine Spur aus – sie verändert deine Münzbelohnungen.</div>
+    <div class="skinGrid" id="trailGrid"></div>
 
     <button type="button" class="shopClose" id="shopClose">ZURÜCK</button>
   </div>
@@ -1267,6 +1338,7 @@ function save(){
   localStorage.setItem("crCompleted",JSON.stringify(completed));
   persistSkins();
   saveSkins();
+  saveTrails();
 }
 
 /* ---------- player ---------- */
@@ -1472,7 +1544,11 @@ function updateCoinEventHud(){
 }
 
 function coinReward(base){
-  return coinEventActive && Date.now()<coinEventUntil ? base*2 : base;
+  const amount=Number(base)||0;
+  const trail=(typeof trailById === "function") ? trailById(equippedTrail) : null;
+  const multiplier=trail ? Number(trail.multiplier)||1 : 1;
+  const eventMultiplier=(coinEventActive && Date.now()<coinEventUntil) ? 2 : 1;
+  return Math.max(0,Math.floor(amount*multiplier*eventMultiplier));
 }
 
 setInterval(updateCoinEventHud,500);
@@ -2281,6 +2357,54 @@ const SKINS = [
   {id:"magma", name:"🌋 Magma-Block", price:5500, css:"magmaSkin"}
 ];
 
+const TRAILS = [
+  {id:"half", name:"🌙 Mondspur", price:150, multiplier:0.5, css:"trail-half"},
+  {id:"normal", name:"✨ Sternspur", price:500, multiplier:1, css:"trail-normal"},
+  {id:"double", name:"⚡ Turbo-Spur", price:1000, multiplier:2, css:"trail-double"}
+];
+
+let ownedTrails=[];
+try{
+  ownedTrails=JSON.parse(localStorage.getItem("crOwnedTrails")) || [];
+  if(!Array.isArray(ownedTrails)) ownedTrails=[];
+}catch(_){
+  ownedTrails=[];
+}
+
+// Keine Spur ist beim Start automatisch gekauft oder ausgerüstet.
+// Die erste Spur muss für 150 Münzen gekauft werden.
+let equippedTrail=localStorage.getItem("crEquippedTrail") || null;
+if(!equippedTrail || !ownedTrails.includes(equippedTrail)){
+  equippedTrail=null;
+}
+
+// Legacy-Startzustand dieser Spur-Funktion zurücksetzen: Die frühere
+// Version hatte die erste Spur automatisch im Besitz. Neue Spieler sollen
+// sie kaufen müssen, daher wird nur dieser alte Startzustand entfernt.
+try{
+  const trailVersion=localStorage.getItem("crTrailVersion");
+  if(!trailVersion){
+    const hadOnlyFreeStartTrail = ownedTrails.length===1 && ownedTrails[0]==="half";
+    const wasAutoEquipped = !localStorage.getItem("crEquippedTrail") || localStorage.getItem("crEquippedTrail")==="half";
+    if(hadOnlyFreeStartTrail && wasAutoEquipped){
+      ownedTrails=[];
+      equippedTrail=null;
+      localStorage.removeItem("crOwnedTrails");
+      localStorage.removeItem("crEquippedTrail");
+    }
+    localStorage.setItem("crTrailVersion","2");
+  }
+}catch(_){}
+
+function saveTrails(){
+  localStorage.setItem("crOwnedTrails",JSON.stringify(ownedTrails));
+  localStorage.setItem("crEquippedTrail",equippedTrail);
+}
+
+function trailById(id){
+  return TRAILS.find(t=>t.id===id) || null;
+}
+
 let ownedSkins = [];
 try {
   ownedSkins = JSON.parse(localStorage.getItem("crOwnedSkins")) || ["classic"];
@@ -2397,6 +2521,77 @@ function updateShop(){
 
     card.appendChild(btn);
     grid.appendChild(card);
+  });
+
+  const trailGrid=document.getElementById("trailGrid");
+  if(!trailGrid)return;
+  trailGrid.innerHTML="";
+
+  TRAILS.forEach(trail=>{
+    const card=document.createElement("div");
+    card.className="skinCard trailCard";
+
+    const preview=document.createElement("div");
+    preview.className="trailPreview "+trail.css;
+    card.appendChild(preview);
+
+    const name=document.createElement("div");
+    name.className="skinName";
+    name.textContent=trail.name;
+    card.appendChild(name);
+
+    const mult=document.createElement("div");
+    mult.className="trailMultiplier";
+    mult.textContent="🪙 ×"+trail.multiplier+" Münzen";
+    card.appendChild(mult);
+
+    const price=document.createElement("div");
+    price.className="skinPrice";
+    price.textContent="🪙 "+trail.price;
+    card.appendChild(price);
+
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="skinBuyButton";
+
+    const owned=ownedTrails.includes(trail.id);
+    if(owned){
+      btn.disabled=equippedTrail===trail.id;
+      btn.textContent=equippedTrail===trail.id ? "✅ AUSGERÜSTET" : "⭐ AUSRÜSTEN";
+      if(equippedTrail!==trail.id){
+        btn.onclick=()=>{
+          equippedTrail=trail.id;
+          saveTrails();
+          save();
+          updateShop();
+          updateHUD();
+        };
+      }
+    }else{
+      btn.disabled=coins<trail.price;
+      btn.textContent=coins>=trail.price ? "🛒 KAUFEN" : "🔒 ZU TEUER";
+      if(!btn.disabled){
+        let buying=false;
+        btn.onclick=()=>{
+          if(buying)return;
+          if(ownedTrails.includes(trail.id)){updateShop();return;}
+          if(coins<trail.price)return;
+          buying=true;
+          btn.disabled=true;
+          coins=Math.max(0,coins-trail.price);
+          ownedTrails.push(trail.id);
+          equippedTrail=trail.id;
+          saveTrails();
+          save();
+          updateShop();
+          updateMenu();
+          updateHUD();
+        };
+      }
+    }
+
+    card.appendChild(btn);
+    trailGrid.appendChild(card);
   });
 }
 
@@ -3325,6 +3520,44 @@ function drawObjects(){
 
 
 
+function drawTrail(){
+  const trail=trailById(equippedTrail);
+  if(!trail || !running)return;
+
+  const cx=player.x+player.size/2;
+  const cy=player.y+player.size/2;
+  const t=Date.now()/120;
+
+  ctx.save();
+  ctx.globalCompositeOperation="lighter";
+
+  for(let i=0;i<7;i++){
+    const age=i*0.65;
+    const x=cx-26-age*7;
+    const y=cy+Math.sin(t+i)*5;
+    const size=Math.max(4,12-i*1.1);
+    const alpha=Math.max(.08,.65-i*.08);
+
+    if(trail.id==="half"){
+      ctx.fillStyle=`rgba(210,225,255,${alpha})`;
+      ctx.shadowColor="#b8d0ff";
+    }else if(trail.id==="normal"){
+      ctx.fillStyle=`rgba(${100+i*15},255,${150+i*10},${alpha})`;
+      ctx.shadowColor="#68ffb0";
+    }else{
+      ctx.fillStyle=`hsla(${(t*18+i*48)%360},100%,65%,${alpha})`;
+      ctx.shadowColor="#ff4fd8";
+    }
+
+    ctx.shadowBlur=16;
+    ctx.beginPath();
+    ctx.arc(x,y,size/2,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function drawPlayer(){
  ctx.save();
  ctx.translate(player.x+player.size/2,player.y+player.size/2);
@@ -3542,6 +3775,7 @@ ctx.clearRect(0,0,W,H);
  drawGround();
  drawObjects();
  drawTacos();
+ drawTrail();
 
  // Lava-Ausbruch direkt aus dem Kopf des Magma-Blocks.
  if(typeof drawMagmaHeadLava==="function")drawMagmaHeadLava();
@@ -3619,6 +3853,7 @@ window.addEventListener("pagehide",()=>{
     localStorage.setItem("crUnlocked",String(unlocked));
     localStorage.setItem("crCompleted",JSON.stringify(completed));
     localStorage.setItem("crCurrentLevel",String(levelIndex));
+    saveTrails();
   }catch(e){}
 });
 
@@ -3628,6 +3863,7 @@ window.addEventListener("beforeunload",()=>{
     localStorage.setItem("crUnlocked",String(unlocked));
     localStorage.setItem("crCompleted",JSON.stringify(completed));
     localStorage.setItem("crCurrentLevel",String(levelIndex));
+    saveTrails();
   }catch(e){}
 });
 
