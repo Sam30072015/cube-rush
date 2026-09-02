@@ -492,8 +492,10 @@ body.world2-cartoon #game{
 #adminBox2 h2{margin:0 0 8px;font-size:30px}
 #adminBox2 input{width:100%;box-sizing:border-box;margin:6px 0;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
 #admin2Close{width:100%;margin-top:14px;padding:12px;border:0;border-radius:14px;background:#65f28a;color:#0b1b12;font-weight:900;cursor:pointer}
-#serverMessage{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:1150;display:none;max-width:88vw;padding:10px 16px;border:3px solid #ffd83d;border-radius:15px;background:rgba(28,18,45,.96);color:#fff;font-weight:900;text-align:center;box-shadow:0 5px 0 #202040}
-#serverMessage.show{display:block}
+#serverMessages{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:1150;display:flex;flex-direction:column;gap:8px;align-items:center;max-width:94vw;width:min(760px,94vw);pointer-events:none}
+.serverMessageItem{display:flex;align-items:center;justify-content:center;gap:8px;max-width:100%;padding:10px 16px;border:3px solid #ffd83d;border-radius:15px;background:rgba(28,18,45,.96);color:#fff;font-weight:900;text-align:center;box-shadow:0 5px 0 #202040;box-sizing:border-box}
+.serverMessageText{overflow-wrap:anywhere}
+.serverMessageCountdown{white-space:nowrap;opacity:.9}
 
 #adminMessageMinutes{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:11px;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:#090b18;color:#fff}
 #adminMessageDelete{margin-top:8px;width:100%}
@@ -617,18 +619,19 @@ body.phone-mode #tacoHud{
   font-size:12px;
   line-height:1.15;
 }
-body.phone-mode #serverMessage{
-  display:none;
+body.phone-mode #serverMessages{
   top:4px;
+  width:92vw;
+  max-width:92vw;
+  gap:4px;
+}
+body.phone-mode .serverMessageItem{
   max-width:92vw;
   padding:6px 10px;
   border-width:2px;
   border-radius:11px;
   font-size:12px;
   line-height:1.15;
-}
-body.phone-mode #serverMessage.show{
-  display:block !important;
 }
 
 
@@ -1256,7 +1259,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
   </div>
 </div>
 
-<div id="serverMessage"><span class="messageText"></span><span class="countdown"></span></div>
+<div id="serverMessages" aria-live="polite"></div>
 <canvas id="game" width="1200" height="650"></canvas>
 
 <div id="result" class="screen hidden">
@@ -4215,45 +4218,106 @@ const loungeBass=[98,123.47,146.83,130.81];
 
 
 
-/* ---------- SERVER NACHRICHT ---------- */
-const SERVER_MESSAGE_KEY="crServerMessage_clean_v2";
-let serverMessage={text:"",endsAt:0};
+/* ---------- SERVER NACHRICHTEN ---------- */
+const SERVER_MESSAGES_KEY="crServerMessages_clean_v4";
+let serverMessages= [];
 
-function loadServerMessage(){
+function loadServerMessages(){
   try{
-    const s=JSON.parse(localStorage.getItem(SERVER_MESSAGE_KEY)||"null");
-    if(s&&s.text&&s.endsAt>Date.now())serverMessage=s;
+    const parsed=JSON.parse(localStorage.getItem(SERVER_MESSAGES_KEY)||"[]");
+    serverMessages=Array.isArray(parsed)
+      ? parsed.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now())
+      : [];
+  }catch(e){
+    serverMessages=[];
+  }
+}
+
+function saveServerMessages(){
+  try{
+    localStorage.setItem(SERVER_MESSAGES_KEY,JSON.stringify(serverMessages));
   }catch(e){}
 }
+
+function upsertServerMessage(msg){
+  const id=String(msg?.id||"");
+  const item={
+    id:id||("local-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)),
+    text:String(msg?.text||"").trim(),
+    endsAt:Number(msg?.endsAt)||0
+  };
+  if(!item.text||item.endsAt<=Date.now())return;
+
+  const index=serverMessages.findIndex(m=>String(m.id)===String(item.id));
+  if(index>=0)serverMessages[index]=item;
+  else serverMessages.push(item);
+
+  serverMessages=serverMessages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
+  saveServerMessages();
+  renderServerMessages();
+}
+
+function renderServerMessages(){
+  const box=document.getElementById("serverMessages");
+  if(!box)return;
+
+  const now=Date.now();
+  serverMessages=serverMessages.filter(m=>m&&m.text&&Number(m.endsAt)>now);
+  saveServerMessages();
+
+  box.innerHTML="";
+
+  for(const message of serverMessages){
+    const left=Math.max(0,Number(message.endsAt)-now);
+    const sec=Math.ceil(left/1000);
+    const h=Math.floor(sec/3600);
+    const m=Math.floor((sec%3600)/60);
+    const ss=sec%60;
+    const time=h
+      ? `${h}h ${m}m`
+      : (m ? `${m}m ${String(ss).padStart(2,"0")}s` : `${ss}s`);
+
+    const item=document.createElement("div");
+    item.className="serverMessageItem";
+
+    const text=document.createElement("span");
+    text.className="serverMessageText";
+    text.textContent="📢 "+message.text;
+
+    const countdown=document.createElement("span");
+    countdown.className="serverMessageCountdown";
+    countdown.textContent="· "+time;
+
+    item.appendChild(text);
+    item.appendChild(countdown);
+    box.appendChild(item);
+  }
+}
+
 function publishServerMessage(text,minutes){
-  text=text.trim();
+  text=String(text||"").trim();
   minutes=Number(minutes);
   if(!text||!Number.isFinite(minutes)||minutes<1)return false;
-  serverMessage={text,endsAt:Date.now()+minutes*60000};
-  localStorage.setItem(SERVER_MESSAGE_KEY,JSON.stringify(serverMessage));
-  renderServerMessage();
+
+  upsertServerMessage({
+    text,
+    endsAt:Date.now()+minutes*60000
+  });
   return true;
 }
-function deleteServerMessage(){
-  serverMessage={text:"",endsAt:0};
-  localStorage.removeItem(SERVER_MESSAGE_KEY);
-  renderServerMessage();
-}
-function renderServerMessage(){
-  const b=document.getElementById("serverMessage");if(!b)return;
-  const left=Math.max(0,serverMessage.endsAt-Date.now());
-  if(!serverMessage.text||left<=0){
-    b.classList.remove("show");
-    if(serverMessage.text)deleteServerMessage();
-    return;
+
+function deleteServerMessage(id){
+  if(id===undefined||id===null||id===""){
+    serverMessages=[];
+  }else{
+    serverMessages=serverMessages.filter(m=>String(m.id)!==String(id));
   }
-  const sec=Math.ceil(left/1000),h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
-  b.querySelector(".messageText").textContent="📢 "+serverMessage.text;
-  b.querySelector(".countdown").textContent=" · "+(h?`${h}h ${m}m`:(m?`${m}m ${String(s).padStart(2,"0")}s`:`${s}s`));
-  b.classList.add("show");
+  saveServerMessages();
+  renderServerMessages();
 }
-loadServerMessage();
-setInterval(renderServerMessage,250);
+
+loadServerMessages();
+setInterval(renderServerMessages,250);
 
 (function(){
   const send=document.getElementById("adminMessageSend");
@@ -4264,16 +4328,15 @@ setInterval(renderServerMessage,250);
 
   if(send&&input&&minutes&&seconds)send.addEventListener("click",async()=>{
     const text=input.value.trim();
-    const min=Number(minutes.value)||0;
-    const sec=Number(seconds.value)||0;
+    const min=Math.max(0,Number(minutes.value)||0);
+    const sec=Math.max(0,Math.min(59,Number(seconds.value)||0));
     const status=document.getElementById("adminStatus");
 
-    if(!text || (min===0 && sec===0)){
-      status.textContent="❌ Nachricht und Zeit eingeben";
+    if(!text||(min===0&&sec===0)){
+      if(status)status.textContent="❌ Nachricht und Zeit eingeben";
       return;
     }
 
-    // Online-Version: Nachricht an alle verbundenen Spieler senden.
     if(location.protocol!=="file:"){
       try{
         const res=await fetch("/api/admin/message",{
@@ -4286,45 +4349,46 @@ setInterval(renderServerMessage,250);
         });
         const data=await res.json();
         if(!res.ok)throw new Error(data.error||"Serverfehler");
-
-        status.textContent="✅ Nachricht an alle online Spieler gesendet";
+        if(data.message)upsertServerMessage(data.message);
+        if(status)status.textContent="✅ Nachricht an alle online Spieler gesendet";
         input.value="";
         minutes.value="";
         seconds.value="";
         return;
       }catch(e){
-        status.textContent="❌ Server nicht erreichbar";
+        if(status)status.textContent="❌ Server nicht erreichbar";
         return;
       }
     }
 
-    // Lokaler Fallback, falls die HTML direkt geöffnet wird.
-    serverMessage={text,endsAt:Date.now()+(min*60+sec)*1000};
-    localStorage.setItem("crServerMessage_clean_v2",JSON.stringify(serverMessage));
-    renderServerMessage();
+    upsertServerMessage({
+      text,
+      endsAt:Date.now()+(min*60+sec)*1000
+    });
     input.value="";
     minutes.value="";
     seconds.value="";
-    status.textContent="✅ Lokale Nachricht gesetzt";
+    if(status)status.textContent="✅ Lokale Nachricht gesetzt";
   });
 
   del?.addEventListener("click",async()=>{
     try{
-      // Server-seitiges Löschen/Leeren für alle verbundenen Spieler.
       if(location.protocol!=="file:"){
-        await fetch("/api/admin/message/delete",{
+        const res=await fetch("/api/admin/message/delete",{
           method:"POST",
           headers:{
             "Content-Type":"application/json",
             "x-admin-key":"603781"
-          }
+          },
+          body:JSON.stringify({clearAll:true})
         });
+        if(!res.ok)throw new Error("Fehler");
       }
     }catch(e){}
 
     deleteServerMessage();
-    const s=document.getElementById("adminStatus");
-    if(s)s.textContent="🗑️ Server-Nachricht gelöscht";
+    const status=document.getElementById("adminStatus");
+    if(status)status.textContent="🗑️ Alle Server-Nachrichten gelöscht";
   });
 })();
 
@@ -4698,7 +4762,8 @@ setInterval(renderServerMessage,250);
   coinsStart?.addEventListener("click",async()=>{
     const minutes=Math.max(1,Number(coinsMin.value)||0);
     try{
-      await api("/api/second-admin/coins-event",{
+      await api("/api/second-admin/event-request",{
+        event:"coins",
         action:"start",
         durationMs:minutes*60000
       });
@@ -4708,8 +4773,8 @@ setInterval(renderServerMessage,250);
 
   coinsStop?.addEventListener("click",async()=>{
     try{
-      const data=await api("/api/second-admin/coins-event",{action:"stop"});
-      if(typeof setCoinEvent==="function")setCoinEvent(data.until||0);
+      const data=await api("/api/second-admin/event-stop",{event:"coins"});
+      if(typeof setCoinEvent==="function")setCoinEvent(0);
       if(status)status.textContent="🛑 2× Münzen gestoppt";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
   });
@@ -4717,7 +4782,8 @@ setInterval(renderServerMessage,250);
   poopStart?.addEventListener("click",async()=>{
     const minutes=Math.max(1,Number(poopMin.value)||0);
     try{
-      await api("/api/second-admin/poop-event",{
+      await api("/api/second-admin/event-request",{
+        event:"poop",
         action:"start",
         durationMs:minutes*60000
       });
@@ -4727,7 +4793,7 @@ setInterval(renderServerMessage,250);
 
   poopStop?.addEventListener("click",async()=>{
     try{
-      const data=await api("/api/second-admin/poop-event",{action:"stop"});
+      const data=await api("/api/second-admin/event-stop",{event:"poop"});
       if(typeof stopPoopEvent==="function")stopPoopEvent();
       if(status)status.textContent="🛑 Kackhaufen-Event gestoppt";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
@@ -4905,7 +4971,7 @@ setInterval(renderServerMessage,250);
   function startPolling(){
     if(timer) clearInterval(timer);
     loadRequests();
-    timer=setInterval(loadRequests,2000);
+    timer=setInterval(loadRequests,3000);
   }
 
   window.startEventRequestPolling=startPolling;
@@ -5373,6 +5439,12 @@ setInterval(updateSettingsScore,500);
             playerName=msg.name;
             localStorage.setItem("crPlayerName",playerName);
             if(Number(msg.poopEventUntil)>Date.now()) startPoopEvent(Number(msg.poopEventUntil));
+            if(Number(msg.coinEventUntil)>Date.now()) setCoinEvent(Number(msg.coinEventUntil));
+            if(Array.isArray(msg.serverMessages)){
+              serverMessages=msg.serverMessages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
+              saveServerMessages();
+              renderServerMessages();
+            }
           }
 
           if(msg.type==="gift"){
@@ -5421,18 +5493,24 @@ setInterval(updateSettingsScore,500);
           }
 
           if(msg.type==="serverMessage"){
-            serverMessage={
-              text:String(msg.text||""),
-              endsAt:Number(msg.endsAt)||0
-            };
-            localStorage.setItem("crServerMessage_clean_v2",JSON.stringify(serverMessage));
-            if(typeof renderServerMessage==="function")renderServerMessage();
+            upsertServerMessage(msg);
             window.dispatchEvent(new CustomEvent("cubeRushServerMessage",{detail:msg}));
           }
 
-          if(msg.type==="serverMessageDelete"){
-            if(typeof deleteServerMessage==="function")deleteServerMessage();
+          if(msg.type==="serverMessagesClear"){
+            deleteServerMessage();
             window.dispatchEvent(new CustomEvent("cubeRushServerMessageDelete",{detail:msg}));
+          }
+
+          if(msg.type==="serverMessageDelete"){
+            if(msg.id)deleteServerMessage(msg.id);
+            window.dispatchEvent(new CustomEvent("cubeRushServerMessageDelete",{detail:msg}));
+          }
+
+          if(msg.type==="serverMessagesUpdate" && Array.isArray(msg.messages)){
+            serverMessages=msg.messages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
+            saveServerMessages();
+            renderServerMessages();
           }
         }catch(e){}
       });
