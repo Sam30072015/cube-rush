@@ -7,7 +7,6 @@ const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 
 const app = express();
-
 app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -16,11 +15,6 @@ const wss = new WebSocket.Server({ server });
 
 const players = new Map();
 let poopEventUntil = 0;
-
-
-/* =========================================================
-   HILFSFUNKTIONEN
-   ========================================================= */
 
 function cleanName(name) {
   return String(name || "").trim().slice(0, 40);
@@ -34,11 +28,8 @@ function send(ws, payload) {
 
 function broadcast(payload) {
   const data = JSON.stringify(payload);
-
   for (const ws of wss.clients) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-    }
+    if (ws.readyState === WebSocket.OPEN) ws.send(data);
   }
 }
 
@@ -47,16 +38,8 @@ function adminOK(req) {
 }
 
 function amountFrom(body) {
-  return Math.max(
-    0,
-    Math.floor(Number(body?.coins) || 0)
-  );
+  return Math.max(0, Math.floor(Number(body?.coins) || 0));
 }
-
-
-/* =========================================================
-   WEBSOCKET
-   ========================================================= */
 
 wss.on("connection", (ws) => {
   ws.playerName = "";
@@ -64,7 +47,6 @@ wss.on("connection", (ws) => {
 
   ws.on("message", (raw) => {
     let msg;
-
     try {
       msg = JSON.parse(raw.toString());
     } catch {
@@ -77,18 +59,9 @@ wss.on("connection", (ws) => {
       let name = cleanName(msg.name);
 
       if (!name) {
-        name =
-          "Spieler-" +
-          Math.random()
-            .toString(36)
-            .slice(2, 8)
-            .toUpperCase();
+        name = "Spieler-" + Math.random().toString(36).slice(2, 8).toUpperCase();
       }
 
-      /*
-       * Jeder Spielername darf nur eine aktive
-       * Verbindung haben.
-       */
       const oldSocket = players.get(name);
 
       if (oldSocket && oldSocket !== ws) {
@@ -99,10 +72,7 @@ wss.on("connection", (ws) => {
         players.delete(name);
       }
 
-      if (
-        ws.playerName &&
-        players.get(ws.playerName) === ws
-      ) {
+      if (ws.playerName && players.get(ws.playerName) === ws) {
         players.delete(ws.playerName);
       }
 
@@ -112,45 +82,29 @@ wss.on("connection", (ws) => {
       send(ws, {
         type: "connected",
         name,
-        poopEventUntil:
-          poopEventUntil > Date.now()
-            ? poopEventUntil
-            : 0
+        poopEventUntil: poopEventUntil > Date.now() ? poopEventUntil : 0
       });
 
       return;
     }
 
     if (msg.type === "heartbeat") {
-      send(ws, {
-        type: "heartbeatAck"
-      });
+      send(ws, { type: "heartbeatAck" });
     }
   });
 
   ws.on("close", () => {
-    if (
-      ws.playerName &&
-      players.get(ws.playerName) === ws
-    ) {
+    if (ws.playerName && players.get(ws.playerName) === ws) {
       players.delete(ws.playerName);
     }
   });
 
   ws.on("error", () => {
-    if (
-      ws.playerName &&
-      players.get(ws.playerName) === ws
-    ) {
+    if (ws.playerName && players.get(ws.playerName) === ws) {
       players.delete(ws.playerName);
     }
   });
 });
-
-
-/* =========================================================
-   OFFLINE SPIELER AUFRÄUMEN
-   ========================================================= */
 
 setInterval(() => {
   const now = Date.now();
@@ -176,23 +130,17 @@ setInterval(() => {
 
 app.post("/api/admin/coins-event", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const action = String(
-    req.body?.action || ""
-  );
+  const action = String(req.body?.action || "");
 
   if (action === "start") {
     const durationMs = Math.max(
       1000,
       Math.min(
         10080 * 60 * 1000,
-        Math.floor(
-          Number(req.body?.durationMs) || 0
-        )
+        Math.floor(Number(req.body?.durationMs) || 0)
       )
     );
 
@@ -203,10 +151,7 @@ app.post("/api/admin/coins-event", (req, res) => {
       until
     });
 
-    return res.json({
-      ok: true,
-      until
-    });
+    return res.json({ ok: true, until });
   }
 
   if (action === "stop") {
@@ -233,30 +178,21 @@ app.post("/api/admin/coins-event", (req, res) => {
 
 app.post("/api/admin/give", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const player = cleanName(
-    req.body?.player
-  );
-
+  const player = cleanName(req.body?.player);
   const coins = amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error:
-        "Player and a coin amount are required"
+      error: "Player and a coin amount are required"
     });
   }
 
   const target = players.get(player);
 
-  if (
-    !target ||
-    target.readyState !== WebSocket.OPEN
-  ) {
+  if (!target || target.readyState !== WebSocket.OPEN) {
     if (players.get(player) === target) {
       players.delete(player);
     }
@@ -266,9 +202,6 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  /*
-   * Exakt die eingegebene Anzahl senden.
-   */
   send(target, {
     type: "gift",
     target: player,
@@ -287,53 +220,41 @@ app.post("/api/admin/give", (req, res) => {
    ADMIN: MÜNZEN AN ALLE
    ========================================================= */
 
-app.post(
-  "/api/admin/give-all",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
+app.post("/api/admin/give-all", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-    const coins = amountFrom(req.body);
+  const coins = amountFrom(req.body);
 
-    if (coins <= 0) {
-      return res.status(400).json({
-        error:
-          "A coin amount greater than 0 is required"
-      });
-    }
-
-    let count = 0;
-
-    /*
-     * Jeder Online-Spieler bekommt genau
-     * die eingegebene Menge.
-     */
-    const message = JSON.stringify({
-      type: "giftAll",
-      coins
-    });
-
-    for (const [name, ws] of players) {
-      if (
-        ws.readyState === WebSocket.OPEN
-      ) {
-        ws.send(message);
-        count++;
-      } else {
-        players.delete(name);
-      }
-    }
-
-    return res.json({
-      ok: true,
-      coins,
-      count
+  if (coins <= 0) {
+    return res.status(400).json({
+      error: "A coin amount greater than 0 is required"
     });
   }
-);
+
+  let count = 0;
+
+  const message = JSON.stringify({
+    type: "giftAll",
+    coins
+  });
+
+  for (const [name, ws] of players) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+      count++;
+    } else {
+      players.delete(name);
+    }
+  }
+
+  return res.json({
+    ok: true,
+    coins,
+    count
+  });
+});
 
 
 /* =========================================================
@@ -342,30 +263,21 @@ app.post(
 
 app.post("/api/admin/take", (req, res) => {
   if (!adminOK(req)) {
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const player = cleanName(
-    req.body?.player
-  );
-
+  const player = cleanName(req.body?.player);
   const coins = amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
-      error:
-        "Player and a coin amount are required"
+      error: "Player and a coin amount are required"
     });
   }
 
   const target = players.get(player);
 
-  if (
-    !target ||
-    target.readyState !== WebSocket.OPEN
-  ) {
+  if (!target || target.readyState !== WebSocket.OPEN) {
     if (players.get(player) === target) {
       players.delete(player);
     }
@@ -375,10 +287,6 @@ app.post("/api/admin/take", (req, res) => {
     });
   }
 
-  /*
-   * Der Client zieht diese Menge ab.
-   * Der Client darf den Stand nicht unter 0 setzen.
-   */
   send(target, {
     type: "giftSubtract",
     target: player,
@@ -397,126 +305,102 @@ app.post("/api/admin/take", (req, res) => {
    ADMIN: KACKHAUFEN EVENT
    ========================================================= */
 
-app.post(
-  "/api/admin/poop-event",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
+app.post("/api/admin/poop-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-    const action = String(
-      req.body?.action || ""
+  const action = String(req.body?.action || "");
+
+  if (action === "start") {
+    const durationMs = Math.max(
+      60000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(Number(req.body?.durationMs) || 0)
+      )
     );
 
-    if (action === "start") {
-      const durationMs = Math.max(
-        60000,
-        Math.min(
-          10080 * 60 * 1000,
-          Math.floor(
-            Number(req.body?.durationMs) || 0
-          )
-        )
-      );
+    poopEventUntil = Date.now() + durationMs;
 
-      poopEventUntil =
-        Date.now() + durationMs;
+    broadcast({
+      type: "poopEvent",
+      until: poopEventUntil
+    });
 
-      broadcast({
-        type: "poopEvent",
-        until: poopEventUntil
-      });
-
-      return res.json({
-        ok: true,
-        until: poopEventUntil
-      });
-    }
-
-    if (action === "stop") {
-      poopEventUntil = 0;
-
-      broadcast({
-        type: "poopEvent",
-        until: 0
-      });
-
-      return res.json({
-        ok: true,
-        until: 0
-      });
-    }
-
-    return res.status(400).json({
-      error: "Invalid action"
+    return res.json({
+      ok: true,
+      until: poopEventUntil
     });
   }
-);
+
+  if (action === "stop") {
+    poopEventUntil = 0;
+
+    broadcast({
+      type: "poopEvent",
+      until: 0
+    });
+
+    return res.json({
+      ok: true,
+      until: 0
+    });
+  }
+
+  return res.status(400).json({
+    error: "Invalid action"
+  });
+});
 
 
 /* =========================================================
    ADMIN: SERVER-NACHRICHT
    ========================================================= */
 
-app.post(
-  "/api/admin/message",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
+app.post("/api/admin/message", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-    const text = String(
-      req.body?.text || ""
+  const text = String(req.body?.text || "")
+    .trim()
+    .slice(0, 120);
+
+  const minutes = Math.max(
+    0,
+    Math.floor(Number(req.body?.minutes) || 0)
+  );
+
+  const seconds = Math.max(
+    0,
+    Math.min(
+      59,
+      Math.floor(Number(req.body?.seconds) || 0)
     )
-      .trim()
-      .slice(0, 120);
+  );
 
-    const minutes = Math.max(
-      0,
-      Math.floor(
-        Number(req.body?.minutes) || 0
-      )
-    );
+  const duration = (minutes * 60 + seconds) * 1000;
 
-    const seconds = Math.max(
-      0,
-      Math.min(
-        59,
-        Math.floor(
-          Number(req.body?.seconds) || 0
-        )
-      )
-    );
-
-    const duration =
-      (minutes * 60 + seconds) * 1000;
-
-    if (!text || duration <= 0) {
-      return res.status(400).json({
-        error:
-          "Text and duration required"
-      });
-    }
-
-    const message = {
-      type: "serverMessage",
-      text,
-      endsAt:
-        Date.now() + duration
-    };
-
-    broadcast(message);
-
-    return res.json({
-      ok: true,
-      ...message
+  if (!text || duration <= 0) {
+    return res.status(400).json({
+      error: "Text and duration required"
     });
   }
-);
+
+  const message = {
+    type: "serverMessage",
+    text,
+    endsAt: Date.now() + duration
+  };
+
+  broadcast(message);
+
+  return res.json({
+    ok: true,
+    ...message
+  });
+});
 
 
 /* =========================================================
@@ -542,11 +426,7 @@ app.get("/api/status", (req, res) => {
 
 app.use((req, res) => {
   res.sendFile(
-    path.join(
-      __dirname,
-      "public",
-      "index.html"
-    )
+    path.join(__dirname, "public", "index.html")
   );
 });
 
