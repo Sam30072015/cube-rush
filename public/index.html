@@ -2494,12 +2494,16 @@ function updateTacos(){
     const sx=t.x-camera+180;
     if(Math.hypot(px-sx,py-t.y)<t.r+22){
       t.collected=true;
-      const reward=TACO_REWARD;
+      // Jeder eingesammelte Taco gibt garantiert 25 Münzen.
+      // Das 2x-Event und Spuren verändern diese Taco-Belohnung nicht.
+      const reward=25;
 
       try{
-        coins = Math.max(0, Number(coins)||0) + Number(coinReward(reward)||reward);
+        coins = Math.max(0, Number(coins)||0) + reward;
+        localStorage.setItem("crCoins", String(coins));
         save();
         updateHUD();
+        if(typeof updateMenu==="function") updateMenu();
         showTacoCoinPopup(reward);
       }catch(err){
         // Ein Taco-Fehler darf das Spiel niemals abstürzen lassen.
