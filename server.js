@@ -4,12 +4,10 @@ const express = require("express");
 const WebSocket = require("ws");
 
 const PORT = Number(process.env.PORT || 3000);
-
 const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
-const SECOND_ADMIN_KEY = "6301";
+const SECOND_ADMIN_KEY = process.env.SECOND_ADMIN_KEY || "6301";
 
 const app = express();
-
 app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -17,41 +15,16 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const players = new Map();
-
 let poopEventUntil = 0;
 let coinEventUntil = 0;
-
-let serverMessages = [];
-
-/*
- * Offene Event-Anfragen von Admin 2
- *
- * Beispiel:
- * {
- *   id: "123...",
- *   event: "poop",
- *   action: "start",
- *   durationMs: 600000
- * }
- */
-let eventRequests = [];
-
-
-/* =========================================================
-   HILFSFUNKTIONEN
-   ========================================================= */
+let pendingEventRequests = [];
 
 function cleanName(name) {
-  return String(name || "")
-    .trim()
-    .slice(0, 40);
+  return String(name || "").trim().slice(0, 40);
 }
 
 function send(ws, payload) {
-  if (
-    ws &&
-    ws.readyState === WebSocket.OPEN
-  ) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(payload));
   }
 }
@@ -70,12 +43,9 @@ function adminOK(req) {
   return req.headers["x-admin-key"] === ADMIN_KEY;
 }
 
-function secondAdminOK(req) {
-  return req.headers["x-admin-key"] === SECOND_ADMIN_KEY;
-}
-
-function anyAdminOK(req) {
-  return adminOK(req) || secondAdminOK(req);
+function adminMessageEventOK(req) {
+  const key = req.headers["x-admin-key"];
+  return key === ADMIN_KEY || key === SECOND_ADMIN_KEY;
 }
 
 function amountFrom(body) {
@@ -117,15 +87,9 @@ wss.on("connection", (ws) => {
             .toUpperCase();
       }
 
-      /*
-       * Nur eine Verbindung pro Spieler.
-       */
       const oldSocket = players.get(name);
 
-      if (
-        oldSocket &&
-        oldSocket !== ws
-      ) {
+      if (oldSocket && oldSocket !== ws) {
         try {
           oldSocket.terminate();
         } catch {}
@@ -146,18 +110,14 @@ wss.on("connection", (ws) => {
       send(ws, {
         type: "connected",
         name,
-
         poopEventUntil:
           poopEventUntil > Date.now()
             ? poopEventUntil
             : 0,
-
         coinEventUntil:
           coinEventUntil > Date.now()
             ? coinEventUntil
-            : 0,
-
-        serverMessages
+            : 0
       });
 
       return;
@@ -191,7 +151,7 @@ wss.on("connection", (ws) => {
 
 
 /* =========================================================
-   OFFLINE SPIELER ENTFERNEN
+   OFFLINE SPIELER AUFRÄUMEN
    ========================================================= */
 
 setInterval(() => {
@@ -213,11 +173,167 @@ setInterval(() => {
 
 
 /* =========================================================
-   HAUPT-ADMIN 603781
+   EVENT-ANFRAGEN VOM ZWEITEN ADMIN
+   CODE: 6301
+   ========================================================= */
+
+app.get(
+  "/api/admin/event-requests",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    pendingEventRequests =
+      pendingEventRequests.filter(
+        (request) =>
+          request &&
+          request.id &&
+          request.expiresAt > Date.now()
+      );
+
+    return res.json({
+      ok: true,
+      requests: pendingEventRequests
+    });
+  }
+);
+
+
+app.post(
+  "/api/admin/event-requests/approve",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const id = String(
+      req.body?.id || ""
+    );
+
+    const index =
+      pendingEventRequests.findIndex(
+        (request) =>
+          request.id === id
+      );
+
+    if (index === -1) {
+      return res.status(404).json({
+        error:
+          "Event-Anfrage nicht gefunden"
+      });
+    }
+
+    const request =
+      pendingEventRequests[index];
+
+    if (
+      request.expiresAt <= Date.now()
+    ) {
+      pendingEventRequests.splice(
+        index,
+        1
+      );
+
+      return res.status(410).json({
+        error:
+          "Event-Anfrage ist abgelaufen"
+      });
+    }
+
+    pendingEventRequests.splice(
+      index,
+      1
+    );
+
+    if (request.event === "coins") {
+      coinEventUntil =
+        Date.now() + request.durationMs;
+
+      broadcast({
+        type: "coinEvent",
+        until: coinEventUntil
+      });
+
+      return res.json({
+        ok: true,
+        event: "coins",
+        until: coinEventUntil
+      });
+    }
+
+    if (request.event === "poop") {
+      poopEventUntil =
+        Date.now() + request.durationMs;
+
+      broadcast({
+        type: "poopEvent",
+        until: poopEventUntil
+      });
+
+      return res.json({
+        ok: true,
+        event: "poop",
+        until: poopEventUntil
+      });
+    }
+
+    return res.status(400).json({
+      error: "Unbekanntes Event"
+    });
+  }
+);
+
+
+app.post(
+  "/api/admin/event-requests/reject",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const id = String(
+      req.body?.id || ""
+    );
+
+    const index =
+      pendingEventRequests.findIndex(
+        (request) =>
+          request.id === id
+      );
+
+    if (index === -1) {
+      return res.status(404).json({
+        error:
+          "Event-Anfrage nicht gefunden"
+      });
+    }
+
+    pendingEventRequests.splice(
+      index,
+      1
+    );
+
+    return res.json({
+      ok: true
+    });
+  }
+);
+
+
+/* =========================================================
+   HAUPT-ADMIN
+   CODE: 603781
    ========================================================= */
 
 
-/* ---------- 2x-Münzen-Event ---------- */
+/* ---------- 2x-Münzen Event ---------- */
 
 app.post(
   "/api/admin/coins-event",
@@ -233,15 +349,18 @@ app.post(
     );
 
     if (action === "start") {
-      const durationMs = Math.max(
-        1000,
-        Math.min(
-          10080 * 60 * 1000,
-          Math.floor(
-            Number(req.body?.durationMs) || 0
+      const durationMs =
+        Math.max(
+          1000,
+          Math.min(
+            10080 * 60 * 1000,
+            Math.floor(
+              Number(
+                req.body?.durationMs
+              ) || 0
+            )
           )
-        )
-      );
+        );
 
       coinEventUntil =
         Date.now() + durationMs;
@@ -289,11 +408,11 @@ app.post(
       });
     }
 
-    const player = cleanName(
-      req.body?.player
-    );
+    const player =
+      cleanName(req.body?.player);
 
-    const coins = amountFrom(req.body);
+    const coins =
+      amountFrom(req.body);
 
     if (!player || coins <= 0) {
       return res.status(400).json({
@@ -302,14 +421,24 @@ app.post(
       });
     }
 
-    const target = players.get(player);
+    const target =
+      players.get(player);
 
     if (
       !target ||
-      target.readyState !== WebSocket.OPEN
+      target.readyState !==
+        WebSocket.OPEN
     ) {
+      if (
+        players.get(player) ===
+        target
+      ) {
+        players.delete(player);
+      }
+
       return res.status(404).json({
-        error: "Player is not online"
+        error:
+          "Player is not online"
       });
     }
 
@@ -339,7 +468,8 @@ app.post(
       });
     }
 
-    const coins = amountFrom(req.body);
+    const coins =
+      amountFrom(req.body);
 
     if (coins <= 0) {
       return res.status(400).json({
@@ -350,14 +480,19 @@ app.post(
 
     let count = 0;
 
-    const message = JSON.stringify({
-      type: "giftAll",
-      coins
-    });
+    const message =
+      JSON.stringify({
+        type: "giftAll",
+        coins
+      });
 
-    for (const [name, ws] of players) {
+    for (
+      const [name, ws]
+      of players
+    ) {
       if (
-        ws.readyState === WebSocket.OPEN
+        ws.readyState ===
+        WebSocket.OPEN
       ) {
         ws.send(message);
         count++;
@@ -386,11 +521,11 @@ app.post(
       });
     }
 
-    const player = cleanName(
-      req.body?.player
-    );
+    const player =
+      cleanName(req.body?.player);
 
-    const coins = amountFrom(req.body);
+    const coins =
+      amountFrom(req.body);
 
     if (!player || coins <= 0) {
       return res.status(400).json({
@@ -399,19 +534,29 @@ app.post(
       });
     }
 
-    const target = players.get(player);
+    const target =
+      players.get(player);
 
     if (
       !target ||
-      target.readyState !== WebSocket.OPEN
+      target.readyState !==
+        WebSocket.OPEN
     ) {
+      if (
+        players.get(player) ===
+        target
+      ) {
+        players.delete(player);
+      }
+
       return res.status(404).json({
-        error: "Player is not online"
+        error:
+          "Player is not online"
       });
     }
 
     send(target, {
-      type: "giftSubtract",
+      type: "takeCoins",
       target: player,
       coins
     });
@@ -425,7 +570,7 @@ app.post(
 );
 
 
-/* ---------- Kackhaufen-Event ---------- */
+/* ---------- Kackhaufen Event ---------- */
 
 app.post(
   "/api/admin/poop-event",
@@ -441,15 +586,18 @@ app.post(
     );
 
     if (action === "start") {
-      const durationMs = Math.max(
-        60000,
-        Math.min(
-          10080 * 60 * 1000,
-          Math.floor(
-            Number(req.body?.durationMs) || 0
+      const durationMs =
+        Math.max(
+          60000,
+          Math.min(
+            10080 * 60 * 1000,
+            Math.floor(
+              Number(
+                req.body?.durationMs
+              ) || 0
+            )
           )
-        )
-      );
+        );
 
       poopEventUntil =
         Date.now() + durationMs;
@@ -487,46 +635,229 @@ app.post(
 
 
 /* =========================================================
-   SERVER-NACHRICHTEN
+   ZWEITES ADMIN-PANEL
+   CODE: 6301
+   EVENTS NUR ALS ANFRAGE
    ========================================================= */
 
 
-/* ---------- Nachricht senden ---------- */
+/* ---------- 2x-Münzen Event anfragen ---------- */
 
 app.post(
-  "/api/admin/message",
+  "/api/second-admin/coins-event",
   (req, res) => {
-    if (!anyAdminOK(req)) {
+    if (
+      req.headers["x-admin-key"] !==
+      SECOND_ADMIN_KEY
+    ) {
       return res.status(401).json({
         error: "Unauthorized"
       });
     }
 
-    const text = String(
-      req.body?.text || ""
-    )
-      .trim()
-      .slice(0, 120);
-
-    const minutes = Math.max(
-      0,
-      Math.floor(
-        Number(req.body?.minutes) || 0
-      )
+    const action = String(
+      req.body?.action || ""
     );
 
-    const seconds = Math.max(
-      0,
-      Math.min(
-        59,
+    if (action === "start") {
+      const durationMs =
+        Math.max(
+          1000,
+          Math.min(
+            10080 * 60 * 1000,
+            Math.floor(
+              Number(
+                req.body?.durationMs
+              ) || 0
+            )
+          )
+        );
+
+      const request = {
+        id:
+          "coins-" +
+          Date.now() +
+          "-" +
+          Math.random()
+            .toString(36)
+            .slice(2, 8),
+
+        event: "coins",
+
+        durationMs,
+
+        createdAt:
+          Date.now(),
+
+        expiresAt:
+          Date.now() +
+          15 * 60 * 1000
+      };
+
+      pendingEventRequests.push(
+        request
+      );
+
+      return res.json({
+        ok: true,
+        pending: true,
+        requestId: request.id
+      });
+    }
+
+    if (action === "stop") {
+      coinEventUntil = 0;
+
+      broadcast({
+        type: "coinEvent",
+        until: 0
+      });
+
+      return res.json({
+        ok: true,
+        until: 0
+      });
+    }
+
+    return res.status(400).json({
+      error: "Invalid action"
+    });
+  }
+);
+
+
+/* ---------- Kackhaufen Event anfragen ---------- */
+
+app.post(
+  "/api/second-admin/poop-event",
+  (req, res) => {
+    if (
+      req.headers["x-admin-key"] !==
+      SECOND_ADMIN_KEY
+    ) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const action = String(
+      req.body?.action || ""
+    );
+
+    if (action === "start") {
+      const durationMs =
+        Math.max(
+          60000,
+          Math.min(
+            10080 * 60 * 1000,
+            Math.floor(
+              Number(
+                req.body?.durationMs
+              ) || 0
+            )
+          )
+        );
+
+      const request = {
+        id:
+          "poop-" +
+          Date.now() +
+          "-" +
+          Math.random()
+            .toString(36)
+            .slice(2, 8),
+
+        event: "poop",
+
+        durationMs,
+
+        createdAt:
+          Date.now(),
+
+        expiresAt:
+          Date.now() +
+          15 * 60 * 1000
+      };
+
+      pendingEventRequests.push(
+        request
+      );
+
+      return res.json({
+        ok: true,
+        pending: true,
+        requestId: request.id
+      });
+    }
+
+    if (action === "stop") {
+      poopEventUntil = 0;
+
+      broadcast({
+        type: "poopEvent",
+        until: 0
+      });
+
+      return res.json({
+        ok: true,
+        until: 0
+      });
+    }
+
+    return res.status(400).json({
+      error: "Invalid action"
+    });
+  }
+);
+
+
+/* =========================================================
+   SERVER-NACHRICHTEN
+   Beide Admin-Panels dürfen sie benutzen.
+   ========================================================= */
+
+app.post(
+  "/api/admin/message",
+  (req, res) => {
+    if (!adminMessageEventOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const text =
+      String(
+        req.body?.text || ""
+      )
+        .trim()
+        .slice(0, 120);
+
+    const minutes =
+      Math.max(
+        0,
         Math.floor(
-          Number(req.body?.seconds) || 0
+          Number(
+            req.body?.minutes
+          ) || 0
         )
-      )
-    );
+      );
+
+    const seconds =
+      Math.max(
+        0,
+        Math.min(
+          59,
+          Math.floor(
+            Number(
+              req.body?.seconds
+            ) || 0
+          )
+        )
+      );
 
     const duration =
-      (minutes * 60 + seconds) * 1000;
+      (minutes * 60 + seconds) *
+      1000;
 
     if (!text || duration <= 0) {
       return res.status(400).json({
@@ -536,93 +867,35 @@ app.post(
     }
 
     const message = {
-      id:
-        Date.now().toString() +
-        Math.random()
-          .toString(36)
-          .slice(2, 8),
-
       type: "serverMessage",
-
       text,
-
       endsAt:
         Date.now() + duration
     };
-
-    serverMessages.push(message);
-
-    serverMessages =
-      serverMessages.filter(
-        (m) =>
-          Number(m.endsAt || 0) >
-          Date.now()
-      );
 
     broadcast(message);
 
     return res.json({
       ok: true,
-      message
+      ...message
     });
   }
 );
 
 
-/* ---------- Alle Nachrichten löschen ---------- */
-
-app.post(
-  "/api/admin/message/clear",
-  (req, res) => {
-    if (!anyAdminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    serverMessages = [];
-
-    broadcast({
-      type: "serverMessagesClear"
-    });
-
-    return res.json({
-      ok: true
-    });
-  }
-);
-
-
-/* ---------- Eine Nachricht löschen ---------- */
+/* ---------- Servernachricht löschen ---------- */
 
 app.post(
   "/api/admin/message/delete",
   (req, res) => {
-    if (!anyAdminOK(req)) {
+    if (!adminMessageEventOK(req)) {
       return res.status(401).json({
         error: "Unauthorized"
       });
     }
 
-    const id = String(
-      req.body?.id || ""
-    );
-
-    if (!id) {
-      return res.status(400).json({
-        error: "Message id required"
-      });
-    }
-
-    serverMessages =
-      serverMessages.filter(
-        (m) =>
-          String(m.id) !== id
-      );
-
     broadcast({
-      type: "serverMessageDelete",
-      id
+      type: "serverMessageDelete"
     });
 
     return res.json({
@@ -633,341 +906,7 @@ app.post(
 
 
 /* =========================================================
-   ZWEITES ADMIN-PANEL 6301
-   ========================================================= */
-
-
-/*
- * Admin 2 darf hier NICHT direkt ein Event starten.
- * Stattdessen wird eine Anfrage an Admin 1 geschickt.
- */
-
-app.post(
-  "/api/second-admin/event-request",
-  (req, res) => {
-    if (!secondAdminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    const event = String(
-      req.body?.event || ""
-    );
-
-    const action = String(
-      req.body?.action || ""
-    );
-
-    if (
-      !["poop", "coins"].includes(event)
-    ) {
-      return res.status(400).json({
-        error: "Invalid event"
-      });
-    }
-
-    if (
-      !["start", "stop"].includes(action)
-    ) {
-      return res.status(400).json({
-        error: "Invalid action"
-      });
-    }
-
-    let durationMs = 0;
-
-    if (action === "start") {
-      durationMs = Math.max(
-        1000,
-        Math.min(
-          10080 * 60 * 1000,
-          Math.floor(
-            Number(
-              req.body?.durationMs
-            ) || 0
-          )
-        )
-      );
-    }
-
-    const request = {
-      id:
-        Date.now().toString() +
-        Math.random()
-          .toString(36)
-          .slice(2, 8),
-
-      event,
-      action,
-      durationMs,
-
-      createdAt: Date.now()
-    };
-
-    eventRequests.push(request);
-
-    /*
-     * Nur offene Anfragen behalten.
-     */
-    eventRequests =
-      eventRequests.filter(
-        (r) =>
-          Date.now() - r.createdAt <
-          10 * 60 * 1000
-      );
-
-    /*
-     * An alle aktuell verbundenen Admin-
-     * Panel-WebSockets senden.
-     */
-    broadcast({
-      type: "adminEventRequest",
-      request
-    });
-
-    return res.json({
-      ok: true,
-      request
-    });
-  }
-);
-
-
-/* =========================================================
-   ADMIN 1: EVENT-ANFRAGEN ABRUFEN
-   ========================================================= */
-
-app.get(
-  "/api/admin/event-requests",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    eventRequests =
-      eventRequests.filter(
-        (request) =>
-          Date.now() -
-            request.createdAt <
-          10 * 60 * 1000
-      );
-
-    return res.json({
-      ok: true,
-      requests: eventRequests
-    });
-  }
-);
-
-
-/* =========================================================
-   ADMIN 1: EVENT-ANFRAGE ANNEHMEN
-   ========================================================= */
-
-app.post(
-  "/api/admin/event-request/approve",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    const id = String(
-      req.body?.id || ""
-    );
-
-    const request =
-      eventRequests.find(
-        (r) => String(r.id) === id
-      );
-
-    if (!request) {
-      return res.status(404).json({
-        error:
-          "Event request not found"
-      });
-    }
-
-    /*
-     * Anfrage zuerst entfernen,
-     * damit sie nicht doppelt angenommen
-     * werden kann.
-     */
-    eventRequests =
-      eventRequests.filter(
-        (r) =>
-          String(r.id) !== id
-      );
-
-    /*
-     * EVENT START / STOP
-     */
-
-    if (
-      request.event === "coins"
-    ) {
-      if (
-        request.action === "start"
-      ) {
-        coinEventUntil =
-          Date.now() +
-          Math.max(
-            1000,
-            request.durationMs
-          );
-
-        broadcast({
-          type: "coinEvent",
-          until: coinEventUntil
-        });
-      }
-
-      if (
-        request.action === "stop"
-      ) {
-        coinEventUntil = 0;
-
-        broadcast({
-          type: "coinEvent",
-          until: 0
-        });
-      }
-    }
-
-    if (
-      request.event === "poop"
-    ) {
-      if (
-        request.action === "start"
-      ) {
-        poopEventUntil =
-          Date.now() +
-          Math.max(
-            60000,
-            request.durationMs
-          );
-
-        broadcast({
-          type: "poopEvent",
-          until: poopEventUntil
-        });
-      }
-
-      if (
-        request.action === "stop"
-      ) {
-        poopEventUntil = 0;
-
-        broadcast({
-          type: "poopEvent",
-          until: 0
-        });
-      }
-    }
-
-    /*
-     * Admin 2 bekommt eine Rückmeldung.
-     */
-    broadcast({
-      type: "adminEventRequestApproved",
-      request
-    });
-
-    return res.json({
-      ok: true,
-      request
-    });
-  }
-);
-
-
-/* =========================================================
-   ADMIN 1: EVENT-ANFRAGE ABLEHNEN
-   ========================================================= */
-
-app.post(
-  "/api/admin/event-request/deny",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    const id = String(
-      req.body?.id || ""
-    );
-
-    const request =
-      eventRequests.find(
-        (r) => String(r.id) === id
-      );
-
-    if (!request) {
-      return res.status(404).json({
-        error:
-          "Event request not found"
-      });
-    }
-
-    eventRequests =
-      eventRequests.filter(
-        (r) =>
-          String(r.id) !== id
-      );
-
-    broadcast({
-      type: "adminEventRequestDenied",
-      request
-    });
-
-    return res.json({
-      ok: true,
-      request
-    });
-  }
-);
-
-
-/* =========================================================
-   ZWEITES ADMIN-PANEL STATUS
-   ========================================================= */
-
-app.get(
-  "/api/second-admin/status",
-  (req, res) => {
-    if (!secondAdminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    return res.json({
-      ok: true,
-
-      coinEventUntil:
-        coinEventUntil > Date.now()
-          ? coinEventUntil
-          : 0,
-
-      poopEventUntil:
-        poopEventUntil > Date.now()
-          ? poopEventUntil
-          : 0,
-
-      messages:
-        serverMessages
-    });
-  }
-);
-
-
-/* =========================================================
-   ONLINE SPIELER
+   STATUS
    ========================================================= */
 
 app.get(
@@ -986,29 +925,6 @@ app.get(
     });
   }
 );
-
-
-/* =========================================================
-   ABGELAUFENE NACHRICHTEN UND ANFRAGEN
-   ========================================================= */
-
-setInterval(() => {
-  const now = Date.now();
-
-  serverMessages =
-    serverMessages.filter(
-      (message) =>
-        Number(message.endsAt || 0) >
-        now
-    );
-
-  eventRequests =
-    eventRequests.filter(
-      (request) =>
-        now - request.createdAt <
-        10 * 60 * 1000
-    );
-}, 1000);
 
 
 /* =========================================================
@@ -1040,10 +956,6 @@ server.listen(PORT, () => {
   );
 
   console.log(
-    "Zweiter Admin: 6301"
-  );
-
-  console.log(
-    "Admin-2-Event-Anfragen aktiviert."
+    "Zweites Admin-Panel: 6301"
   );
 });
