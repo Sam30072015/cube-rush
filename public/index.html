@@ -2018,6 +2018,15 @@ const levels=[
 {name:"LEVEL 40",length:13000,world:4,objects:[['spike',600,46,50],['mine',820,350,31],['block',1050,84,120],['saw',1290,410,42],['spike',1530,46,52],['doubleSaw',1770,410,43],['portal',2010,445,'ship'],['wall',2290,0,85,170],['wall',2470,390,85,150],['wall',2650,90,85,195],['wall',2830,340,85,200],['wall',3010,20,85,220],['wall',3190,360,85,180],['wall',3370,70,85,210],['wall',3550,330,85,210],['movingBar',3730,245,185,14],['portal',4020,445,'cube'],['mine',4300,300,32],['spike',4540,46,50],['doubleSaw',4780,410,43],['block',5020,84,125],['saw',5270,410,42],['mine',5520,350,31],['spike',5770,46,52],['doubleSaw',6020,410,43],['block',6270,84,120],['mine',6520,320,32],['saw',6770,410,42],['spike',7020,46,50],['doubleSaw',7270,410,43],['block',7520,84,125],['mine',7770,360,31],['saw',8020,410,42],['spike',8270,46,52],['doubleSaw',8520,410,43],['block',8770,84,120],['mine',9020,300,32],['saw',9270,410,42],['spike',9520,46,50],['doubleSaw',9770,410,43],['block',10020,84,125],['mine',10270,350,31],['saw',10520,410,42],['spike',10770,46,52],['doubleSaw',11020,410,43],['block',11270,84,120],['mine',11520,320,32],['saw',11770,410,42],['spike',12020,46,50],['doubleSaw',12270,410,43],['block',12520,84,125],['mine',12770,350,31]]}
 ];
 
+// Wichtig: Die Galaxy-Level waren versehentlich mitten im Array.
+// Nach dem Laden werden ALLE Level nach ihrer echten Levelnummer sortiert.
+// Dadurch entspricht Index 40 wieder Level 41 und ein Klick auf Level 41 startet korrekt.
+levels.sort((a,b)=>{
+  const na=parseInt(String(a?.name||"").match(/(\d+)/)?.[1]||"0",10);
+  const nb=parseInt(String(b?.name||"").match(/(\d+)/)?.[1]||"0",10);
+  return na-nb;
+});
+
 /* ---------- unique music per level ---------- */
 const musicTracks=[
  {bpm:116,lead:[261.63,329.63,392,329.63,440,392,329.63,293.66],bass:[130.81,164.81,196,164.81]},
