@@ -18,9 +18,9 @@ const wss = new WebSocket.Server({ server });
 
 const players = new Map();
 
-let coinEventUntil = 0;
-let tenCoinEventUntil = 0;
-let galaxyEventUntil = 0;
+let coinEventUntil = 0;       // 2x Münzen
+let tenCoinEventUntil = 0;    // 10x Münzen
+let galaxyEventUntil = 0;     // Galaxy-Welt
 
 let serverMessages = [];
 let eventRequests = [];
@@ -81,16 +81,6 @@ function makeRequestId() {
   );
 }
 
-function publicRequests() {
-  return eventRequests.map((request) => ({
-    id: request.id,
-    event: request.event,
-    action: request.action,
-    durationMs: request.durationMs,
-    createdAt: request.createdAt
-  }));
-}
-
 function cleanupRequests() {
   const now = Date.now();
 
@@ -102,131 +92,15 @@ function cleanupRequests() {
   );
 }
 
-
-/* =========================================================
-   WEBSOCKET
-   ========================================================= */
-
-wss.on("connection", (ws) => {
-  ws.playerName = "";
-  ws.lastHeartbeat = Date.now();
-
-  ws.on("message", (raw) => {
-    let msg;
-
-    try {
-      msg = JSON.parse(raw.toString());
-    } catch {
-      return;
-    }
-
-    ws.lastHeartbeat = Date.now();
-
-    if (msg.type === "identify") {
-      let name = cleanName(msg.name);
-
-      if (!name) {
-        name =
-          "Spieler-" +
-          Math.random()
-            .toString(36)
-            .slice(2, 8)
-            .toUpperCase();
-      }
-
-      // Pro Spielername nur eine Verbindung
-      const oldSocket = players.get(name);
-
-      if (oldSocket && oldSocket !== ws) {
-        try {
-          oldSocket.terminate();
-        } catch {}
-
-        players.delete(name);
-      }
-
-      if (
-        ws.playerName &&
-        players.get(ws.playerName) === ws
-      ) {
-        players.delete(ws.playerName);
-      }
-
-      ws.playerName = name;
-      players.set(name, ws);
-
-      send(ws, {
-        type: "connected",
-        name,
-
-        coinEventUntil:
-          coinEventUntil > Date.now()
-            ? coinEventUntil
-            : 0,
-
-        tenCoinEventUntil:
-          tenCoinEventUntil > Date.now()
-            ? tenCoinEventUntil
-            : 0,
-
-        galaxyEventUntil:
-          galaxyEventUntil > Date.now()
-            ? galaxyEventUntil
-            : 0,
-
-        serverMessages
-      });
-
-      return;
-    }
-
-    if (msg.type === "heartbeat") {
-      send(ws, {
-        type: "heartbeatAck"
-      });
-    }
-  });
-
-  ws.on("close", () => {
-    if (
-      ws.playerName &&
-      players.get(ws.playerName) === ws
-    ) {
-      players.delete(ws.playerName);
-    }
-  });
-
-  ws.on("error", () => {
-    if (
-      ws.playerName &&
-      players.get(ws.playerName) === ws
-    ) {
-      players.delete(ws.playerName);
-    }
-  });
-});
-
-
-/* =========================================================
-   OFFLINE SPIELER ENTFERNEN
-   ========================================================= */
-
-setInterval(() => {
-  const now = Date.now();
-
-  for (const [name, ws] of players) {
-    if (
-      ws.readyState !== WebSocket.OPEN ||
-      now - (ws.lastHeartbeat || 0) > 30000
-    ) {
-      players.delete(name);
-
-      try {
-        ws.terminate();
-      } catch {}
-    }
-  }
-}, 15000);
+function publicRequests() {
+  return eventRequests.map((request) => ({
+    id: request.id,
+    event: request.event,
+    action: request.action,
+    durationMs: request.durationMs,
+    createdAt: request.createdAt
+  }));
+}
 
 
 /* =========================================================
@@ -304,11 +178,137 @@ function stopGalaxyEvent() {
 
 
 /* =========================================================
+   WEBSOCKET
+   ========================================================= */
+
+wss.on("connection", (ws) => {
+  ws.playerName = "";
+  ws.lastHeartbeat = Date.now();
+
+  ws.on("message", (raw) => {
+    let msg;
+
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    ws.lastHeartbeat = Date.now();
+
+    if (msg.type === "identify") {
+      let name = cleanName(msg.name);
+
+      if (!name) {
+        name =
+          "Spieler-" +
+          Math.random()
+            .toString(36)
+            .slice(2, 8)
+            .toUpperCase();
+      }
+
+      // Pro Spielername nur eine aktive Verbindung.
+      const oldSocket = players.get(name);
+
+      if (oldSocket && oldSocket !== ws) {
+        try {
+          oldSocket.terminate();
+        } catch {}
+
+        players.delete(name);
+      }
+
+      if (
+        ws.playerName &&
+        players.get(ws.playerName) === ws
+      ) {
+        players.delete(ws.playerName);
+      }
+
+      ws.playerName = name;
+      players.set(name, ws);
+
+      send(ws, {
+        type: "connected",
+        name,
+
+        coinEventUntil:
+          coinEventUntil > Date.now()
+            ? coinEventUntil
+            : 0,
+
+        tenCoinEventUntil:
+          tenCoinEventUntil > Date.now()
+            ? tenCoinEventUntil
+            : 0,
+
+        galaxyEventUntil:
+          galaxyEventUntil > Date.now()
+            ? galaxyEventUntil
+            : 0,
+
+        serverMessages
+      });
+
+      return;
+    }
+
+    if (msg.type === "heartbeat") {
+      send(ws, {
+        type: "heartbeatAck"
+      });
+    }
+  });
+
+  ws.on("close", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+
+  ws.on("error", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+});
+
+
+/* =========================================================
+   OFFLINE SPIELER AUFRÄUMEN
+   ========================================================= */
+
+setInterval(() => {
+  const now = Date.now();
+
+  for (const [name, ws] of players) {
+    if (
+      ws.readyState !== WebSocket.OPEN ||
+      now - (ws.lastHeartbeat || 0) > 30000
+    ) {
+      players.delete(name);
+
+      try {
+        ws.terminate();
+      } catch {}
+    }
+  }
+}, 15000);
+
+
+/* =========================================================
    HAUPT-ADMIN 603781
    ========================================================= */
 
 
-/* ---------- 2x-MÜNZEN-EVENT ---------- */
+/* ---------- 2x MÜNZEN EVENT ---------- */
 
 app.post("/api/admin/coins-event", (req, res) => {
   if (!adminOK(req)) {
@@ -356,7 +356,7 @@ app.post("/api/admin/coins-event", (req, res) => {
 });
 
 
-/* ---------- 10x-MÜNZEN-EVENT ---------- */
+/* ---------- 10x MÜNZEN EVENT ---------- */
 
 app.post(
   "/api/admin/ten-coin-event",
@@ -409,7 +409,7 @@ app.post(
 );
 
 
-/* ---------- GALAXY-EVENT ---------- */
+/* ---------- GALAXY EVENT ---------- */
 
 app.post(
   "/api/admin/galaxy-event",
@@ -424,18 +424,15 @@ app.post(
       String(req.body?.action || "");
 
     if (action === "start") {
-      const durationMs =
-        Math.max(
-          60000,
-          Math.min(
-            10080 * 60 * 1000,
-            Math.floor(
-              Number(
-                req.body?.durationMs
-              ) || 0
-            )
+      const durationMs = Math.max(
+        60000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(req.body?.durationMs) || 0
           )
-        );
+        )
+      );
 
       const until =
         startGalaxyEvent(
@@ -499,6 +496,7 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
+  // Admin-Geschenke werden nicht multipliziert.
   send(target, {
     type: "gift",
     target: player,
@@ -542,10 +540,10 @@ app.post(
         coins
       });
 
+    // Jeder Spieler bekommt exakt einmal die Menge.
     for (const [name, ws] of players) {
       if (
-        ws.readyState ===
-        WebSocket.OPEN
+        ws.readyState === WebSocket.OPEN
       ) {
         ws.send(message);
         count++;
@@ -662,10 +660,7 @@ app.post(
       (minutes * 60 + seconds) *
       1000;
 
-    if (
-      !text ||
-      duration <= 0
-    ) {
+    if (!text || duration <= 0) {
       return res.status(400).json({
         error:
           "Text and duration required"
@@ -682,8 +677,7 @@ app.post(
           .toString(36)
           .slice(2, 10),
 
-      type:
-        "serverMessage",
+      type: "serverMessage",
 
       text,
 
@@ -693,7 +687,7 @@ app.post(
         now + duration
     };
 
-    // Mehrere Nachrichten gleichzeitig
+    // Mehrere Nachrichten gleichzeitig erlaubt.
     serverMessages.push(message);
 
     broadcast(message);
@@ -736,10 +730,7 @@ app.post(
    ========================================================= */
 
 
-/*
- * Admin 2 darf Events nur anfragen.
- * Der Haupt-Admin muss sie genehmigen.
- */
+/* ---------- Event-Anfrage ---------- */
 
 app.post(
   "/api/second-admin/event-request",
@@ -760,14 +751,12 @@ app.post(
         req.body?.action || "start"
       );
 
-    const allowedEvents = [
-      "coins",
-      "tenCoins",
-      "galaxy"
-    ];
-
     if (
-      !allowedEvents.includes(event)
+      ![
+        "coins",
+        "tenCoins",
+        "galaxy"
+      ].includes(event)
     ) {
       return res.status(400).json({
         error:
@@ -782,27 +771,25 @@ app.post(
       });
     }
 
-    let minDuration = 1000;
-
-    if (event === "galaxy") {
-      minDuration = 60000;
-    }
-
-    const value =
-      Number(
-        req.body?.durationMs
-      ) || 0;
+    const minDuration =
+      event === "galaxy"
+        ? 60000
+        : 1000;
 
     const durationMs =
       Math.max(
         minDuration,
         Math.min(
           10080 * 60 * 1000,
-          Math.floor(value)
+          Math.floor(
+            Number(
+              req.body?.durationMs
+            ) || 0
+          )
         )
       );
 
-    // Keine doppelten offenen Anfragen
+    // Keine doppelten offenen Anfragen.
     const existing =
       eventRequests.find(
         (request) =>
@@ -820,23 +807,14 @@ app.post(
     }
 
     const request = {
-      id:
-        makeRequestId(),
-
+      id: makeRequestId(),
       event,
-
-      action:
-        "start",
-
+      action: "start",
       durationMs,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
-    eventRequests.push(
-      request
-    );
+    eventRequests.push(request);
 
     return res.json({
       ok: true,
@@ -848,7 +826,7 @@ app.post(
 
 
 /* =========================================================
-   ADMIN 1: ANFRAGEN ABRUFEN
+   ADMIN 1: OFFENE EVENT-ANFRAGEN
    ========================================================= */
 
 app.get(
@@ -913,6 +891,7 @@ app.post(
     const request =
       eventRequests[index];
 
+    // Anfrage entfernen.
     eventRequests.splice(
       index,
       1
@@ -1008,67 +987,9 @@ app.post(
 
 
 /* =========================================================
-   ZWEITER ADMIN: EVENTS STOPPEN
+   ZWEITER ADMIN: 2x EVENT STOPPEN
    ========================================================= */
 
-app.post(
-  "/api/second-admin/event-stop",
-  (req, res) => {
-    if (!secondAdminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    const event =
-      String(
-        req.body?.event || ""
-      );
-
-    if (event === "coins") {
-      const until =
-        stopCoinEvent();
-
-      return res.json({
-        ok: true,
-        until
-      });
-    }
-
-    if (event === "tenCoins") {
-      const until =
-        stopTenCoinEvent();
-
-      return res.json({
-        ok: true,
-        until
-      });
-    }
-
-    if (event === "galaxy") {
-      const until =
-        stopGalaxyEvent();
-
-      return res.json({
-        ok: true,
-        until
-      });
-    }
-
-    return res.status(400).json({
-      error:
-        "Unbekanntes Event"
-    });
-  }
-);
-
-
-/* =========================================================
-   ZWEITER ADMIN: KOMPATIBILITÄTS-ENDPOINTS
-   ========================================================= */
-
-
-/* 2x Start = Anfrage */
 app.post(
   "/api/second-admin/coins-event",
   (req, res) => {
@@ -1132,9 +1053,7 @@ app.post(
         createdAt: Date.now()
       };
 
-      eventRequests.push(
-        request
-      );
+      eventRequests.push(request);
 
       return res.json({
         ok: true,
@@ -1150,7 +1069,10 @@ app.post(
 );
 
 
-/* 10x Start = Anfrage */
+/* =========================================================
+   ZWEITER ADMIN: 10x EVENT
+   ========================================================= */
+
 app.post(
   "/api/second-admin/ten-coin-event",
   (req, res) => {
@@ -1214,9 +1136,7 @@ app.post(
         createdAt: Date.now()
       };
 
-      eventRequests.push(
-        request
-      );
+      eventRequests.push(request);
 
       return res.json({
         ok: true,
@@ -1232,7 +1152,10 @@ app.post(
 );
 
 
-/* Galaxy Start = Anfrage */
+/* =========================================================
+   ZWEITER ADMIN: GALAXY EVENT
+   ========================================================= */
+
 app.post(
   "/api/second-admin/galaxy-event",
   (req, res) => {
@@ -1247,6 +1170,7 @@ app.post(
         req.body?.action || ""
       );
 
+    // Stoppen darf direkt gemacht werden.
     if (action === "stop") {
       const until =
         stopGalaxyEvent();
@@ -1257,6 +1181,7 @@ app.post(
       });
     }
 
+    // Starten wird als Anfrage gespeichert.
     if (action === "start") {
       const durationMs =
         Math.max(
@@ -1296,9 +1221,7 @@ app.post(
         createdAt: Date.now()
       };
 
-      eventRequests.push(
-        request
-      );
+      eventRequests.push(request);
 
       return res.json({
         ok: true,
@@ -1315,29 +1238,7 @@ app.post(
 
 
 /* =========================================================
-   ADMIN STATUS
-   ========================================================= */
-
-app.get(
-  "/api/status",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    res.json({
-      onlinePlayers: [
-        ...players.keys()
-      ]
-    });
-  }
-);
-
-
-/* =========================================================
-   SECOND ADMIN STATUS
+   ZWEITER ADMIN STATUS
    ========================================================= */
 
 app.get(
@@ -1351,7 +1252,8 @@ app.get(
 
     cleanupRequests();
 
-    const now = Date.now();
+    const now =
+      Date.now();
 
     res.json({
       ok: true,
@@ -1382,20 +1284,82 @@ app.get(
 
 
 /* =========================================================
-   ABGELAUFENE NACHRICHTEN UND ANFRAGEN AUFRÄUMEN
+   ONLINE SPIELER
+   ========================================================= */
+
+app.get(
+  "/api/status",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    res.json({
+      onlinePlayers:
+        [...players.keys()]
+    });
+  }
+);
+
+
+/* =========================================================
+   AUTOMATISCHES AUFRÄUMEN
    ========================================================= */
 
 setInterval(() => {
-  const now = Date.now();
+  const now =
+    Date.now();
 
+  // Abgelaufene Servernachrichten entfernen.
   serverMessages =
     serverMessages.filter(
       (message) =>
-        Number(message.endsAt || 0) >
-        now
+        Number(
+          message.endsAt || 0
+        ) > now
     );
 
+  // Alte Event-Anfragen entfernen.
   cleanupRequests();
+
+  // Events automatisch beenden.
+  if (
+    coinEventUntil > 0 &&
+    coinEventUntil <= now
+  ) {
+    coinEventUntil = 0;
+
+    broadcast({
+      type: "coinEvent",
+      until: 0
+    });
+  }
+
+  if (
+    tenCoinEventUntil > 0 &&
+    tenCoinEventUntil <= now
+  ) {
+    tenCoinEventUntil = 0;
+
+    broadcast({
+      type: "tenCoinEvent",
+      until: 0
+    });
+  }
+
+  if (
+    galaxyEventUntil > 0 &&
+    galaxyEventUntil <= now
+  ) {
+    galaxyEventUntil = 0;
+
+    broadcast({
+      type: "galaxyEvent",
+      until: 0
+    });
+  }
 }, 1000);
 
 
@@ -1429,5 +1393,9 @@ server.listen(PORT, () => {
 
   console.log(
     "Zweiter Admin: 6301"
+  );
+
+  console.log(
+    "Events: 2x / 10x / Galaxy"
   );
 });
