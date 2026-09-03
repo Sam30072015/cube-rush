@@ -4286,25 +4286,27 @@ const loungeBass=[98,123.47,146.83,130.81];
 
   submit?.addEventListener("click",()=>{
     const code=(input?.value||"").trim();
-    const usedKey="crCode67Used_v1";
 
-    if(code!=="6" && code!=="7"){
-      msg.textContent="❌ Ungültiger Code";
+    if(code==="67"){
+      const usedKey="crCode67Used_v2";
+
+      if(localStorage.getItem(usedKey)==="1"){
+        msg.textContent="ℹ️ Code 67 wurde bereits eingelöst";
+        return;
+      }
+
+      coins+=670;
+      localStorage.setItem(usedKey,"1");
+
+      if(typeof save==="function")save();
+      if(typeof updateHUD==="function")updateHUD();
+
+      msg.textContent="✅ Code 67 eingelöst: +670 Münzen!";
+      input.value="";
       return;
     }
 
-    // Neue Spieler können Code 6 ODER 7 einmalig für +100 Münzen einlösen.
-    if(localStorage.getItem(usedKey)==="1"){
-      msg.textContent="ℹ️ Code wurde bereits eingelöst";
-      return;
-    }
-
-    coins+=100;
-    localStorage.setItem(usedKey,"1");
-    if(typeof save==="function")save();
-    if(typeof updateHUD==="function")updateHUD();
-    msg.textContent="✅ +100 Münzen!";
-    input.value="";
+    msg.textContent="❌ Ungültiger Code";
   });
 
   // W/Space etc. are left to gameplay; no music toggle is shown outside Settings.
