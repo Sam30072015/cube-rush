@@ -1687,11 +1687,11 @@ for(let gi=40;gi<Math.min(50,levels.length);gi++){
 
   if(base<900) continue;
 
-  const stepW=112;
-  const gap=38;
+  const stepW=118;
+  const gap=88;
 
-  // Maximal 55 Pixel Höhenunterschied zwischen benachbarten Stufen.
-  const stepHeights=[70,125,180,235,180,125];
+  // Sanfte, gut springbare Treppe: die Stufen liegen deutlich weiter auseinander.
+  const stepHeights=[60,95,130,165,130,95];
 
   const totalWidth=
     stepHeights.length*stepW+
@@ -3048,12 +3048,14 @@ function cubeCollision(){
    if(o[0]==="platform"){
      const py=o[2];
      const b={x:x,y:py,w:o[3],h:o[4]||16};
-     if(rectHit(p,b)){
-       if(player.vy>=0&&player.y+player.size<=py+18){
-         player.y=py-player.size;
-         player.vy=0;
-         player.grounded=true;
-       }else return true;
+
+     // Galaxy-Plattformen sind EINWEG-Plattformen: von unten oder seitlich
+     // berührt der Spieler sie nicht als Todes-Hindernis. Man landet nur
+     // beim Fallen von oben darauf.
+     if(rectHit(p,b) && player.vy>=0 && player.y+player.size<=py+22){
+       player.y=py-player.size;
+       player.vy=0;
+       player.grounded=true;
      }
    }
 
