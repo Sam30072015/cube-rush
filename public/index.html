@@ -650,6 +650,8 @@ body.phone-mode .serverMessageItem{
   pointer-events:none;
 }
 body.phone-mode #coinEventHud{top:108px;max-width:92vw;font-size:12px;padding:5px 9px;white-space:nowrap}
+#tenCoinEventHud{position:fixed;top:320px;left:50%;transform:translateX(-50%);z-index:9;padding:7px 13px;border:2px solid #ff7cf5;border-radius:999px;background:rgba(60,0,55,.9);color:#ff7cf5;font-weight:900;font-size:16px;text-shadow:0 0 10px #ff7cf5;box-shadow:0 0 18px rgba(255,124,245,.28);pointer-events:none}
+body.phone-mode #tenCoinEventHud{top:84px;max-width:92vw;font-size:12px;padding:5px 9px;white-space:nowrap}
 
 /* ---------- HANDY: GANZE SPIELMAP SICHTBAR ---------- */
 body.phone-mode canvas#game{
@@ -1169,6 +1171,15 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 <button class="adminAction" id="adminCoinsEventStart">🪙 2× Münzen für alle starten</button>
 <button class="adminAction" id="adminCoinsEventStop">🛑 2× Münzen stoppen</button>
 <div id="adminCoinsEventStatus"></div>
+<div class="adminSectionTitle">🔥 10×-MÜNZEN-EVENT</div>
+<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center">
+<input id="adminTenCoinsMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
+<input id="adminTenCoinsSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
+<span style="font-weight:800;color:#ff7cf5">Zehnfache Münzen</span>
+</div>
+<button class="adminAction" id="adminTenCoinsEventStart">🔥 10× Münzen für alle starten</button>
+<button class="adminAction" id="adminTenCoinsEventStop">🛑 10× Münzen stoppen</button>
+<div id="adminTenCoinsEventStatus"></div>
 <div class="adminSectionTitle">🌌 GALAXY-EVENT</div>
 <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
 <input id="adminGalaxyMinutes" inputmode="numeric" max="10080" min="1" placeholder="Minuten" type="number"/>
@@ -1215,6 +1226,13 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 <input id="admin2CoinsMinutes" inputmode="numeric" max="10080" min="1" placeholder="Minuten" type="number"/>
 <button class="adminAction" id="admin2CoinsStart">🪙 2× Münzen starten</button>
 <button class="adminAction" id="admin2CoinsStop">🛑 2× Münzen stoppen</button>
+<div class="adminSectionTitle" style="font-size:18px;margin-top:12px">🔥 10×-MÜNZEN-EVENT</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<input id="admin2TenCoinsMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
+<input id="admin2TenCoinsSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
+</div>
+<button class="adminAction" id="admin2TenCoinsStart">🔥 10× Münzen anfragen</button>
+<button class="adminAction" id="admin2TenCoinsStop">🛑 10× Münzen stoppen</button>
 <div class="adminSectionTitle" style="font-size:18px;margin-top:12px">🌌 GALAXY-EVENT</div>
 <input id="admin2GalaxyMinutes" inputmode="numeric" max="10080" min="1" placeholder="Minuten" type="number"/>
 <button class="adminAction" id="admin2GalaxyStart">🌌 Galaxy-Welt anfragen</button>
@@ -1223,6 +1241,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 </div>
 </div>
 <div aria-live="polite" id="serverMessages"></div>
+<div class="hidden" id="tenCoinEventHud"></div>
 <canvas height="650" id="game" width="1200"></canvas>
 <div class="screen hidden" id="result">
 <h1 id="resultTitle">GAME OVER</h1>
@@ -1545,6 +1564,8 @@ function updateAbilityHud(){
 /* ---------- GLOBALES 2×-MÜNZEN-EVENT ---------- */
 let coinEventUntil=0;
 let coinEventActive=false;
+let tenCoinEventUntil=0;
+let tenCoinEventActive=false;
 
 /* ---------- GALAXY-EVENT ---------- */
 let galaxyEventUntil=0;
@@ -1637,11 +1658,34 @@ function coinReward(base){
 
   // Ein normales Level gibt 50 Münzen.
   // Mit der besten Spur (2x) sind es exakt 100.
-  const eventMultiplier=(coinEventActive && Date.now()<coinEventUntil) ? 2 : 1;
-  return Math.max(0,Math.floor(amount*multiplier*eventMultiplier));
+  const doubleEvent=(coinEventActive && Date.now()<coinEventUntil) ? 2 : 1;
+  const tenEvent=(tenCoinEventActive && Date.now()<tenCoinEventUntil) ? 10 : 1;
+  return Math.max(0,Math.floor(amount*multiplier*doubleEvent*tenEvent));
 }
 
 setInterval(updateCoinEventHud,500);
+function setTenCoinEvent(until){
+  tenCoinEventUntil=Number(until)||0;
+  tenCoinEventActive=tenCoinEventUntil>Date.now();
+  updateTenCoinEventHud();
+}
+
+function updateTenCoinEventHud(){
+  const hud=document.getElementById("tenCoinEventHud");
+  if(!hud)return;
+  const now=Date.now();
+  if(tenCoinEventActive && now<tenCoinEventUntil){
+    hud.classList.remove("hidden");
+    const sec=Math.max(0,Math.ceil((tenCoinEventUntil-now)/1000));
+    hud.textContent="🔥 10× MÜNZEN · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
+  }else{
+    tenCoinEventActive=false;
+    hud.classList.add("hidden");
+  }
+}
+
+setInterval(updateTenCoinEventHud,500);
+
 
 function galaxyReward(){
   // Galaxy-Level: 100 Basis-Münzen.
@@ -4660,6 +4704,63 @@ setInterval(renderServerMessages,250);
   });
 })();
 
+/* ---------- ADMIN 10×-MÜNZEN-EVENT ---------- */
+(function(){
+  const start=document.getElementById("adminTenCoinsEventStart");
+  const stop=document.getElementById("adminTenCoinsEventStop");
+  const minutes=document.getElementById("adminTenCoinsMinutes");
+  const seconds=document.getElementById("adminTenCoinsSeconds");
+  const status=document.getElementById("adminTenCoinsEventStatus");
+  const KEY="603781";
+  if(!start||!stop||!minutes||!seconds)return;
+
+  async function send(action,durationMs=0){
+    try{
+      const res=await fetch("/api/admin/ten-coins-event",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-admin-key":KEY
+        },
+        body:JSON.stringify({action,durationMs})
+      });
+
+      const data=await res.json().catch(()=>({}));
+
+      if(!res.ok){
+        throw new Error(data.error||"Fehler");
+      }
+
+      if(typeof setTenCoinEvent==="function"){
+        setTenCoinEvent(data.until||0);
+      }
+
+      if(status){
+        status.textContent = action==="start"
+          ? "✅ 10× Münzen für alle aktiviert"
+          : "🛑 10× Münzen beendet";
+      }
+    }catch(e){
+      if(status)status.textContent="❌ "+e.message;
+    }
+  }
+
+  start.addEventListener("click",()=>{
+    const min=Math.max(0,Number(minutes.value)||0);
+    const sec=Math.max(0,Math.min(59,Number(seconds.value)||0));
+    const totalMs=(min*60+sec)*1000;
+
+    if(totalMs<=0){
+      if(status)status.textContent="❌ Bitte Minuten oder Sekunden eingeben";
+      return;
+    }
+
+    send("start",totalMs);
+  });
+
+  stop.addEventListener("click",()=>send("stop"));
+})();
+
 /* ---------- ADMIN GALAXY-EVENT ---------- */
 (function(){
   const start=document.getElementById("adminGalaxyStart");
@@ -4808,6 +4909,73 @@ setInterval(renderServerMessages,250);
 })();
 
 
+/* ---------- ADMIN PANEL 2 · 10× MÜNZEN ---------- */
+(function(){
+  const start=document.getElementById("admin2TenCoinsStart");
+  const stop=document.getElementById("admin2TenCoinsStop");
+  const minutes=document.getElementById("admin2TenCoinsMinutes");
+  const seconds=document.getElementById("admin2TenCoinsSeconds");
+  const status=document.getElementById("admin2Status");
+  const KEY="6301";
+  if(!start||!stop||!minutes||!seconds)return;
+
+  async function post(url,body){
+    const res=await fetch(url,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-admin-key":KEY
+      },
+      body:JSON.stringify(body||{})
+    });
+
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||"Fehler");
+    return data;
+  }
+
+  start.addEventListener("click",async()=>{
+    const min=Math.max(0,Number(minutes.value)||0);
+    const sec=Math.max(0,Math.min(59,Number(seconds.value)||0));
+    const totalMs=(min*60+sec)*1000;
+
+    if(totalMs<=0){
+      if(status)status.textContent="❌ Bitte Minuten oder Sekunden eingeben";
+      return;
+    }
+
+    try{
+      await post("/api/second-admin/event-request",{
+        event:"tenCoins",
+        action:"start",
+        durationMs:totalMs
+      });
+
+      if(status){
+        status.textContent="🕐 10×-Münzen-Anfrage an Haupt-Admin gesendet";
+      }
+    }catch(e){
+      if(status)status.textContent="❌ "+e.message;
+    }
+  });
+
+  stop.addEventListener("click",async()=>{
+    try{
+      await post("/api/second-admin/ten-coins-event",{
+        action:"stop"
+      });
+
+      if(typeof setTenCoinEvent==="function"){
+        setTenCoinEvent(0);
+      }
+
+      if(status)status.textContent="🛑 10× Münzen gestoppt";
+    }catch(e){
+      if(status)status.textContent="❌ "+e.message;
+    }
+  });
+})();
+
 /* ---------- ADMIN PANEL 2 · GALAXY ---------- */
 (function(){
   const start=document.getElementById("admin2GalaxyStart");
@@ -4851,6 +5019,7 @@ setInterval(renderServerMessages,250);
 
   function eventName(type){
     if(type==="coins")return "🪙 2× Münzen";
+    if(type==="tenCoins")return "🔥 10× Münzen";
     if(type==="galaxy")return "🌌 Galaxy-Welt";
     return "🎉 Event";
   }
@@ -5518,6 +5687,10 @@ setInterval(updateSettingsScore,500);
 
           if(msg.type==="coinEvent"){
             setCoinEvent(msg.until||0);
+          }
+
+          if(msg.type==="tenCoinEvent"){
+            setTenCoinEvent(msg.until||0);
           }
 
           if(msg.type==="galaxyEvent"){
