@@ -4301,8 +4301,37 @@ const loungeBass=[98,123.47,146.83,130.81];
       if(typeof save==="function")save();
       if(typeof updateHUD==="function")updateHUD();
 
+      const menuCoinsEl=document.getElementById("menuCoins");
+      if(menuCoinsEl) menuCoinsEl.textContent="🪙 Münzen: "+coins;
+
+      const shopBalanceEl=document.getElementById("shopBalance");
+      if(shopBalanceEl) shopBalanceEl.textContent="🪙 Münzen: "+coins;
+
       msg.textContent="✅ Code 67 eingelöst: +670 Münzen!";
       input.value="";
+
+      const popup=document.createElement("div");
+      popup.textContent="🪙 +670 Münzen";
+      popup.style.cssText=
+        "position:fixed;left:50%;top:25%;transform:translate(-50%,-50%);"+
+        "z-index:99999;padding:14px 24px;border-radius:16px;"+
+        "background:rgba(10,14,40,.96);color:#ffd83d;font-size:28px;"+
+        "font-weight:1000;text-shadow:0 0 12px #ffd83d;"+
+        "border:3px solid #ffd83d;box-shadow:0 0 30px rgba(255,216,61,.5);"+
+        "pointer-events:none;opacity:0;transition:opacity .15s ease,top .9s ease;";
+      document.body.appendChild(popup);
+
+      requestAnimationFrame(()=>{
+        popup.style.opacity="1";
+        popup.style.top="18%";
+      });
+
+      setTimeout(()=>{
+        popup.style.opacity="0";
+        popup.style.top="12%";
+      },900);
+
+      setTimeout(()=>popup.remove(),1200);
       return;
     }
 
