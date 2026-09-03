@@ -19,9 +19,9 @@ const wss = new WebSocket.Server({ server });
 const players = new Map();
 
 let coinEventUntil = 0;
-let serverMessages = [];
+let galaxyEventUntil = 0;
 
-// Event-Anfragen vom zweiten Admin
+let serverMessages = [];
 let eventRequests = [];
 
 
@@ -90,35 +90,15 @@ function publicRequests() {
   }));
 }
 
-function executeCoinEvent(action, durationMs) {
-  if (action === "start") {
-    coinEventUntil =
-      Date.now() + durationMs;
+function cleanupRequests() {
+  const now = Date.now();
 
-    broadcast({
-      type: "coinEvent",
-      until: coinEventUntil
-    });
-
-    return {
-      until: coinEventUntil
-    };
-  }
-
-  if (action === "stop") {
-    coinEventUntil = 0;
-
-    broadcast({
-      type: "coinEvent",
-      until: 0
-    });
-
-    return {
-      until: 0
-    };
-  }
-
-  throw new Error("Ungültige Event-Aktion");
+  eventRequests = eventRequests.filter(
+    (request) =>
+      now -
+        Number(request.createdAt || 0) <
+      10 * 60 * 1000
+  );
 }
 
 
@@ -153,9 +133,9 @@ wss.on("connection", (ws) => {
             .toUpperCase();
       }
 
-      // Nur eine aktive Verbindung pro Spieler
       const oldSocket = players.get(name);
 
+      // Pro Spielername nur eine aktive Verbindung
       if (oldSocket && oldSocket !== ws) {
         try {
           oldSocket.terminate();
@@ -176,11 +156,17 @@ wss.on("connection", (ws) => {
 
       send(ws, {
         type: "connected",
+
         name,
 
         coinEventUntil:
           coinEventUntil > Date.now()
             ? coinEventUntil
+            : 0,
+
+        galaxyEventUntil:
+          galaxyEventUntil > Date.now()
+            ? galaxyEventUntil
             : 0,
 
         serverMessages
@@ -243,7 +229,7 @@ setInterval(() => {
    ========================================================= */
 
 
-/* ---------- 2x-Münzen-Event ---------- */
+/* ---------- 2x-MÜNZEN-EVENT ---------- */
 
 app.post("/api/admin/coins-event", (req, res) => {
   if (!adminOK(req)) {
@@ -267,28 +253,31 @@ app.post("/api/admin/coins-event", (req, res) => {
       )
     );
 
-    const result =
-      executeCoinEvent(
-        "start",
-        durationMs
-      );
+    coinEventUntil =
+      Date.now() + durationMs;
+
+    broadcast({
+      type: "coinEvent",
+      until: coinEventUntil
+    });
 
     return res.json({
       ok: true,
-      ...result
+      until: coinEventUntil
     });
   }
 
   if (action === "stop") {
-    const result =
-      executeCoinEvent(
-        "stop",
-        0
-      );
+    coinEventUntil = 0;
+
+    broadcast({
+      type: "coinEvent",
+      until: 0
+    });
 
     return res.json({
       ok: true,
-      ...result
+      until: 0
     });
   }
 
@@ -298,7 +287,7 @@ app.post("/api/admin/coins-event", (req, res) => {
 });
 
 
-/* ---------- Münzen an Spieler ---------- */
+/* ---------- MÜNZEN GEBEN ---------- */
 
 app.post("/api/admin/give", (req, res) => {
   if (!adminOK(req)) {
@@ -345,7 +334,7 @@ app.post("/api/admin/give", (req, res) => {
 });
 
 
-/* ---------- Münzen an alle ---------- */
+/* ---------- MÜNZEN AN ALLE ---------- */
 
 app.post("/api/admin/give-all", (req, res) => {
   if (!adminOK(req)) {
@@ -370,11 +359,9 @@ app.post("/api/admin/give-all", (req, res) => {
     coins
   });
 
-  // Jeder Spielername existiert nur einmal.
+  // Jeder Spielername nur einmal
   for (const [name, ws] of players) {
-    if (
-      ws.readyState === WebSocket.OPEN
-    ) {
+    if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
       count++;
     } else {
@@ -390,7 +377,7 @@ app.post("/api/admin/give-all", (req, res) => {
 });
 
 
-/* ---------- Münzen abziehen ---------- */
+/* ---------- MÜNZEN ABZIEHEN ---------- */
 
 app.post("/api/admin/take", (req, res) => {
   if (!adminOK(req)) {
@@ -438,11 +425,74 @@ app.post("/api/admin/take", (req, res) => {
 
 
 /* =========================================================
+   GALAXY-EVENT
+   ========================================================= */
+
+
+/* ---------- Galaxy starten ---------- */
+
+app.post("/api/admin/galaxy-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({
+      error: "Unauthorized"
+    });
+  }
+
+  const action = String(
+    req.body?.action || ""
+  );
+
+  if (action === "start") {
+    const durationMs = Math.max(
+      60000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(
+          Number(req.body?.durationMs) || 0
+        )
+      )
+    );
+
+    galaxyEventUntil =
+      Date.now() + durationMs;
+
+    broadcast({
+      type: "galaxyEvent",
+      until: galaxyEventUntil
+    });
+
+    return res.json({
+      ok: true,
+      until: galaxyEventUntil
+    });
+  }
+
+  if (action === "stop") {
+    galaxyEventUntil = 0;
+
+    broadcast({
+      type: "galaxyEvent",
+      until: 0
+    });
+
+    return res.json({
+      ok: true,
+      until: 0
+    });
+  }
+
+  return res.status(400).json({
+    error: "Invalid action"
+  });
+});
+
+
+/* =========================================================
    SERVERNACHRICHTEN
    ========================================================= */
 
 
-/* ---------- Nachricht erstellen ---------- */
+/* ---------- Nachricht senden ---------- */
 
 app.post("/api/admin/message", (req, res) => {
   if (!anyAdminOK(req)) {
@@ -475,8 +525,7 @@ app.post("/api/admin/message", (req, res) => {
   );
 
   const duration =
-    (minutes * 60 + seconds) *
-    1000;
+    (minutes * 60 + seconds) * 1000;
 
   if (!text || duration <= 0) {
     return res.status(400).json({
@@ -503,7 +552,7 @@ app.post("/api/admin/message", (req, res) => {
       Date.now() + duration
   };
 
-  // Mehrere Nachrichten dürfen gleichzeitig existieren.
+  // Mehrere Nachrichten gleichzeitig möglich
   serverMessages.push(message);
 
   broadcast(message);
@@ -545,8 +594,9 @@ app.post(
 
 
 /*
- * Admin 2 darf ein 2x-Münzen-Event NICHT direkt starten.
- * Er erstellt eine Anfrage.
+ * Der zweite Admin darf Galaxy und 2x-Münzen
+ * NICHT direkt starten.
+ * Er muss eine Anfrage stellen.
  */
 
 app.post(
@@ -566,40 +616,51 @@ app.post(
       req.body?.action || "start"
     );
 
-    // Beim jetzigen System gibt es nur
-    // das 2x-Münzen-Event.
-    if (event !== "coins") {
+    if (
+      event !== "coins" &&
+      event !== "galaxy"
+    ) {
       return res.status(400).json({
-        error:
-          "Dieses Event ist nicht verfügbar"
+        error: "Unbekanntes Event"
       });
     }
 
     if (action !== "start") {
       return res.status(400).json({
         error:
-          "Nur Event-Start benötigt eine Anfrage"
+          "Nur Start-Anfragen sind erlaubt"
       });
     }
 
-    const value =
-      Number(
-        req.body?.durationMs
-      ) || 0;
+    let durationMs;
 
-    const durationMs = Math.max(
-      1000,
-      Math.min(
-        10080 * 60 * 1000,
-        Math.floor(value)
-      )
-    );
+    if (event === "galaxy") {
+      durationMs = Math.max(
+        60000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(req.body?.durationMs) || 0
+          )
+        )
+      );
+    } else {
+      durationMs = Math.max(
+        1000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(req.body?.durationMs) || 0
+          )
+        )
+      );
+    }
 
-    // Doppelte offene Anfrage vermeiden
+    // Doppelte offene Anfrage verhindern
     const existing =
       eventRequests.find(
         (request) =>
-          request.event === "coins" &&
+          request.event === event &&
           request.action === "start"
       );
 
@@ -607,14 +668,15 @@ app.post(
       return res.json({
         ok: true,
         pending: true,
-        id: existing.id
+        id: existing.id,
+        duplicate: true
       });
     }
 
     const request = {
       id: makeRequestId(),
 
-      event: "coins",
+      event,
 
       action: "start",
 
@@ -625,6 +687,11 @@ app.post(
 
     eventRequests.push(request);
 
+    /*
+     * Keine Broadcast-Spam-Nachrichten.
+     * Das erste Admin-Panel fragt die offenen
+     * Anfragen regelmäßig ab.
+     */
     return res.json({
       ok: true,
       pending: true,
@@ -635,7 +702,7 @@ app.post(
 
 
 /* =========================================================
-   OFFENE ANFRAGEN FÜR ADMIN 1
+   ADMIN 1: ANFRAGEN ABRUFEN
    ========================================================= */
 
 app.get(
@@ -647,30 +714,18 @@ app.get(
       });
     }
 
-    const now = Date.now();
-
-    // Anfragen maximal 10 Minuten offen lassen
-    eventRequests =
-      eventRequests.filter(
-        (request) =>
-          now -
-            Number(
-              request.createdAt || 0
-            ) <
-          10 * 60 * 1000
-      );
+    cleanupRequests();
 
     return res.json({
       ok: true,
-      requests:
-        publicRequests()
+      requests: publicRequests()
     });
   }
 );
 
 
 /* =========================================================
-   ADMIN 1: ANFRAGE ANNEHMEN
+   ADMIN 1: ANNEHMEN
    ========================================================= */
 
 app.post(
@@ -684,6 +739,8 @@ app.post(
         error: "Unauthorized"
       });
     }
+
+    cleanupRequests();
 
     const id = String(
       req.params.id ||
@@ -708,39 +765,49 @@ app.post(
     const request =
       eventRequests[index];
 
-    // Anfrage aus der Liste entfernen
+    // Aus der offenen Liste entfernen
     eventRequests.splice(
       index,
       1
     );
 
     if (
-      request.event === "coins" &&
-      request.action === "start"
+      request.event === "coins"
     ) {
-      const result =
-        executeCoinEvent(
-          "start",
-          request.durationMs
-        );
+      coinEventUntil =
+        Date.now() +
+        request.durationMs;
 
-      return res.json({
-        ok: true,
-        approved: true,
-        request,
-        ...result
+      broadcast({
+        type: "coinEvent",
+        until: coinEventUntil
       });
     }
 
-    return res.status(400).json({
-      error: "Ungültige Anfrage"
+    if (
+      request.event === "galaxy"
+    ) {
+      galaxyEventUntil =
+        Date.now() +
+        request.durationMs;
+
+      broadcast({
+        type: "galaxyEvent",
+        until: galaxyEventUntil
+      });
+    }
+
+    return res.json({
+      ok: true,
+      approved: true,
+      request
     });
   }
 );
 
 
 /* =========================================================
-   ADMIN 1: ANFRAGE ABLEHNEN
+   ADMIN 1: ABLEHNEN
    ========================================================= */
 
 app.post(
@@ -754,6 +821,8 @@ app.post(
         error: "Unauthorized"
       });
     }
+
+    cleanupRequests();
 
     const id = String(
       req.params.id ||
@@ -793,11 +862,11 @@ app.post(
 
 
 /* =========================================================
-   ZWEITER ADMIN: EVENT STOPPEN
+   ZWEITER ADMIN: 2x-MÜNZEN STOPPEN
    ========================================================= */
 
 app.post(
-  "/api/second-admin/event-stop",
+  "/api/second-admin/coins-event",
   (req, res) => {
     if (!secondAdminOK(req)) {
       return res.status(401).json({
@@ -805,26 +874,156 @@ app.post(
       });
     }
 
-    const event = String(
-      req.body?.event || ""
+    const action = String(
+      req.body?.action || ""
     );
 
-    if (event !== "coins") {
-      return res.status(400).json({
-        error:
-          "Dieses Event ist nicht verfügbar"
+    if (action === "stop") {
+      coinEventUntil = 0;
+
+      broadcast({
+        type: "coinEvent",
+        until: 0
+      });
+
+      return res.json({
+        ok: true,
+        until: 0
       });
     }
 
-    const result =
-      executeCoinEvent(
-        "stop",
-        0
+    if (action === "start") {
+      const durationMs = Math.max(
+        1000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(
+              req.body?.durationMs
+            ) || 0
+          )
+        )
       );
 
-    return res.json({
-      ok: true,
-      ...result
+      const existing =
+        eventRequests.find(
+          (request) =>
+            request.event === "coins" &&
+            request.action === "start"
+        );
+
+      if (existing) {
+        return res.json({
+          ok: true,
+          pending: true,
+          id: existing.id
+        });
+      }
+
+      const request = {
+        id: makeRequestId(),
+        event: "coins",
+        action: "start",
+        durationMs,
+        createdAt: Date.now()
+      };
+
+      eventRequests.push(request);
+
+      return res.json({
+        ok: true,
+        pending: true,
+        id: request.id
+      });
+    }
+
+    return res.status(400).json({
+      error: "Invalid action"
+    });
+  }
+);
+
+
+/* =========================================================
+   ZWEITER ADMIN: GALAXY STOPPEN
+   ========================================================= */
+
+app.post(
+  "/api/second-admin/galaxy-event",
+  (req, res) => {
+    if (!secondAdminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const action = String(
+      req.body?.action || ""
+    );
+
+    // Stoppen darf direkt gemacht werden
+    if (action === "stop") {
+      galaxyEventUntil = 0;
+
+      broadcast({
+        type: "galaxyEvent",
+        until: 0
+      });
+
+      return res.json({
+        ok: true,
+        until: 0
+      });
+    }
+
+    // Starten geht nur über Anfrage
+    if (action === "start") {
+      const durationMs = Math.max(
+        60000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(
+              req.body?.durationMs
+            ) || 0
+          )
+        )
+      );
+
+      const existing =
+        eventRequests.find(
+          (request) =>
+            request.event === "galaxy" &&
+            request.action === "start"
+        );
+
+      if (existing) {
+        return res.json({
+          ok: true,
+          pending: true,
+          id: existing.id
+        });
+      }
+
+      const request = {
+        id: makeRequestId(),
+        event: "galaxy",
+        action: "start",
+        durationMs,
+        createdAt: Date.now()
+      };
+
+      eventRequests.push(request);
+
+      return res.json({
+        ok: true,
+        pending: true,
+        id: request.id
+      });
+    }
+
+    return res.status(400).json({
+      error: "Invalid action"
     });
   }
 );
@@ -843,17 +1042,9 @@ app.get(
       });
     }
 
-    const now = Date.now();
+    cleanupRequests();
 
-    eventRequests =
-      eventRequests.filter(
-        (request) =>
-          now -
-            Number(
-              request.createdAt || 0
-            ) <
-          10 * 60 * 1000
-      );
+    const now = Date.now();
 
     res.json({
       ok: true,
@@ -861,6 +1052,11 @@ app.get(
       coinEventUntil:
         coinEventUntil > now
           ? coinEventUntil
+          : 0,
+
+      galaxyEventUntil:
+        galaxyEventUntil > now
+          ? galaxyEventUntil
           : 0,
 
       messages:
@@ -896,13 +1092,13 @@ app.get(
 
 
 /* =========================================================
-   AUFRÄUMEN
+   AUTOMATISCHES AUFRÄUMEN
    ========================================================= */
 
 setInterval(() => {
   const now = Date.now();
 
-  // Abgelaufene Nachrichten entfernen
+  // Abgelaufene Nachrichten
   serverMessages =
     serverMessages.filter(
       (message) =>
@@ -911,16 +1107,8 @@ setInterval(() => {
         ) > now
     );
 
-  // Alte Event-Anfragen entfernen
-  eventRequests =
-    eventRequests.filter(
-      (request) =>
-        now -
-          Number(
-            request.createdAt || 0
-          ) <
-        10 * 60 * 1000
-    );
+  // Abgelaufene Event-Anfragen
+  cleanupRequests();
 }, 1000);
 
 
@@ -957,6 +1145,6 @@ server.listen(PORT, () => {
   );
 
   console.log(
-    "Kackhaufen-Event ist deaktiviert."
+    "Galaxy-Event aktiviert."
   );
 });
