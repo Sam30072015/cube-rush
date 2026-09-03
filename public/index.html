@@ -3082,8 +3082,24 @@ function updateMenu(){
       // Galaxy-Level sind während des laufenden DLC-Events immer offen.
       // Der normale Welt-Fortschritt (unlocked) sperrt sie NICHT.
       b.innerHTML="🌌<br>LEVEL "+(i+1)+"<br>+100 🪙";
-      b.addEventListener("click",()=>{
-        if(galaxyLevelOpen(i)) startLevel(i);
+      b.addEventListener("click",(ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        // Galaxy-Level 41-50: während des Events immer direkt öffnen.
+        if(i<40 || i>=50)return;
+        if(!galaxyWorldActive()) return;
+        try{
+          startLevel(i);
+        }catch(err){
+          console.error("Galaxy-Level konnte nicht gestartet werden:",err);
+          // Fallback: Startzustand sicher setzen und erneut starten.
+          try{
+            galaxyEventActive = Number(galaxyEventUntil) > Date.now();
+            if(galaxyEventActive) startLevel(i);
+          }catch(err2){
+            console.error("Galaxy-Level Fallback fehlgeschlagen:",err2);
+          }
+        }
       });
       g5.appendChild(b);
     }
@@ -3106,7 +3122,13 @@ function startLevel(i){
  // DLC/Galaxy-Level 41-50 sind bei aktivem Galaxy-Event immer spielbar.
  // Sie hängen NICHT vom normalen unlocked-Fortschritt ab.
  if(i>=40){
-   if(!galaxyWorldActive())return;
+   // Galaxy-Level 41-50 ignorieren den normalen Unlock-Fortschritt.
+   // Entscheidend ist nur, ob das Galaxy-Event gerade läuft.
+   if(Number(galaxyEventUntil) <= Date.now()) {
+     galaxyEventActive=false;
+     return;
+   }
+   galaxyEventActive=true;
  }else if(i>=unlocked)return;
  const musicWasOn=(typeof musicOn!=="undefined")?musicOn:false;
  if(typeof stopLoungeMusic==="function")stopLoungeMusic();
