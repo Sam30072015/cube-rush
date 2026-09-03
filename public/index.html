@@ -1662,29 +1662,93 @@ levels.sort((a,b)=>{
   return na-nb;
 });
 
-/* ---------- GALAXY: schwebende Plattform-Treppen ----------
-   Jede Galaxy-Stufe bekommt eine eigene kleine Plattform-Sequenz.
-   Sie benutzt bestehende Collider-Logik und ist nicht einsammelbar.
+/* ---------- GALAXY: logisch spielbare Plattform-Treppen ----------
+   Die Treppe liegt in einem bewusst freien Bereich.
+   Gefährliche Hindernisse werden nicht zwischen die Plattformen gesetzt.
+   Die Höhenunterschiede bleiben mit dem normalen Sprung schaffbar.
 */
 for(let gi=40;gi<Math.min(50,levels.length);gi++){
   const lvl=levels[gi];
   if(!lvl || !Array.isArray(lvl.objects)) continue;
 
-  const portals=lvl.objects.filter(o=>Array.isArray(o)&&o[0]==="portal");
-  const lastPortalX=portals.length?portals[portals.length-1][1]:2500;
-  const base=Math.min(lvl.length-1250, lastPortalX+430);
-  if(base<700) continue;
+  const portals=lvl.objects.filter(
+    o=>Array.isArray(o)&&o[0]==="portal"
+  );
 
-  const shape=(gi-40)%5;
-  const stepW=92+(gi%4)*8;
-  const gap=36+(gi%3)*8;
-  const heights=[72,124,176,128,82].map((h,i)=>h + ((shape+i)%3)*12);
+  const lastPortalX=portals.length
+    ? portals[portals.length-1][1]
+    : 2500;
 
-  for(let sidx=0;sidx<5;sidx++){
+  // Etwas Abstand zum Portal, damit der Spieler sauber zur Treppe kommt.
+  const base=Math.min(
+    lvl.length-1650,
+    lastPortalX+560
+  );
+
+  if(base<900) continue;
+
+  const stepW=112;
+  const gap=38;
+
+  // Maximal 55 Pixel Höhenunterschied zwischen benachbarten Stufen.
+  const stepHeights=[70,125,180,235,180,125];
+
+  const totalWidth=
+    stepHeights.length*stepW+
+    (stepHeights.length-1)*gap;
+
+  const clearStart=base-100;
+  const clearEnd=base+totalWidth+120;
+
+  // Alle gefährlichen Objekte aus dem Treppenbereich entfernen.
+  lvl.objects=lvl.objects.filter(o=>{
+    if(!Array.isArray(o)||!o[0]) return true;
+    if(o[0]==="platform") return false;
+    if(o[0]==="portal") return true;
+
+    const ox=Number(o[1])||0;
+    const ow=Math.max(Number(o[2])||0,40);
+
+    if(ox+ow<clearStart) return true;
+    if(ox>clearEnd) return true;
+
+    // Hindernis wäre in/auf der Treppe -> entfernen.
+    return false;
+  });
+
+  // Saubere sechsstufige Galaxy-Treppe.
+  for(let sidx=0;sidx<stepHeights.length;sidx++){
     const x=base+sidx*(stepW+gap);
-    if(x+stepW>lvl.length-120) break;
-    const y=GROUND-heights[sidx];
-    lvl.objects.push(["platform",x,y,stepW,16]);
+    const y=GROUND-stepHeights[sidx];
+
+    lvl.objects.push([
+      "platform",
+      x,
+      y,
+      stepW,
+      18
+    ]);
+  }
+
+  // Erst deutlich hinter der Treppe kommen wieder Hindernisse.
+  const obstacleBase=clearEnd+280;
+
+  if(obstacleBase<lvl.length-250){
+    const variant=(gi-40)%4;
+
+    if(variant===0){
+      lvl.objects.push(["spike",obstacleBase,46,48]);
+      lvl.objects.push(["saw",obstacleBase+220,405,36]);
+    }else if(variant===1){
+      lvl.objects.push(["spike",obstacleBase,42,42]);
+      lvl.objects.push(["spike",obstacleBase+58,42,42]);
+    }else if(variant===2){
+      lvl.objects.push(["block",obstacleBase,72,105]);
+      lvl.objects.push(["spike",obstacleBase+220,46,48]);
+    }else{
+      lvl.objects.push(["saw",obstacleBase,405,38]);
+      lvl.objects.push(["spike",obstacleBase+230,46,48]);
+    }
   }
 }
 
