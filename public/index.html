@@ -1662,6 +1662,33 @@ levels.sort((a,b)=>{
   return na-nb;
 });
 
+/* ---------- GALAXY: schwebende Plattform-Treppen ----------
+   Jede Galaxy-Stufe bekommt eine eigene kleine Plattform-Sequenz.
+   Sie benutzt bestehende Collider-Logik und ist nicht einsammelbar.
+*/
+for(let gi=40;gi<Math.min(50,levels.length);gi++){
+  const lvl=levels[gi];
+  if(!lvl || !Array.isArray(lvl.objects)) continue;
+
+  const portals=lvl.objects.filter(o=>Array.isArray(o)&&o[0]==="portal");
+  const lastPortalX=portals.length?portals[portals.length-1][1]:2500;
+  const base=Math.min(lvl.length-1250, lastPortalX+430);
+  if(base<700) continue;
+
+  const shape=(gi-40)%5;
+  const stepW=92+(gi%4)*8;
+  const gap=36+(gi%3)*8;
+  const heights=[72,124,176,128,82].map((h,i)=>h + ((shape+i)%3)*12);
+
+  for(let sidx=0;sidx<5;sidx++){
+    const x=base+sidx*(stepW+gap);
+    if(x+stepW>lvl.length-120) break;
+    const y=GROUND-heights[sidx];
+    lvl.objects.push(["platform",x,y,stepW,16]);
+  }
+}
+
+
 /* ---------- unique music per level ---------- */
 const musicTracks=[
  {bpm:116,lead:[261.63,329.63,392,329.63,440,392,329.63,293.66],bass:[130.81,164.81,196,164.81]},
@@ -2954,6 +2981,18 @@ function cubeCollision(){
      }
    }
 
+   if(o[0]==="platform"){
+     const py=o[2];
+     const b={x:x,y:py,w:o[3],h:o[4]||16};
+     if(rectHit(p,b)){
+       if(player.vy>=0&&player.y+player.size<=py+18){
+         player.y=py-player.size;
+         player.vy=0;
+         player.grounded=true;
+       }else return true;
+     }
+   }
+
    if(o[0]==="mine"){
      const r=o[3],cy=o[2];
      const qx=Math.max(p.x,Math.min(x,p.x+p.w));
@@ -3196,9 +3235,10 @@ function drawBackground(){
  const g=ctx.createLinearGradient(0,0,0,H);
 
  if(world5){
-   g.addColorStop(0,"#050018");
-   g.addColorStop(.42,"#18065f");
-   g.addColorStop(1,"#02030d");
+   // GALAXY: kein Häuser-/Stadt-Hintergrund, nur tiefer Weltraum.
+   g.addColorStop(0,"#02000a");
+   g.addColorStop(.42,"#10003b");
+   g.addColorStop(1,"#01020a");
  }else if(world4){
    g.addColorStop(0,"#03210a");
    g.addColorStop(.45,"#087a2a");
@@ -3220,22 +3260,68 @@ function drawBackground(){
  ctx.fillStyle=g;
  ctx.fillRect(0,0,W,H);
 
- // Während des vom Admin gestarteten Events liegt überall Kackhaufen-Deko im Hintergrund.
- drawPoopEventBackground();
+ if(!world5){
+   drawPoopEventBackground();
+ }
 
- /* stars */
- for(let i=0;i<100;i++){
-   let x=(i*149-camera*.12)%(W+100);
+ // GALAXY: viele Sterne, aber keine Gebäude.
+ const starCount=world5?150:100;
+ for(let i=0;i<starCount;i++){
+   let x=(i*149-camera*(world5?.06:.12))%(W+100);
    if(x<0)x+=W+100;
    let y=(i*73)%430;
-   ctx.globalAlpha=.25+(i%5)/10;
+   ctx.globalAlpha=world5 ? .35+(i%6)/10 : .25+(i%5)/10;
    ctx.fillStyle="#fff";
    ctx.fillRect(x,y,(i%3)+1,(i%3)+1);
  }
  ctx.globalAlpha=1;
 
+ if(world5){
+   // Große leuchtende Sterne/kleine Nebelwolken.
+   ctx.save();
+   ctx.globalCompositeOperation="screen";
+   for(let i=0;i<18;i++){
+     let x=(i*233-camera*.025)%(W+160);
+     if(x<0)x+=W+160;
+     const y=55+(i*61)%330;
+     const r=10+(i%4)*4;
+     const grd=ctx.createRadialGradient(x,y,0,x,y,r*2.8);
+     grd.addColorStop(0,"rgba(190,130,255,.20)");
+     grd.addColorStop(1,"rgba(190,130,255,0)");
+     ctx.fillStyle=grd;
+     ctx.beginPath();ctx.arc(x,y,r*2.8,0,Math.PI*2);ctx.fill();
+   }
+
+   // Planet oben links.
+   const px=110;
+   const py=105;
+   const pr=58;
+   const pg=ctx.createRadialGradient(px-pr*.35,py-pr*.35,6,px,py,pr);
+   pg.addColorStop(0,"#ffeaff");
+   pg.addColorStop(.28,"#b975ff");
+   pg.addColorStop(.62,"#5a27d9");
+   pg.addColorStop(1,"#160045");
+   ctx.shadowBlur=28;
+   ctx.shadowColor="#b975ff";
+   ctx.fillStyle=pg;
+   ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.fill();
+   ctx.shadowBlur=0;
+
+   // Planet-Ringe.
+   ctx.save();
+   ctx.translate(px,py+4);
+   ctx.rotate(-.20);
+   ctx.strokeStyle="rgba(240,220,255,.72)";
+   ctx.lineWidth=7;
+   ctx.beginPath();ctx.ellipse(0,0,86,23,0,0,Math.PI*2);ctx.stroke();
+   ctx.strokeStyle="rgba(148,102,255,.55)";
+   ctx.lineWidth=3;
+   ctx.beginPath();ctx.ellipse(0,0,98,28,0,0,Math.PI*2);ctx.stroke();
+   ctx.restore();
+   ctx.restore();
+ }
+
  if(world2){
-   /* Kristall-Silhouetten der zweiten Welt */
    for(let i=0;i<14;i++){
      let x=(i*175-camera*.18)%(W+220);
      if(x<0)x+=W+220;
@@ -3275,7 +3361,6 @@ function drawBackground(){
  }
 
  if(world4){
-   // Grün leuchtende "Luck"-Welt mit Bäumen, Blättern und Lichtpunkten.
    for(let i=0;i<9;i++){
      let x=(i*250-camera*.14)%(W+280);
      if(x<0)x+=W+280;
@@ -3298,54 +3383,41 @@ function drawBackground(){
      if(x<0)x+=W+160;
      const y=55+(i%6)*45;
      ctx.globalAlpha=.35+.05*(i%5);
-     ctx.beginPath();
-     ctx.arc(x,y,2+(i%3),0,Math.PI*2);
-     ctx.fill();
+     ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fill();
    }
    ctx.globalAlpha=1;
  }
 
- /* distant skyline */
- for(let i=0;i<12;i++){
-   let x=(i*210-camera*.24)%(W+260);
-   if(x<0)x+=W+260;
-   const h=90+(i%4)*38;
-   ctx.fillStyle="#090c2b";
-   ctx.fillRect(x,GROUND-h,145,h);
+ // Skyline nur für die alten Welten, NIE für Galaxy.
+ if(!world5){
+   for(let i=0;i<12;i++){
+     let x=(i*210-camera*.24)%(W+260);
+     if(x<0)x+=W+260;
+     const h=90+(i%4)*38;
+     ctx.fillStyle="#090c2b";
+     ctx.fillRect(x,GROUND-h,145,h);
 
-   ctx.fillStyle="#242b6c";
-   for(let y=GROUND-h+18;y<GROUND-10;y+=27){
-     ctx.fillRect(x+18,y,8,8);
-     ctx.fillRect(x+52,y,8,8);
-     ctx.fillRect(x+86,y,8,8);
+     ctx.fillStyle="#242b6c";
+     for(let y=GROUND-h+18;y<GROUND-10;y+=27){
+       ctx.fillRect(x+18,y,8,8);
+       ctx.fillRect(x+52,y,8,8);
+       ctx.fillRect(x+86,y,8,8);
+     }
    }
  }
 
- /* grid */
- ctx.strokeStyle="#20265b";
- ctx.lineWidth=1;
- for(let x=-camera%50;x<W;x+=50){
-   ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,GROUND);ctx.stroke();
- }
- for(let y=60;y<GROUND;y+=60){
-   ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
- }
- if(world5){
-   ctx.save();
-   for(let i=0;i<70;i++){
-     let sx=(i*173-camera*.08)%(W+40);
-     if(sx<0)sx+=W+40;
-     const sy=24+((i*97)%400);
-     const r=1+(i%3)*.6;
-     ctx.globalAlpha=.3+(i%4)*.13;
-     ctx.fillStyle="#fff";
-     ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
+ // Grid nur für alte Welten. Galaxy bekommt einen sauberen Weltraum-Look.
+ if(!world5){
+   ctx.strokeStyle="#20265b";
+   ctx.lineWidth=1;
+   for(let x=-camera%50;x<W;x+=50){
+     ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,GROUND);ctx.stroke();
    }
-   ctx.globalAlpha=1;
-   ctx.restore();
+   for(let y=60;y<GROUND;y+=60){
+     ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+   }
  }
 }
-
 function drawGround(){
  const world5=levelIndex>=40;
  const world4=levelIndex>=30 && levelIndex<40;
@@ -3573,6 +3645,33 @@ function drawObjects(){
      ctx.strokeStyle="#aa4cff";
      ctx.lineWidth=3;
      ctx.strokeRect(x,y,o[2],o[3]);
+     ctx.restore();
+     continue;
+   }
+
+   if(type==="platform"){
+     if(x<-220||x>W+220)continue;
+     const y=o[2],w=o[3],h=o[4]||16;
+     ctx.save();
+     const galaxy=levelIndex>=40;
+     const glow=galaxy?"#b975ff":"#00eaff";
+     const fill=galaxy?"#20104f":"#102040";
+     const edge=galaxy?"#e6c9ff":"#65eaff";
+     ctx.shadowBlur=24;
+     ctx.shadowColor=glow;
+     ctx.fillStyle=fill;
+     ctx.fillRect(x,y,w,h);
+     ctx.shadowBlur=0;
+     ctx.strokeStyle=edge;
+     ctx.lineWidth=3;
+     ctx.strokeRect(x,y,w,h);
+     // leuchtende Kerben auf Galaxy-Plattformen
+     if(galaxy){
+       ctx.fillStyle="rgba(255,255,255,.7)";
+       for(let k=12;k<w-8;k+=24){
+         ctx.fillRect(x+k,y+4,8,3);
+       }
+     }
      ctx.restore();
      continue;
    }
@@ -4014,6 +4113,8 @@ document.addEventListener("keyup",e=>{
 window.addEventListener("blur",()=>spaceHeld=false);
 
 canvas.addEventListener("pointerdown",e=>{
+  // Im Handy-Modus darf man ausschließlich über den Sprungbutton springen.
+  if(typeof deviceMode!=="undefined" && deviceMode==="phone") return;
   if(e.target===document.getElementById("mobileJump"))return;
   if(!running)return;
   if(mode==="cube"){
