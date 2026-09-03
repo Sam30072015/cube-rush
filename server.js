@@ -4,12 +4,10 @@ const express = require("express");
 const WebSocket = require("ws");
 
 const PORT = Number(process.env.PORT || 3000);
-
 const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 const SECOND_ADMIN_KEY = process.env.SECOND_ADMIN_KEY || "6301";
 
 const app = express();
-
 app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -18,12 +16,14 @@ const wss = new WebSocket.Server({ server });
 
 const players = new Map();
 
-let coinEventUntil = 0;       // 2x Münzen
-let tenCoinEventUntil = 0;    // 10x Münzen
-let galaxyEventUntil = 0;     // Galaxy-Welt
+let coinEventUntil = 0;
+let tenCoinEventUntil = 0;
+let galaxyEventUntil = 0;
 
 let serverMessages = [];
 let eventRequests = [];
+
+let activePoll = null;
 
 
 /* =========================================================
@@ -31,9 +31,7 @@ let eventRequests = [];
    ========================================================= */
 
 function cleanName(name) {
-  return String(name || "")
-    .trim()
-    .slice(0, 40);
+  return String(name || "").trim().slice(0, 40);
 }
 
 function send(ws, payload) {
@@ -60,8 +58,9 @@ function secondAdminOK(req) {
   return req.headers["x-admin-key"] === SECOND_ADMIN_KEY;
 }
 
-function anyAdminOK(req) {
-  return adminOK(req) || secondAdminOK(req);
+function adminMessageEventOK(req) {
+  const key = req.headers["x-admin-key"];
+  return key === ADMIN_KEY || key === SECOND_ADMIN_KEY;
 }
 
 function amountFrom(body) {
@@ -74,106 +73,106 @@ function amountFrom(body) {
 function makeRequestId() {
   return (
     Date.now().toString(36) +
-    "-" +
-    Math.random()
-      .toString(36)
-      .slice(2, 10)
-  );
-}
-
-function cleanupRequests() {
-  const now = Date.now();
-
-  eventRequests = eventRequests.filter(
-    (request) =>
-      now -
-        Number(request.createdAt || 0) <
-      10 * 60 * 1000
+    Math.random().toString(36).slice(2, 9)
   );
 }
 
 function publicRequests() {
-  return eventRequests.map((request) => ({
-    id: request.id,
-    event: request.event,
-    action: request.action,
-    durationMs: request.durationMs,
-    createdAt: request.createdAt
+  return eventRequests.map((r) => ({
+    id: r.id,
+    event: r.event,
+    action: r.action,
+    durationMs: r.durationMs,
+    createdAt: r.createdAt
   }));
 }
 
+function executeEvent(event, action, durationMs) {
+  if (event === "coins") {
+    if (action === "start") {
+      coinEventUntil = Date.now() + durationMs;
 
-/* =========================================================
-   EVENT-FUNKTIONEN
-   ========================================================= */
+      broadcast({
+        type: "coinEvent",
+        until: coinEventUntil
+      });
 
-function startCoinEvent(durationMs) {
-  coinEventUntil =
-    Date.now() + durationMs;
+      return {
+        until: coinEventUntil
+      };
+    }
 
-  broadcast({
-    type: "coinEvent",
-    until: coinEventUntil
-  });
+    if (action === "stop") {
+      coinEventUntil = 0;
 
-  return coinEventUntil;
-}
+      broadcast({
+        type: "coinEvent",
+        until: 0
+      });
 
-function stopCoinEvent() {
-  coinEventUntil = 0;
+      return {
+        until: 0
+      };
+    }
+  }
 
-  broadcast({
-    type: "coinEvent",
-    until: 0
-  });
+  if (event === "galaxy") {
+    if (action === "start") {
+      galaxyEventUntil = Date.now() + durationMs;
 
-  return 0;
-}
+      broadcast({
+        type: "galaxyEvent",
+        until: galaxyEventUntil
+      });
 
-function startTenCoinEvent(durationMs) {
-  tenCoinEventUntil =
-    Date.now() + durationMs;
+      return {
+        until: galaxyEventUntil
+      };
+    }
 
-  broadcast({
-    type: "tenCoinEvent",
-    until: tenCoinEventUntil
-  });
+    if (action === "stop") {
+      galaxyEventUntil = 0;
 
-  return tenCoinEventUntil;
-}
+      broadcast({
+        type: "galaxyEvent",
+        until: 0
+      });
 
-function stopTenCoinEvent() {
-  tenCoinEventUntil = 0;
+      return {
+        until: 0
+      };
+    }
+  }
 
-  broadcast({
-    type: "tenCoinEvent",
-    until: 0
-  });
+  if (event === "tenCoins") {
+    if (action === "start") {
+      tenCoinEventUntil = Date.now() + durationMs;
 
-  return 0;
-}
+      broadcast({
+        type: "tenCoinEvent",
+        until: tenCoinEventUntil
+      });
 
-function startGalaxyEvent(durationMs) {
-  galaxyEventUntil =
-    Date.now() + durationMs;
+      return {
+        until: tenCoinEventUntil
+      };
+    }
 
-  broadcast({
-    type: "galaxyEvent",
-    until: galaxyEventUntil
-  });
+    if (action === "stop") {
+      tenCoinEventUntil = 0;
 
-  return galaxyEventUntil;
-}
+      broadcast({
+        type: "tenCoinEvent",
+        until: 0
+      });
 
-function stopGalaxyEvent() {
-  galaxyEventUntil = 0;
+      return {
+        until: 0
+      };
+    }
+  }
 
-  broadcast({
-    type: "galaxyEvent",
-    until: 0
-  });
-
-  return 0;
+  throw new Error("Ungültiges Event");
 }
 
 
@@ -208,7 +207,6 @@ wss.on("connection", (ws) => {
             .toUpperCase();
       }
 
-      // Pro Spielername nur eine aktive Verbindung.
       const oldSocket = players.get(name);
 
       if (oldSocket && oldSocket !== ws) {
@@ -248,7 +246,20 @@ wss.on("connection", (ws) => {
             ? galaxyEventUntil
             : 0,
 
-        serverMessages
+        serverMessages,
+
+        poll:
+          activePoll &&
+          activePoll.endsAt > Date.now()
+            ? {
+                id: activePoll.id,
+                question: activePoll.question,
+                yesLabel: activePoll.yesLabel,
+                noLabel: activePoll.noLabel,
+                createdAt: activePoll.createdAt,
+                endsAt: activePoll.endsAt
+              }
+            : null
       });
 
       return;
@@ -282,7 +293,7 @@ wss.on("connection", (ws) => {
 
 
 /* =========================================================
-   OFFLINE SPIELER AUFRÄUMEN
+   SPIELER AUFRÄUMEN
    ========================================================= */
 
 setInterval(() => {
@@ -308,7 +319,7 @@ setInterval(() => {
    ========================================================= */
 
 
-/* ---------- 2x MÜNZEN EVENT ---------- */
+/* ---------- 2x MÜNZEN ---------- */
 
 app.post("/api/admin/coins-event", (req, res) => {
   if (!adminOK(req)) {
@@ -317,8 +328,9 @@ app.post("/api/admin/coins-event", (req, res) => {
     });
   }
 
-  const action =
-    String(req.body?.action || "");
+  const action = String(
+    req.body?.action || ""
+  );
 
   if (action === "start") {
     const durationMs = Math.max(
@@ -331,22 +343,24 @@ app.post("/api/admin/coins-event", (req, res) => {
       )
     );
 
-    const until =
-      startCoinEvent(durationMs);
-
     return res.json({
       ok: true,
-      until
+      ...executeEvent(
+        "coins",
+        "start",
+        durationMs
+      )
     });
   }
 
   if (action === "stop") {
-    const until =
-      stopCoinEvent();
-
     return res.json({
       ok: true,
-      until
+      ...executeEvent(
+        "coins",
+        "stop",
+        0
+      )
     });
   }
 
@@ -356,7 +370,7 @@ app.post("/api/admin/coins-event", (req, res) => {
 });
 
 
-/* ---------- 10x MÜNZEN EVENT ---------- */
+/* ---------- 10x MÜNZEN ---------- */
 
 app.post(
   "/api/admin/ten-coin-event",
@@ -367,8 +381,9 @@ app.post(
       });
     }
 
-    const action =
-      String(req.body?.action || "");
+    const action = String(
+      req.body?.action || ""
+    );
 
     if (action === "start") {
       const durationMs = Math.max(
@@ -381,24 +396,24 @@ app.post(
         )
       );
 
-      const until =
-        startTenCoinEvent(
-          durationMs
-        );
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "tenCoins",
+          "start",
+          durationMs
+        )
       });
     }
 
     if (action === "stop") {
-      const until =
-        stopTenCoinEvent();
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "tenCoins",
+          "stop",
+          0
+        )
       });
     }
 
@@ -409,7 +424,7 @@ app.post(
 );
 
 
-/* ---------- GALAXY EVENT ---------- */
+/* ---------- GALAXY ---------- */
 
 app.post(
   "/api/admin/galaxy-event",
@@ -420,8 +435,9 @@ app.post(
       });
     }
 
-    const action =
-      String(req.body?.action || "");
+    const action = String(
+      req.body?.action || ""
+    );
 
     if (action === "start") {
       const durationMs = Math.max(
@@ -434,24 +450,24 @@ app.post(
         )
       );
 
-      const until =
-        startGalaxyEvent(
-          durationMs
-        );
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "galaxy",
+          "start",
+          durationMs
+        )
       });
     }
 
     if (action === "stop") {
-      const until =
-        stopGalaxyEvent();
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "galaxy",
+          "stop",
+          0
+        )
       });
     }
 
@@ -471,11 +487,11 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  const player =
-    cleanName(req.body?.player);
+  const player = cleanName(
+    req.body?.player
+  );
 
-  const coins =
-    amountFrom(req.body);
+  const coins = amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
@@ -484,19 +500,21 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  const target =
-    players.get(player);
+  const target = players.get(player);
 
   if (
     !target ||
     target.readyState !== WebSocket.OPEN
   ) {
+    if (players.get(player) === target) {
+      players.delete(player);
+    }
+
     return res.status(404).json({
       error: "Player is not online"
     });
   }
 
-  // Admin-Geschenke werden nicht multipliziert.
   send(target, {
     type: "gift",
     target: player,
@@ -522,8 +540,7 @@ app.post(
       });
     }
 
-    const coins =
-      amountFrom(req.body);
+    const coins = amountFrom(req.body);
 
     if (coins <= 0) {
       return res.status(400).json({
@@ -534,13 +551,11 @@ app.post(
 
     let count = 0;
 
-    const message =
-      JSON.stringify({
-        type: "giftAll",
-        coins
-      });
+    const message = JSON.stringify({
+      type: "giftAll",
+      coins
+    });
 
-    // Jeder Spieler bekommt exakt einmal die Menge.
     for (const [name, ws] of players) {
       if (
         ws.readyState === WebSocket.OPEN
@@ -572,11 +587,11 @@ app.post(
       });
     }
 
-    const player =
-      cleanName(req.body?.player);
+    const player = cleanName(
+      req.body?.player
+    );
 
-    const coins =
-      amountFrom(req.body);
+    const coins = amountFrom(req.body);
 
     if (!player || coins <= 0) {
       return res.status(400).json({
@@ -585,8 +600,7 @@ app.post(
       });
     }
 
-    const target =
-      players.get(player);
+    const target = players.get(player);
 
     if (
       !target ||
@@ -598,7 +612,7 @@ app.post(
     }
 
     send(target, {
-      type: "giftSubtract",
+      type: "takeCoins",
       target: player,
       coins
     });
@@ -616,45 +630,41 @@ app.post(
    SERVERNACHRICHTEN
    ========================================================= */
 
-
-/* ---------- Nachricht senden ---------- */
-
 app.post(
   "/api/admin/message",
   (req, res) => {
-    if (!anyAdminOK(req)) {
+    if (!adminMessageEventOK(req)) {
       return res.status(401).json({
         error: "Unauthorized"
       });
     }
 
-    const text =
-      String(req.body?.text || "")
-        .trim()
-        .slice(0, 120);
+    const text = String(
+      req.body?.text || ""
+    )
+      .trim()
+      .slice(0, 120);
 
-    const minutes =
-      Math.max(
-        0,
+    const minutes = Math.max(
+      0,
+      Math.floor(
+        Number(
+          req.body?.minutes
+        ) || 0
+      )
+    );
+
+    const seconds = Math.max(
+      0,
+      Math.min(
+        59,
         Math.floor(
           Number(
-            req.body?.minutes
+            req.body?.seconds
           ) || 0
         )
-      );
-
-    const seconds =
-      Math.max(
-        0,
-        Math.min(
-          59,
-          Math.floor(
-            Number(
-              req.body?.seconds
-            ) || 0
-          )
-        )
-      );
+      )
+    );
 
     const duration =
       (minutes * 60 + seconds) *
@@ -667,27 +677,24 @@ app.post(
       });
     }
 
-    const now = Date.now();
-
     const message = {
       id:
-        now.toString(36) +
-        "-" +
+        Date.now().toString(36) +
         Math.random()
           .toString(36)
-          .slice(2, 10),
+          .slice(2, 8),
 
       type: "serverMessage",
 
       text,
 
-      createdAt: now,
+      createdAt:
+        Date.now(),
 
       endsAt:
-        now + duration
+        Date.now() + duration
     };
 
-    // Mehrere Nachrichten gleichzeitig erlaubt.
     serverMessages.push(message);
 
     broadcast(message);
@@ -700,12 +707,10 @@ app.post(
 );
 
 
-/* ---------- Alle Nachrichten löschen ---------- */
-
 app.post(
   "/api/admin/message/delete",
   (req, res) => {
-    if (!anyAdminOK(req)) {
+    if (!adminMessageEventOK(req)) {
       return res.status(401).json({
         error: "Unauthorized"
       });
@@ -730,7 +735,7 @@ app.post(
    ========================================================= */
 
 
-/* ---------- Event-Anfrage ---------- */
+/* ---------- EVENT-ANFRAGE ---------- */
 
 app.post(
   "/api/second-admin/event-request",
@@ -741,22 +746,22 @@ app.post(
       });
     }
 
-    const event =
-      String(
-        req.body?.event || ""
-      );
+    const event = String(
+      req.body?.event || ""
+    );
 
-    const action =
-      String(
-        req.body?.action || "start"
-      );
+    const action = String(
+      req.body?.action || "start"
+    );
+
+    const allowedEvents = [
+      "coins",
+      "tenCoins",
+      "galaxy"
+    ];
 
     if (
-      ![
-        "coins",
-        "tenCoins",
-        "galaxy"
-      ].includes(event)
+      !allowedEvents.includes(event)
     ) {
       return res.status(400).json({
         error:
@@ -789,29 +794,34 @@ app.post(
         )
       );
 
-    // Keine doppelten offenen Anfragen.
-    const existing =
+    const duplicate =
       eventRequests.find(
         (request) =>
           request.event === event &&
           request.action === "start"
       );
 
-    if (existing) {
+    if (duplicate) {
       return res.json({
         ok: true,
         pending: true,
-        id: existing.id,
-        duplicate: true
+        id: duplicate.id
       });
     }
 
     const request = {
-      id: makeRequestId(),
+      id:
+        makeRequestId(),
+
       event,
-      action: "start",
+
+      action:
+        "start",
+
       durationMs,
-      createdAt: Date.now()
+
+      createdAt:
+        Date.now()
     };
 
     eventRequests.push(request);
@@ -825,9 +835,7 @@ app.post(
 );
 
 
-/* =========================================================
-   ADMIN 1: OFFENE EVENT-ANFRAGEN
-   ========================================================= */
+/* ---------- OFFENE ANFRAGEN ---------- */
 
 app.get(
   "/api/admin/event-requests",
@@ -838,7 +846,7 @@ app.get(
       });
     }
 
-    cleanupRequests();
+    cleanupEventRequests();
 
     return res.json({
       ok: true,
@@ -849,9 +857,7 @@ app.get(
 );
 
 
-/* =========================================================
-   ADMIN 1: EVENT ANNEHMEN
-   ========================================================= */
+/* ---------- ANFRAGE ANNEHMEN ---------- */
 
 app.post(
   [
@@ -865,15 +871,14 @@ app.post(
       });
     }
 
-    cleanupRequests();
+    cleanupEventRequests();
 
-    const id =
-      String(
-        req.params.id ||
-        req.body?.id ||
-        req.body?.requestId ||
-        ""
-      );
+    const id = String(
+      req.params.id ||
+      req.body?.id ||
+      req.body?.requestId ||
+      ""
+    );
 
     const index =
       eventRequests.findIndex(
@@ -891,48 +896,37 @@ app.post(
     const request =
       eventRequests[index];
 
-    // Anfrage entfernen.
     eventRequests.splice(
       index,
       1
     );
 
-    if (
-      request.event === "coins"
-    ) {
-      startCoinEvent(
-        request.durationMs
-      );
-    }
+    try {
+      const result =
+        executeEvent(
+          request.event,
+          request.action,
+          request.durationMs
+        );
 
-    if (
-      request.event === "tenCoins"
-    ) {
-      startTenCoinEvent(
-        request.durationMs
-      );
+      return res.json({
+        ok: true,
+        approved: true,
+        request,
+        ...result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error.message ||
+          "Event konnte nicht gestartet werden"
+      });
     }
-
-    if (
-      request.event === "galaxy"
-    ) {
-      startGalaxyEvent(
-        request.durationMs
-      );
-    }
-
-    return res.json({
-      ok: true,
-      approved: true,
-      request
-    });
   }
 );
 
 
-/* =========================================================
-   ADMIN 1: EVENT ABLEHNEN
-   ========================================================= */
+/* ---------- ANFRAGE ABLEHNEN ---------- */
 
 app.post(
   [
@@ -946,15 +940,14 @@ app.post(
       });
     }
 
-    cleanupRequests();
+    cleanupEventRequests();
 
-    const id =
-      String(
-        req.params.id ||
-        req.body?.id ||
-        req.body?.requestId ||
-        ""
-      );
+    const id = String(
+      req.params.id ||
+      req.body?.id ||
+      req.body?.requestId ||
+      ""
+    );
 
     const index =
       eventRequests.findIndex(
@@ -987,8 +980,70 @@ app.post(
 
 
 /* =========================================================
-   ZWEITER ADMIN: 2x EVENT STOPPEN
+   ZWEITER ADMIN: EVENTS STOPPEN
    ========================================================= */
+
+app.post(
+  "/api/second-admin/event-stop",
+  (req, res) => {
+    if (!secondAdminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const event =
+      String(
+        req.body?.event || ""
+      );
+
+    if (event === "coins") {
+      return res.json({
+        ok: true,
+        ...executeEvent(
+          "coins",
+          "stop",
+          0
+        )
+      });
+    }
+
+    if (event === "tenCoins") {
+      return res.json({
+        ok: true,
+        ...executeEvent(
+          "tenCoins",
+          "stop",
+          0
+        )
+      });
+    }
+
+    if (event === "galaxy") {
+      return res.json({
+        ok: true,
+        ...executeEvent(
+          "galaxy",
+          "stop",
+          0
+        )
+      });
+    }
+
+    return res.status(400).json({
+      error:
+        "Unbekanntes Event"
+    });
+  }
+);
+
+
+/* =========================================================
+   ZWEITER ADMIN: KOMPATIBILITÄTS-ENDPUNKTE
+   ========================================================= */
+
+
+/* ---------- 2x Münzen ---------- */
 
 app.post(
   "/api/second-admin/coins-event",
@@ -1005,12 +1060,13 @@ app.post(
       );
 
     if (action === "stop") {
-      const until =
-        stopCoinEvent();
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "coins",
+          "stop",
+          0
+        )
       });
     }
 
@@ -1031,10 +1087,8 @@ app.post(
       const existing =
         eventRequests.find(
           (request) =>
-            request.event ===
-              "coins" &&
-            request.action ===
-              "start"
+            request.event === "coins" &&
+            request.action === "start"
         );
 
       if (existing) {
@@ -1069,9 +1123,7 @@ app.post(
 );
 
 
-/* =========================================================
-   ZWEITER ADMIN: 10x EVENT
-   ========================================================= */
+/* ---------- 10x Münzen ---------- */
 
 app.post(
   "/api/second-admin/ten-coin-event",
@@ -1088,12 +1140,13 @@ app.post(
       );
 
     if (action === "stop") {
-      const until =
-        stopTenCoinEvent();
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "tenCoins",
+          "stop",
+          0
+        )
       });
     }
 
@@ -1152,9 +1205,7 @@ app.post(
 );
 
 
-/* =========================================================
-   ZWEITER ADMIN: GALAXY EVENT
-   ========================================================= */
+/* ---------- Galaxy ---------- */
 
 app.post(
   "/api/second-admin/galaxy-event",
@@ -1170,18 +1221,17 @@ app.post(
         req.body?.action || ""
       );
 
-    // Stoppen darf direkt gemacht werden.
     if (action === "stop") {
-      const until =
-        stopGalaxyEvent();
-
       return res.json({
         ok: true,
-        until
+        ...executeEvent(
+          "galaxy",
+          "stop",
+          0
+        )
       });
     }
 
-    // Starten wird als Anfrage gespeichert.
     if (action === "start") {
       const durationMs =
         Math.max(
@@ -1238,7 +1288,44 @@ app.post(
 
 
 /* =========================================================
-   ZWEITER ADMIN STATUS
+   STATUS
+   ========================================================= */
+
+app.get(
+  "/api/status",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    res.json({
+      onlinePlayers: [
+        ...players.keys()
+      ],
+
+      coinEventUntil:
+        coinEventUntil > Date.now()
+          ? coinEventUntil
+          : 0,
+
+      tenCoinEventUntil:
+        tenCoinEventUntil > Date.now()
+          ? tenCoinEventUntil
+          : 0,
+
+      galaxyEventUntil:
+        galaxyEventUntil > Date.now()
+          ? galaxyEventUntil
+          : 0
+    });
+  }
+);
+
+
+/* =========================================================
+   SECOND ADMIN STATUS
    ========================================================= */
 
 app.get(
@@ -1250,10 +1337,9 @@ app.get(
       });
     }
 
-    cleanupRequests();
+    cleanupEventRequests();
 
-    const now =
-      Date.now();
+    const now = Date.now();
 
     res.json({
       ok: true,
@@ -1284,11 +1370,11 @@ app.get(
 
 
 /* =========================================================
-   ONLINE SPIELER
+   SPIELER-UMFRAGE
    ========================================================= */
 
-app.get(
-  "/api/status",
+app.post(
+  "/api/admin/poll",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
@@ -1296,23 +1382,290 @@ app.get(
       });
     }
 
-    res.json({
-      onlinePlayers:
-        [...players.keys()]
+    const question =
+      String(
+        req.body?.question || ""
+      )
+        .trim()
+        .slice(0, 140);
+
+    const yesLabel =
+      String(
+        req.body?.yesLabel ||
+          "Ja"
+      )
+        .trim()
+        .slice(0, 40) ||
+        "Ja";
+
+    const noLabel =
+      String(
+        req.body?.noLabel ||
+          "Nein"
+      )
+        .trim()
+        .slice(0, 40) ||
+        "Nein";
+
+    const durationMs =
+      Math.max(
+        1000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(
+              req.body?.durationMs
+            ) || 0
+          )
+        )
+      );
+
+    if (!question) {
+      return res.status(400).json({
+        error:
+          "Frage erforderlich"
+      });
+    }
+
+    const now = Date.now();
+
+    activePoll = {
+      id: makeRequestId(),
+
+      question,
+
+      yesLabel,
+
+      noLabel,
+
+      createdAt: now,
+
+      endsAt:
+        now + durationMs,
+
+      answers: {
+        yes: 0,
+        no: 0
+      },
+
+      voters:
+        new Set()
+    };
+
+    broadcast({
+      type: "playerPoll",
+
+      poll: {
+        id: activePoll.id,
+        question:
+          activePoll.question,
+        yesLabel:
+          activePoll.yesLabel,
+        noLabel:
+          activePoll.noLabel,
+        createdAt:
+          activePoll.createdAt,
+        endsAt:
+          activePoll.endsAt
+      }
+    });
+
+    return res.json({
+      ok: true,
+
+      poll: {
+        id: activePoll.id,
+        question:
+          activePoll.question,
+        yesLabel:
+          activePoll.yesLabel,
+        noLabel:
+          activePoll.noLabel,
+        createdAt:
+          activePoll.createdAt,
+        endsAt:
+          activePoll.endsAt,
+        answers:
+          activePoll.answers
+      }
+    });
+  }
+);
+
+
+/* ---------- Umfrage stoppen ---------- */
+
+app.post(
+  "/api/admin/poll/stop",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    activePoll = null;
+
+    broadcast({
+      type:
+        "playerPollClear"
+    });
+
+    return res.json({
+      ok: true
+    });
+  }
+);
+
+
+/* ---------- Umfrage-Status ---------- */
+
+app.get(
+  "/api/admin/poll/status",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    if (
+      !activePoll ||
+      activePoll.endsAt <= Date.now()
+    ) {
+      activePoll = null;
+
+      return res.json({
+        ok: true,
+        poll: null
+      });
+    }
+
+    return res.json({
+      ok: true,
+
+      poll: {
+        id:
+          activePoll.id,
+
+        question:
+          activePoll.question,
+
+        yesLabel:
+          activePoll.yesLabel,
+
+        noLabel:
+          activePoll.noLabel,
+
+        createdAt:
+          activePoll.createdAt,
+
+        endsAt:
+          activePoll.endsAt,
+
+        answers:
+          activePoll.answers
+      }
+    });
+  }
+);
+
+
+/* ---------- Spieler antwortet ---------- */
+
+app.post(
+  "/api/poll/answer",
+  (req, res) => {
+    if (
+      !activePoll ||
+      activePoll.endsAt <= Date.now()
+    ) {
+      activePoll = null;
+
+      return res.status(410).json({
+        error:
+          "Die Umfrage ist beendet"
+      });
+    }
+
+    const pollId =
+      String(
+        req.body?.pollId || ""
+      );
+
+    const answer =
+      String(
+        req.body?.answer || ""
+      );
+
+    if (
+      pollId !==
+      activePoll.id
+    ) {
+      return res.status(409).json({
+        error:
+          "Umfrage nicht mehr aktuell"
+      });
+    }
+
+    if (
+      answer !== "yes" &&
+      answer !== "no"
+    ) {
+      return res.status(400).json({
+        error:
+          "Ungültige Antwort"
+      });
+    }
+
+    const voterId =
+      String(
+        req.body?.voterId || ""
+      ).slice(0, 80);
+
+    /*
+     * Mit voterId nur eine Abstimmung
+     * pro Spieler.
+     */
+    if (
+      voterId &&
+      activePoll.voters.has(voterId)
+    ) {
+      return res.json({
+        ok: true,
+        alreadyAnswered: true,
+        answers:
+          activePoll.answers
+      });
+    }
+
+    if (voterId) {
+      activePoll.voters.add(
+        voterId
+      );
+    }
+
+    activePoll.answers[
+      answer
+    ]++;
+
+    return res.json({
+      ok: true,
+      answers:
+        activePoll.answers
     });
   }
 );
 
 
 /* =========================================================
-   AUTOMATISCHES AUFRÄUMEN
+   AUFRÄUMEN
    ========================================================= */
 
 setInterval(() => {
-  const now =
-    Date.now();
+  const now = Date.now();
 
-  // Abgelaufene Servernachrichten entfernen.
+  // Nachrichten ablaufen lassen
   serverMessages =
     serverMessages.filter(
       (message) =>
@@ -1321,10 +1674,23 @@ setInterval(() => {
         ) > now
     );
 
-  // Alte Event-Anfragen entfernen.
-  cleanupRequests();
+  // Event-Anfragen nach 10 Minuten löschen
+  cleanupEventRequests();
 
-  // Events automatisch beenden.
+  // Umfrage automatisch beenden
+  if (
+    activePoll &&
+    activePoll.endsAt <= now
+  ) {
+    activePoll = null;
+
+    broadcast({
+      type:
+        "playerPollClear"
+    });
+  }
+
+  // 2x Event automatisch beenden
   if (
     coinEventUntil > 0 &&
     coinEventUntil <= now
@@ -1337,6 +1703,7 @@ setInterval(() => {
     });
   }
 
+  // 10x Event automatisch beenden
   if (
     tenCoinEventUntil > 0 &&
     tenCoinEventUntil <= now
@@ -1349,6 +1716,7 @@ setInterval(() => {
     });
   }
 
+  // Galaxy automatisch beenden
   if (
     galaxyEventUntil > 0 &&
     galaxyEventUntil <= now
@@ -1361,6 +1729,25 @@ setInterval(() => {
     });
   }
 }, 1000);
+
+
+/* =========================================================
+   HILFSFUNKTION FÜR ANFRAGEN
+   ========================================================= */
+
+function cleanupEventRequests() {
+  const now = Date.now();
+
+  eventRequests =
+    eventRequests.filter(
+      (request) =>
+        now -
+          Number(
+            request.createdAt || 0
+          ) <
+        10 * 60 * 1000
+    );
+}
 
 
 /* =========================================================
@@ -1397,5 +1784,9 @@ server.listen(PORT, () => {
 
   console.log(
     "Events: 2x / 10x / Galaxy"
+  );
+
+  console.log(
+    "Spieler-Umfragen aktiviert."
   );
 });
