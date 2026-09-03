@@ -4716,7 +4716,7 @@ setInterval(renderServerMessages,250);
 
   async function send(action,durationMs=0){
     try{
-      const res=await fetch("/api/admin/ten-coins-event",{
+      const res=await fetch("/api/admin/ten-coin-event",{
         method:"POST",
         headers:{
           "Content-Type":"application/json",
