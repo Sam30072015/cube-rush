@@ -120,6 +120,13 @@ button{border:0;border-radius:12px;padding:14px 23px;margin:7px;background:#6cff
   overflow:hidden;
   background:#080d25;
 }
+.planePreview{position:relative;height:88px;border-radius:16px;overflow:hidden;background:#0b102f;border:2px solid #3d4b91;display:flex;align-items:center;justify-content:center;font-size:48px;box-shadow:inset 0 0 20px rgba(0,234,255,.12)}
+.planePreview::after{content:"✈️";filter:drop-shadow(0 0 10px rgba(255,255,255,.7));transform:translateX(4px) rotate(0deg);}
+.plane-rainbow{background:linear-gradient(135deg,#ff3131,#ff9b2f,#ffe600,#43ff50,#24dcff,#6a4dff,#ec3cff)}
+.plane-magma{background:linear-gradient(135deg,#ffd36b,#ff7a00,#c31800,#2c0010)}
+.plane-galaxy{background:radial-gradient(circle at 30% 35%,#ffffff 0 2%,transparent 3%),radial-gradient(circle at 70% 65%,#b975ff 0 2%,transparent 3%),linear-gradient(135deg,#050018,#18065f,#02030d)}
+.plane-galaxy::before{content:"✦ ✦ · ✦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;opacity:.7;font-size:18px;letter-spacing:18px;}
+.plane-galaxy::after{position:relative;z-index:2;}
 .trailPreview::before,.trailPreview::after{
   content:"";
   position:absolute;
@@ -1072,6 +1079,9 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
 <div class="shopBalance" id="shopBalance">🪙 Münzen: 0</div>
 <div class="skinGrid" id="skinGrid"></div>
+<h3 class="shopTitle" style="font-size:28px;margin:28px 0 6px">✈️ FLUGZEUG-SKINS</h3>
+<div style="color:#cbd3ff;font-weight:700;margin-bottom:14px">Diese Skins werden sichtbar, sobald du dich im Level in ein Flugzeug verwandelst.</div>
+<div class="skinGrid" id="planeGrid"></div>
 <h3 class="shopTitle" style="font-size:28px;margin:28px 0 6px">✨ SPUREN-SHOP</h3>
 <div style="color:#cbd3ff;font-weight:700;margin-bottom:14px">Rüste eine Spur aus – sie verändert deine Münzbelohnungen.</div>
 <div class="skinGrid" id="trailGrid"></div>
@@ -1239,6 +1249,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
       "crOwnedSkins_final","crEquippedSkin_final",
       "crOwnedSkins_final2","crEquippedSkin_final2",
       "crOwnedSkins_v2","crEquippedSkin_v2",
+      "crOwnedPlaneSkins","crEquippedPlaneSkin",
       "crMusicOn","crMusicOn_final",
       "crServerMessage_clean_v1","crServerMessage_clean_v2",
       "crCode67Used_v1","crDeviceMode"
@@ -1252,6 +1263,8 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
     localStorage.setItem("crCurrentLevel","0");
     localStorage.setItem("crOwnedSkins",JSON.stringify(["classic"]));
     localStorage.setItem("crEquippedSkin","classic");
+    localStorage.setItem("crOwnedPlaneSkins",JSON.stringify([]));
+    localStorage.removeItem("crEquippedPlaneSkin");
 
     localStorage.setItem(FRESH_START_KEY,"done");
   }
@@ -1348,6 +1361,7 @@ function save(){
   persistSkins();
   saveSkins();
   saveTrails();
+  savePlaneSkins();
 }
 
 /* ---------- player ---------- */
@@ -2206,6 +2220,38 @@ const TRAILS = [
   {id:"double", name:"⚡ Turbo-Spur", price:1000, multiplier:2, css:"trail-double"}
 ];
 
+const PLANE_SKINS = [
+  {id:"rainbow", name:"🌈 Rainbow-Flugzeug", price:500, css:"plane-rainbow"},
+  {id:"magma", name:"🌋 Magma-Flugzeug", price:1000, css:"plane-magma"},
+  {id:"galaxy", name:"🌌 Galaxy-Flugzeug", price:10000, css:"plane-galaxy", aimbot:true}
+];
+
+let ownedPlaneSkins=[];
+try{
+  ownedPlaneSkins=JSON.parse(localStorage.getItem("crOwnedPlaneSkins")) || [];
+  if(!Array.isArray(ownedPlaneSkins)) ownedPlaneSkins=[];
+}catch(_){
+  ownedPlaneSkins=[];
+}
+
+let equippedPlaneSkin=localStorage.getItem("crEquippedPlaneSkin") || null;
+if(!equippedPlaneSkin || !ownedPlaneSkins.includes(equippedPlaneSkin)){
+  equippedPlaneSkin=null;
+}
+
+function savePlaneSkins(){
+  localStorage.setItem("crOwnedPlaneSkins",JSON.stringify(ownedPlaneSkins));
+  if(equippedPlaneSkin){
+    localStorage.setItem("crEquippedPlaneSkin",equippedPlaneSkin);
+  }else{
+    localStorage.removeItem("crEquippedPlaneSkin");
+  }
+}
+
+function planeSkinById(id){
+  return PLANE_SKINS.find(p=>p.id===id) || null;
+}
+
 let ownedTrails=[];
 try{
   ownedTrails=JSON.parse(localStorage.getItem("crOwnedTrails")) || [];
@@ -2402,6 +2448,90 @@ function updateShop(){
     }
     card.appendChild(btn);
     grid.appendChild(card);
+  }
+
+  const planeGrid=document.getElementById("planeGrid");
+  if(planeGrid){
+    planeGrid.innerHTML="";
+
+    PLANE_SKINS.forEach(plane=>{
+      const card=document.createElement("div");
+      card.className="skinCard";
+
+      const preview=document.createElement("div");
+      preview.className="planePreview "+plane.css;
+      card.appendChild(preview);
+
+      const name=document.createElement("div");
+      name.className="skinName";
+      name.textContent=plane.name;
+      card.appendChild(name);
+
+      const price=document.createElement("div");
+      price.className="skinPrice";
+      price.textContent="🪙 "+plane.price;
+      card.appendChild(price);
+
+      if(plane.aimbot){
+        const info=document.createElement("div");
+        info.style.color="#d9b8ff";
+        info.style.fontWeight="800";
+        info.style.margin="5px 0";
+        info.textContent="🎯 Auto-Flug durch Hindernisse";
+        card.appendChild(info);
+      }
+
+      const btn=document.createElement("button");
+      btn.type="button";
+      btn.className="skinBuyButton";
+
+      const owned=ownedPlaneSkins.includes(plane.id);
+
+      if(owned){
+        btn.disabled=equippedPlaneSkin===plane.id;
+        btn.textContent=equippedPlaneSkin===plane.id ? "✅ AUSGERÜSTET" : "⭐ AUSRÜSTEN";
+
+        if(equippedPlaneSkin!==plane.id){
+          btn.onclick=()=>{
+            equippedPlaneSkin=plane.id;
+            savePlaneSkins();
+            save();
+            updateShop();
+            updateHUD();
+          };
+        }
+      }else{
+        btn.disabled=coins<plane.price;
+        btn.textContent=coins>=plane.price ? "🛒 KAUFEN" : "🔒 ZU TEUER";
+
+        if(!btn.disabled){
+          let buying=false;
+          btn.onclick=()=>{
+            if(buying)return;
+            if(ownedPlaneSkins.includes(plane.id)){
+              updateShop();
+              return;
+            }
+            if(coins<plane.price)return;
+
+            buying=true;
+            btn.disabled=true;
+            coins=Math.max(0,coins-plane.price);
+            ownedPlaneSkins.push(plane.id);
+            equippedPlaneSkin=plane.id;
+
+            savePlaneSkins();
+            save();
+            updateShop();
+            updateMenu();
+            updateHUD();
+          };
+        }
+      }
+
+      card.appendChild(btn);
+      planeGrid.appendChild(card);
+    });
   }
 
   const trailGrid=document.getElementById("trailGrid");
@@ -2837,6 +2967,32 @@ function cubeCollision(){
  return false;
 }
 
+function galaxyPlaneAimbot(){
+  if(mode!=="ship" || equippedPlaneSkin!=="galaxy" || !running)return;
+
+  const objects=levels[levelIndex]?.objects || [];
+  let target=null;
+
+  for(let i=0;i<objects.length;i++){
+    const o=objects[i];
+    if(!Array.isArray(o) || o[0]!=="portal" || portalUsed[i])continue;
+    if(o[3]==="cube"){
+      target=o;
+      break;
+    }
+  }
+
+  if(!target)return;
+
+  const targetY=target[2]-player.size/2;
+  const diff=targetY-player.y;
+  const step=Math.max(-4,Math.min(4,diff*.12));
+  player.y+=step;
+  player.vy=step;
+  player.y=Math.max(35,Math.min(GROUND-player.size-5,player.y));
+  player.rot=Math.max(-.18,Math.min(.18,step*.03));
+}
+
 function shipCollision(){
  const p={x:player.x+4,y:player.y+5,w:38,h:35};
 
@@ -2970,6 +3126,7 @@ function update(){
     player.vy=Math.max(-7,Math.min(7,player.vy));
     player.y+=player.vy*gameFrameScale;
     player.rot=player.vy*.04;
+    galaxyPlaneAimbot();
   }
 
   camera+=((typeof popKraftAktiv==="function"&&popKraftAktiv())?SPEED*1.35:SPEED)*gameFrameScale;
@@ -3005,7 +3162,7 @@ function update(){
         return;
       }
     }else{
-      if(shipCollision()){
+      if(equippedPlaneSkin!=="galaxy" && shipCollision()){
         die("Das Flugzeug hat ein Hindernis berührt!");
         return;
       }
@@ -3523,9 +3680,46 @@ function drawPlayer(){
  ctx.rotate(player.rot);
 
  if(mode==="ship"){
-   ctx.shadowBlur=28;
-   ctx.shadowColor="#00eaff";
-   ctx.fillStyle="#00eaff";
+   const plane=planeSkinById(equippedPlaneSkin);
+   const planeId=plane ? plane.id : "default";
+
+   let main="#00eaff";
+   let accent="#ff9c00";
+   let glow="#00eaff";
+
+   if(planeId==="rainbow"){
+     const g=ctx.createLinearGradient(-30,-18,30,18);
+     g.addColorStop(0,"#ff3030");
+     g.addColorStop(.2,"#ff9b30");
+     g.addColorStop(.4,"#ffe600");
+     g.addColorStop(.6,"#45ff59");
+     g.addColorStop(.8,"#20dfff");
+     g.addColorStop(1,"#a04dff");
+     main=g;
+     accent="#ffffff";
+     glow="#ff4fd8";
+   }else if(planeId==="magma"){
+     const g=ctx.createLinearGradient(-30,-18,30,18);
+     g.addColorStop(0,"#fff09a");
+     g.addColorStop(.45,"#ff7a00");
+     g.addColorStop(1,"#d71900");
+     main=g;
+     accent="#ffd36b";
+     glow="#ff5a00";
+   }else if(planeId==="galaxy"){
+     const g=ctx.createLinearGradient(-30,-18,30,18);
+     g.addColorStop(0,"#ffffff");
+     g.addColorStop(.25,"#c99cff");
+     g.addColorStop(.55,"#7b42ff");
+     g.addColorStop(1,"#27105f");
+     main=g;
+     accent="#ffffff";
+     glow="#b975ff";
+   }
+
+   ctx.shadowBlur=planeId==="galaxy"?38:28;
+   ctx.shadowColor=glow;
+   ctx.fillStyle=main;
 
    ctx.beginPath();
    ctx.moveTo(32,0);
@@ -3535,11 +3729,18 @@ function drawPlayer(){
    ctx.closePath();
    ctx.fill();
 
-   ctx.fillStyle="#fff";
+   ctx.fillStyle=accent;
    ctx.fillRect(-6,-6,11,11);
 
-   ctx.fillStyle="#ff9c00";
+   ctx.fillStyle=planeId==="galaxy"?"#b975ff":accent;
    ctx.fillRect(-30,-5,11,10);
+
+   if(planeId==="galaxy"){
+     ctx.fillStyle="#ffffff";
+     ctx.fillRect(-1,-18,3,3);
+     ctx.fillRect(8,13,2,2);
+     ctx.fillRect(-12,13,2,2);
+   }
 
    ctx.restore();
    return;
