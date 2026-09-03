@@ -1537,8 +1537,14 @@ let galaxyEventUntil=0;
 let galaxyEventActive=false;
 
 function galaxyWorldActive(){
-  galaxyEventActive=galaxyEventUntil>Date.now();
+  galaxyEventActive=Number(galaxyEventUntil)>Date.now();
   return galaxyEventActive;
+}
+
+// Alle Galaxy-Level (41-50) sind während des Events unabhängig vom normalen
+// unlock-Fortschritt direkt anwählbar und können beliebig oft gespielt werden.
+function galaxyLevelOpen(index){
+  return index>=40 && index<50 && galaxyWorldActive();
 }
 
 function updateGalaxyEventHud(){
@@ -3063,8 +3069,13 @@ function updateMenu(){
       const b=document.createElement("button");
       b.type="button";
       b.className="levelBtn";
+      b.dataset.galaxyLevel="true";
+      // Galaxy-Level sind während des laufenden DLC-Events immer offen.
+      // Der normale Welt-Fortschritt (unlocked) sperrt sie NICHT.
       b.innerHTML="🌌<br>LEVEL "+(i+1)+"<br>+100 🪙";
-      b.addEventListener("click",()=>startLevel(i));
+      b.addEventListener("click",()=>{
+        if(galaxyLevelOpen(i)) startLevel(i);
+      });
       g5.appendChild(b);
     }
     w5.appendChild(g5);
@@ -3083,7 +3094,11 @@ function startLevel(i){
     if(savedSkin && ownedSkins.includes(savedSkin)) equippedSkin=savedSkin;
   }catch(e){}
  if(i<0||i>=levels.length)return;
- if(i>=40){if(!galaxyWorldActive())return;}else if(i>=unlocked)return;
+ // DLC/Galaxy-Level 41-50 sind bei aktivem Galaxy-Event immer spielbar.
+ // Sie hängen NICHT vom normalen unlocked-Fortschritt ab.
+ if(i>=40){
+   if(!galaxyWorldActive())return;
+ }else if(i>=unlocked)return;
  const musicWasOn=(typeof musicOn!=="undefined")?musicOn:false;
  if(typeof stopLoungeMusic==="function")stopLoungeMusic();
  if(typeof stopMusic==="function")
