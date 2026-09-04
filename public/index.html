@@ -1048,7 +1048,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 }
 
 
-#playerPoll{position:fixed;left:50%;top:72px;bottom:auto;transform:translateX(-50%);z-index:1300;display:none;width:min(760px,94vw);padding:8px 12px;border:2px solid #ffd83d;border-radius:12px;background:rgba(25,18,45,.96);box-shadow:0 5px 18px rgba(0,0,0,.32);text-align:center;box-sizing:border-box}
+#playerPoll{position:fixed;left:50%;top:72px;bottom:auto;transform:translateX(-50%);z-index:1300;display:none;width:min(760px,94vw);padding:8px 12px;border:2px solid #ffd83d;border-radius:12px;background:rgba(25,18,45,.96);box-shadow:0 5px 18px rgba(0,0,0,.32);text-align:center;box-sizing:border-box;transition:top .12s ease}
 #playerPoll.open{display:block}
 #playerPollQuestion{font-size:15px;font-weight:900;margin-bottom:7px;line-height:1.2}
 #playerPollButtons{display:grid;grid-template-columns:1fr 1fr;gap:7px}
@@ -1057,6 +1057,13 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 #playerPollNo{background:#ff6175;color:#2a0710}
 #playerPollTime{margin-top:5px;font-size:10px;opacity:.8}
 .adminPollGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:650px){
+  #playerPoll{width:min(340px,86vw);padding:6px 8px;border-width:1px;border-radius:10px}
+  #playerPollQuestion{font-size:11px;margin-bottom:5px;line-height:1.1}
+  #playerPollButtons{gap:5px}
+  #playerPollButtons button{padding:5px 6px;border-radius:7px;font-size:11px}
+  #playerPollTime{margin-top:3px;font-size:8px}
+}
 </style>
 </head>
 <body>
@@ -4415,6 +4422,16 @@ function upsertServerMessage(msg){
   renderServerMessages();
 }
 
+function updatePollPosition(){
+  const box=document.getElementById("serverMessages");
+  const poll=document.getElementById("playerPoll");
+  if(!box||!poll)return;
+  const rect=box.getBoundingClientRect();
+  const gap=8;
+  const top=Math.max(14, Math.round(rect.bottom + gap));
+  poll.style.top=top+"px";
+}
+
 function renderServerMessages(){
   const box=document.getElementById("serverMessages");
   if(!box)return;
@@ -4450,6 +4467,8 @@ function renderServerMessages(){
     item.appendChild(countdown);
     box.appendChild(item);
   }
+
+  updatePollPosition();
 }
 
 function publishServerMessage(text,minutes){
@@ -4476,6 +4495,8 @@ function deleteServerMessage(id){
 
 loadServerMessages();
 setInterval(renderServerMessages,250);
+setTimeout(updatePollPosition,0);
+window.addEventListener("resize",updatePollPosition);
 
 (function(){
   const send=document.getElementById("adminMessageSend");
