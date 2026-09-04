@@ -6217,6 +6217,7 @@ setInterval(updateSettingsScore,500);
   let lastRequestIds='';
 
   const skinNames={
+    classic:'Classic',
     rainbow:'🌈 Regenbogen',
     fire:'🔥 Feuer',
     ocean:'🌊 Ozean',
@@ -6224,22 +6225,51 @@ setInterval(updateSettingsScore,500);
     sunset:'🌅 Sunset',
     cat:'🐱 Meme Katze',
     magma:'🌋 Magma-Block',
-    poop:'💩 Kackhaufen'
+    poop:'💩 Kackhaufen',
+    'plane:rainbow':'🌈 Rainbow-Flugzeug',
+    'plane:magma':'🌋 Magma-Flugzeug',
+    'plane:galaxy':'🌌 Galaxy-Flugzeug'
   };
+
+  function isPlaneTradeSkin(id){
+    return String(id||'').startsWith('plane:');
+  }
 
   function playerName(){
     return String(localStorage.getItem('crPlayerName')||'').trim();
   }
 
   function getOwnedSkins(){
+    const result=[];
     try{
       const a=JSON.parse(localStorage.getItem('crOwnedSkins')||'[]');
-      return Array.isArray(a)?a.filter(Boolean):[];
-    }catch(e){ return []; }
+      if(Array.isArray(a)) a.forEach(id=>{
+        if(id && id!=='classic' && !result.includes(id)) result.push(id);
+      });
+    }catch(e){}
+    try{
+      const planes=JSON.parse(localStorage.getItem('crOwnedPlaneSkins')||'[]');
+      if(Array.isArray(planes)) planes.forEach(id=>{
+        const tradeId='plane:'+id;
+        if(id && !result.includes(tradeId)) result.push(tradeId);
+      });
+    }catch(e){}
+    return result;
   }
 
   function saveOwnedSkins(a){
-    localStorage.setItem('crOwnedSkins',JSON.stringify([...new Set(a)]));
+    const normal=[];
+    const planes=[];
+    for(const id of [...new Set(a)]){
+      if(!id || id==='classic') continue;
+      if(isPlaneTradeSkin(id)){
+        planes.push(id.slice(7));
+      }else{
+        normal.push(id);
+      }
+    }
+    localStorage.setItem('crOwnedSkins',JSON.stringify(normal));
+    localStorage.setItem('crOwnedPlaneSkins',JSON.stringify(planes));
   }
 
   function api(url, opts){
@@ -6371,15 +6401,25 @@ setInterval(updateSettingsScore,500);
           const received=d.completed.receivedSkin;
           const sentSkin=d.completed.sentSkin;
           const owned=getOwnedSkins();
+
           if(received && !owned.includes(received)){
             owned.push(received);
             saveOwnedSkins(owned);
           }
+
           if(sentSkin){
             const next=getOwnedSkins().filter(id=>id!==sentSkin);
             saveOwnedSkins(next);
-            if(localStorage.getItem('crEquippedSkin')===sentSkin){
+
+            if(isPlaneTradeSkin(sentSkin)){
+              const planeId=sentSkin.slice(7);
+              if(localStorage.getItem('crEquippedPlaneSkin')===planeId){
+                localStorage.removeItem('crEquippedPlaneSkin');
+                if(typeof equippedPlaneSkin!=='undefined') equippedPlaneSkin=null;
+              }
+            }else if(localStorage.getItem('crEquippedSkin')===sentSkin){
               localStorage.setItem('crEquippedSkin','classic');
+              if(typeof equippedSkin!=='undefined') equippedSkin='classic';
             }
           }
           statusEl.textContent='✅ Trade erfolgreich!';
