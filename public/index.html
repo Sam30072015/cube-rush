@@ -1268,7 +1268,10 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
     <div id="tradeStatus">Wähle einen Online-Spieler.</div>
     <div id="tradeIncoming"></div>
     <div id="tradeOnlineWrap">
-      <strong>ONLINE-SPIELER</strong>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <strong>ONLINE-SPIELER</strong>
+        <button id="tradeRefresh" type="button" style="margin:0;padding:8px 12px;font-size:13px">🔄 Online-Spieler aktualisieren</button>
+      </div>
       <div id="tradeOnline" class="tradeOnline"></div>
     </div>
     <div id="tradeMachine" class="hidden">
@@ -6196,6 +6199,7 @@ setInterval(updateSettingsScore,500);
   const panel=document.getElementById('tradePanel');
   const closeBtn=document.getElementById('tradeClose');
   const onlineBox=document.getElementById('tradeOnline');
+  const refreshBtn=document.getElementById('tradeRefresh');
   const incomingBox=document.getElementById('tradeIncoming');
   const statusEl=document.getElementById('tradeStatus');
   const machine=document.getElementById('tradeMachine');
@@ -6445,6 +6449,12 @@ setInterval(updateSettingsScore,500);
 
   openBtn.addEventListener('click',open);
   closeBtn.addEventListener('click',close);
+  if(refreshBtn){
+    refreshBtn.addEventListener('click',()=>{
+      statusEl.textContent='🔄 Online-Spieler werden aktualisiert …';
+      refresh();
+    });
+  }
   panel.addEventListener('click',e=>{if(e.target===panel)close();});
 
   window.addEventListener('storage',e=>{
