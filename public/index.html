@@ -1064,6 +1064,39 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
   #playerPollButtons button{padding:4px 6px;border-radius:6px;font-size:10px;line-height:1.05}
   #playerPollTime{margin-top:2px;font-size:8px;color:#fff}
 }
+
+/* Galaxy/Umfrage im Handy-Querformat genauso kompakt wie die Taco-Anzeige */
+@media (max-width: 900px) and (max-height: 600px) {
+  #playerPoll {
+    width: auto !important;
+    max-width: 72vw !important;
+    padding: 3px 6px !important;
+    border-width: 1px !important;
+    border-radius: 7px !important;
+    top: 44px !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,.22) !important;
+  }
+  #playerPollQuestion {
+    font-size: 8px !important;
+    line-height: 1.05 !important;
+    margin-bottom: 2px !important;
+    color: #fff !important;
+  }
+  #playerPollButtons {
+    gap: 3px !important;
+  }
+  #playerPollButtons button {
+    padding: 3px 5px !important;
+    border-radius: 5px !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+  }
+  #playerPollTime {
+    margin-top: 1px !important;
+    font-size: 7px !important;
+    color: #fff !important;
+  }
+}
 </style>
 </head>
 <body>
