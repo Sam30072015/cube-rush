@@ -1068,7 +1068,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 #playerPollYes{background:#44d47a;color:#07210f}
 #playerPollNo{background:#ff6175;color:#2a0710}
 #playerPollTime{margin-top:5px;font-size:10px;opacity:.8}
-
+.adminPollGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
 body.laptop-mode #playerPoll{
   width:min(620px,82vw);
@@ -1116,123 +1116,6 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
     margin-top: 1px !important;
     font-size: 7px !important;
     color: #fff !important;
-  }
-}
-
-/* ---------- NEUES GELBES MÜNZEN-DESIGN ---------- */
-#menuCoins,
-#shopBalance,
-#coins{
-  position:relative;
-  display:inline-flex !important;
-  align-items:center;
-  justify-content:center;
-  gap:9px;
-  color:#fff !important;
-  background:linear-gradient(135deg,#ffe35a 0%,#ffcf20 45%,#f0a900 100%) !important;
-  border:4px solid #17143b !important;
-  border-radius:999px !important;
-  box-shadow:0 5px 0 #17143b,0 10px 20px rgba(23,20,59,.22),inset 0 3px 0 rgba(255,255,255,.55),inset 0 -4px 0 rgba(170,103,0,.22) !important;
-  text-shadow:0 3px 0 rgba(23,20,59,.45) !important;
-  overflow:hidden;
-}
-
-#menuCoins::before,
-#shopBalance::before,
-#coins::before{
-  content:"";
-  flex:0 0 auto;
-  width:27px;
-  height:27px;
-  border-radius:50%;
-  background:
-    linear-gradient(135deg,transparent 0 38%,rgba(255,247,154,.75) 39% 51%,transparent 52%),
-    radial-gradient(circle at 36% 30%,#fff58a 0 10%,#ffd52b 28%,#ffbd00 63%,#e69500 100%);
-  border:3px solid #fff0a0;
-  box-shadow:
-    0 0 0 2px #c98400,
-    inset 2px 2px 0 rgba(255,255,255,.55),
-    inset -3px -3px 0 rgba(166,94,0,.28);
-}
-
-#menuCoins{
-  padding:7px 22px !important;
-  width:min(520px,90vw);
-  max-width:90vw;
-  font-size:clamp(17px,2.2vw,24px) !important;
-  line-height:1.15;
-  white-space:nowrap;
-}
-
-#shopBalance{
-  padding:8px 16px !important;
-}
-
-#coins{
-  padding:7px 14px !important;
-}
-
-@media(max-width:700px){
-  #menuCoins{
-    padding:6px 15px !important;
-    font-size:17px !important;
-  }
-  #menuCoins::before,
-  #shopBalance::before,
-  #coins::before{
-    width:22px;
-    height:22px;
-    border-width:2px;
-  }
-}
-
-
-/* ---------- GAME HUD: MÜNZEN NICHT MEHR IN DER ECKE ---------- */
-body:not(#menu) #coins,
-#hud #coins{
-  position:fixed !important;
-  left:50% !important;
-  right:auto !important;
-  top:14px !important;
-  transform:translateX(-50%) !important;
-  z-index:6 !important;
-  margin:0 !important;
-  min-width:220px;
-  padding:7px 16px !important;
-  font-size:clamp(17px,2vw,24px) !important;
-  white-space:nowrap;
-  pointer-events:none;
-}
-
-/* ---------- SPIELER-FRAGE: IMMER SICHTBAR UND ANKLICKBAR ---------- */
-#playerPoll{
-  pointer-events:auto !important;
-  cursor:default;
-  z-index:1500 !important;
-  color:#fff !important;
-}
-#playerPollQuestion{
-  color:#fff !important;
-}
-#playerPollButtons button{
-  pointer-events:auto !important;
-  position:relative;
-  z-index:1501;
-}
-@media (max-width:650px){
-  body:not(.phone-mode) #coins,
-  body.phone-mode #hud #coins{
-    top:8px !important;
-  }
-}
-@media (orientation:landscape) and (max-width:1000px){
-  body.phone-mode #hud #coins{
-    top:4px !important;
-    left:50% !important;
-    transform:translateX(-50%) !important;
-    font-size:11px !important;
-    min-width:160px;
-    padding:4px 10px !important;
   }
 }
 </style>
@@ -1390,7 +1273,7 @@ body:not(#menu) #coins,
 </div>
 <div class="screen" id="menu">
 <h1>CUBE RUSH</h1>
-<div id="menuCoins">Münzen: 0</div>
+<div id="menuCoins">🪙 Münzen: 0</div>
 <div id="levels"></div>
 <div id="menuShopActions">
 <button id="tradeOpen" type="button">🤝 TRADE</button>
@@ -1401,7 +1284,7 @@ body:not(#menu) #coins,
 <div class="hidden" id="shop">
 <div class="shopPanel">
 <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
-<div class="shopBalance" id="shopBalance">Münzen: 0</div>
+<div class="shopBalance" id="shopBalance">🪙 Münzen: 0</div>
 <div class="skinGrid" id="skinGrid"></div>
 <h3 class="shopTitle" style="font-size:28px;margin:28px 0 6px">✈️ FLUGZEUG-SKINS</h3>
 <div style="color:#cbd3ff;font-weight:700;margin-bottom:14px">Diese Skins werden sichtbar, sobald du dich im Level in ein Flugzeug verwandelst.</div>
@@ -1447,7 +1330,7 @@ body:not(#menu) #coins,
 <button aria-label="Springen" id="mobileJump" type="button">↑</button>
 <div id="hud">
 <div id="score">Punkte: 0</div>
-<div class="gold" id="coins">Münzen: 0</div>
+<div class="gold" id="coins">🪙 Münzen: 0</div>
 <div id="level">LEVEL 1</div>
 <div id="mode">MODUS: 🟨 WÜRFEL</div>
 <div id="percent">0%</div>
@@ -1560,6 +1443,20 @@ body:not(#menu) #coins,
 <button class="adminAction" id="adminMessageSend">Nachricht senden</button>
 <button class="adminAction" id="adminMessageDelete">🗑️ Nachricht löschen</button>
 </div>
+<div class="adminSectionTitle">🗳️ SPIELER-FRAGE</div>
+<input id="adminPollQuestion" maxlength="140" placeholder="z. B. Wollt ihr 10× Münzen?" type="text"/>
+<div class="adminPollGrid">
+<input id="adminPollYes" maxlength="40" placeholder="Antwort Ja" type="text" value="Ja"/>
+<input id="adminPollNo" maxlength="40" placeholder="Antwort Nein" type="text" value="Nein"/>
+</div>
+<div class="adminPollGrid">
+<input id="adminPollMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
+<input id="adminPollSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
+</div>
+<button class="adminAction" id="adminPollStart">🗳️ Frage an Spieler senden</button>
+<button class="adminAction" id="adminPollStop">🛑 Frage schließen</button>
+<div id="adminPollStatus"></div>
+<div id="adminPollResults" style="margin-top:8px;font-size:13px;opacity:.85"></div>
 <button id="adminClose">Schließen</button>
 </div>
 </div>
@@ -2730,7 +2627,7 @@ function updateShop(){
   const grid=document.getElementById("skinGrid");
   if(!balance||!grid)return;
 
-  balance.textContent="Münzen: "+coins;
+  balance.textContent="🪙 Münzen: "+coins;
   grid.innerHTML="";
 
   SKINS.forEach(skin=>{
@@ -3052,7 +2949,7 @@ function updateMenu(){
     typeof world3Unlocked==="function" && world3Unlocked()
   );
   if(!Array.isArray(completed)) completed=[];
-  document.getElementById("menuCoins").textContent="Münzen: "+coins;
+  document.getElementById("menuCoins").textContent="🪙 Münzen: "+coins;
 
   const box=document.getElementById("levels");
   box.innerHTML="";
@@ -3299,7 +3196,7 @@ musicOn=musicWasOn;
 }
 
 function updateHUD(){
- document.getElementById("coins").textContent="Münzen: "+coins;
+ document.getElementById("coins").textContent="🪙 Münzen: "+coins;
  updateAbilityHud();
  document.getElementById("level").textContent=(levelIndex<10?"WELT 1 · ":(levelIndex<20?"WELT 2 · ":(levelIndex<30?"WELT 3 · ":(levelIndex<40?"LUCK · ":"GALAXY · "))))+levels[levelIndex].name;
  document.getElementById("mode").textContent=mode==="ship"?"MODUS: ✈️ FLUGZEUG":"MODUS: 🟨 WÜRFEL";
@@ -4664,10 +4561,10 @@ const loungeBass=[98,123.47,146.83,130.81];
       if(typeof updateHUD==="function")updateHUD();
 
       const menuCoinsEl=document.getElementById("menuCoins");
-      if(menuCoinsEl) menuCoinsEl.textContent="Münzen: "+coins;
+      if(menuCoinsEl) menuCoinsEl.textContent="🪙 Münzen: "+coins;
 
       const shopBalanceEl=document.getElementById("shopBalance");
-      if(shopBalanceEl) shopBalanceEl.textContent="Münzen: "+coins;
+      if(shopBalanceEl) shopBalanceEl.textContent="🪙 Münzen: "+coins;
 
       msg.textContent="✅ Code 67 eingelöst: +670 Münzen!";
       input.value="";
@@ -4749,15 +4646,17 @@ function updatePollPosition(){
   const box=document.getElementById("serverMessages");
   const poll=document.getElementById("playerPoll");
   if(!poll)return;
-  const gap=8;
-  if(box){
-    const rect=box.getBoundingClientRect();
-    poll.style.top=Math.max(54,Math.round(rect.bottom+gap))+"px";
-  }else{
-    poll.style.top="58px";
+  const isLaptop=document.body && document.body.classList.contains("laptop-mode");
+  if(isLaptop){
+    // Auf dem Laptop steht die Frage direkt über dem Fortschrittsbalken.
+    poll.style.top="62px";
+    return;
   }
-  poll.style.left="50%";
-  poll.style.transform="translateX(-50%)";
+  if(!box)return;
+  const rect=box.getBoundingClientRect();
+  const gap=8;
+  const top=Math.max(14, Math.round(rect.bottom + gap));
+  poll.style.top=top+"px";
 }
 
 function renderServerMessages(){
@@ -6198,7 +6097,16 @@ setInterval(updateSettingsScore,500);
   const yes=document.getElementById("playerPollYes");
   const no=document.getElementById("playerPollNo");
   const time=document.getElementById("playerPollTime");
-  if(!poll||!q||!yes||!no||!time)return;
+  const aQ=document.getElementById("adminPollQuestion");
+  const aYes=document.getElementById("adminPollYes");
+  const aNo=document.getElementById("adminPollNo");
+  const aMin=document.getElementById("adminPollMinutes");
+  const aSec=document.getElementById("adminPollSeconds");
+  const aStart=document.getElementById("adminPollStart");
+  const aStop=document.getElementById("adminPollStop");
+  const aStatus=document.getElementById("adminPollStatus");
+  const aResults=document.getElementById("adminPollResults");
+  if(!poll||!q||!yes||!no||!time||!aStart||!aStop)return;
 
   let currentPoll=null;
   let pollTimer=null;
@@ -6215,10 +6123,6 @@ setInterval(updateSettingsScore,500);
     yes.textContent=p.yesLabel||"Ja";
     no.textContent=p.noLabel||"Nein";
     poll.classList.add("open");
-    poll.classList.remove("hidden");
-    poll.style.display="block";
-    poll.style.pointerEvents="auto";
-    updatePollPosition();
     lastPollId=p.id||"";
     if(pollTimer)clearInterval(pollTimer);
     const tick=()=>{
@@ -6279,8 +6183,6 @@ setInterval(updateSettingsScore,500);
       });
       if(!r.ok)throw new Error("Antwort nicht gespeichert");
       time.textContent="✅ Antwort gespeichert";
-      yes.disabled=true;
-      no.disabled=true;
       setTimeout(()=>renderPoll(null),700);
     }catch(e){
       yes.disabled=false; no.disabled=false;
@@ -6290,7 +6192,62 @@ setInterval(updateSettingsScore,500);
   yes.addEventListener("click",()=>answer("yes"));
   no.addEventListener("click",()=>answer("no"));
 
+  async function adminPost(url,body){
+    const r=await fetch(url,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-admin-key":"603781"},
+      body:JSON.stringify(body||{})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"Fehler");
+    return d;
+  }
 
+  aStart.addEventListener("click",async()=>{
+    const question=(aQ.value||"").trim();
+    const yesLabel=(aYes.value||"Ja").trim()||"Ja";
+    const noLabel=(aNo.value||"Nein").trim()||"Nein";
+    const min=Math.max(0,Number(aMin.value)||0);
+    const sec=Math.max(0,Math.min(59,Number(aSec.value)||0));
+    const durationMs=(min*60+sec)*1000;
+    if(!question||durationMs<=0){
+      if(aStatus)aStatus.textContent="❌ Frage und Zeit eingeben";
+      return;
+    }
+    try{
+      const d=await adminPost("/api/admin/poll",{question,yesLabel,noLabel,durationMs});
+      if(aStatus)aStatus.textContent="✅ Frage ist jetzt für alle sichtbar";
+      if(d.poll)handlePoll(d.poll);
+    }catch(e){
+      if(aStatus)aStatus.textContent="❌ "+e.message;
+    }
+  });
+
+  aStop.addEventListener("click",async()=>{
+    try{
+      await adminPost("/api/admin/poll/stop",{});
+      if(aStatus)aStatus.textContent="🛑 Frage geschlossen";
+    }catch(e){
+      if(aStatus)aStatus.textContent="❌ "+e.message;
+    }
+  });
+
+  async function loadResults(){
+    try{
+      const r=await fetch("/api/admin/poll/status",{headers:{"x-admin-key":"603781"}});
+      if(!r.ok)return;
+      const d=await r.json();
+      if(d.poll && Number(d.poll.endsAt||0)>Date.now()){
+        const y=Number(d.poll.answers?.yes||0);
+        const n=Number(d.poll.answers?.no||0);
+        if(aResults)aResults.textContent="Antworten: ✅ "+y+" · ❌ "+n;
+      }else{
+        if(aResults)aResults.textContent="Keine aktive Frage.";
+      }
+    }catch{}
+  }
+  setInterval(loadResults,2000);
+  loadResults();
 })();
 </script>
 
