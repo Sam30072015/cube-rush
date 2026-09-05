@@ -1144,21 +1144,26 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
     height: 86px !important;
     min-width: 86px !important;
     min-height: 86px !important;
-    margin: 520px auto 100px !important;
+    margin: 0 auto !important;
     background-size: 86px 86px !important;
   }
 }
 </style>
 <style>
 /* ========================= TRADE ========================= */
+#menuShopActions{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  margin:18px 0 12px;
+}
 #tradeOpen{
-  position:fixed;
-  right:18px;
-  top:50%;
-  transform:translateY(-50%);
+  position:static;
   z-index:35;
-  margin:0;
-  min-width:120px;
+  margin:0 auto 8px;
+  min-width:170px;
   padding:13px 18px;
   border:2px solid #6cff00;
   border-radius:16px;
@@ -1167,8 +1172,12 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
   font-size:20px;
   font-weight:900;
   box-shadow:0 0 18px rgba(108,255,0,.45);
+  cursor:pointer;
 }
-#tradeOpen:hover{transform:translateY(-50%) scale(1.04)}
+#tradeOpen:hover{transform:scale(1.04)}
+#menuShopActions #shopOpen{
+  margin:0;
+}
 #tradePanel{
   position:fixed;
   inset:0;
@@ -1211,7 +1220,18 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 #tradeStatus{min-height:24px;margin-top:8px;font-weight:800}
 #tradeClose{background:#00eaff;box-shadow:0 0 14px #00eaff}
 @media (max-width:800px){
-  #tradeOpen{right:10px;top:44%;min-width:96px;padding:10px 12px;font-size:16px}
+  #menuShopActions{
+    margin:520px auto 100px;
+  }
+  #tradeOpen{
+    min-width:150px;
+    padding:10px 14px;
+    font-size:16px;
+    margin:0 auto 8px;
+  }
+  #menuShopActions #shopOpen{
+    margin:0 auto;
+  }
   #tradeBox{padding:14px;border-radius:18px}
   #tradeBox h2{font-size:23px}
   #tradeMachine{grid-template-columns:1fr}
@@ -1243,7 +1263,10 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 <h1>CUBE RUSH</h1>
 <div id="menuCoins">🪙 Münzen: 0</div>
 <div id="levels"></div>
+<div id="menuShopActions">
+<button id="tradeOpen" type="button">🤝 TRADE</button>
 <button id="shopOpen" type="button" aria-label="Shop"><span aria-hidden="true"></span></button>
+</div>
 <div id="tip">Leertaste / Klick = Springen · E = Pop-Kraft (Katze) · Im Flugzeug Leertaste halten = hoch</div>
 </div>
 <div class="hidden" id="shop">
@@ -1261,7 +1284,6 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 </div>
 </div>
 
-<button id="tradeOpen" type="button">🤝 TRADE</button>
 <div id="tradePanel" aria-hidden="true">
   <div id="tradeBox">
     <h2>🤝 TRADE</h2>
