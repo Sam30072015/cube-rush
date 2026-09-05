@@ -6239,68 +6239,135 @@ setInterval(updateSettingsScore,500);
   let pollTimer=null;
   let currentTrade=null;
   let currentTarget='';
-  let lastRequestIds='';
 
-  const skinNames={
-    classic:'Classic',
-    rainbow:'🌈 Regenbogen',
-    fire:'🔥 Feuer',
-    ocean:'🌊 Ozean',
-    shadow:'🌑 Schatten',
-    sunset:'🌅 Sunset',
-    blood:'🩸 Blut',
-    gold:'🥇 Gold',
-    cat:'🐱 Meme Katze',
-    magma:'🌋 Magma-Block',
-    poop:'💩 Kackhaufen',
-    'plane:rainbow':'🌈 Rainbow-Flugzeug',
-    'plane:magma':'🌋 Magma-Flugzeug',
-    'plane:galaxy':'🌌 Galaxy-Flugzeug'
-  };
-
-  function isPlaneTradeSkin(id){
-    return String(id||'').startsWith('plane:');
-  }
+  const blockedIds=new Set(['red','blue','gold','poop']);
 
   function playerName(){
     return String(localStorage.getItem('crPlayerName')||'').trim();
   }
 
-  function getOwnedSkins(){
+  function isPlaneTradeSkin(id){
+    return String(id||'').startsWith('plane:');
+  }
+
+  // Nimmt die Namen DIREKT aus dem Shop. Dadurch stimmen Trade-Inventar
+  // und Shop immer überein – auch bei neuen Skins/Flugzeug-Skins.
+  function tradeCatalog(){
+    const out=[];
+    if(Array.isArray(SKINS)){
+      SKINS.forEach(s=>{
+        if(!s || !s.id || s.id==='classic' || blockedIds.has(s.id)) return;
+        out.push({id:s.id,name:s.name});
+      });
+    }
+    if(Array.isArray(PLANE_SKINS)){
+      PLANE_SKINS.forEach(p=>{
+        if(!p || !p.id) return;
+        out.push({id:'plane:'+p.id,name:p.name});
+      });
+    }
+    return out;
+  }
+
+  function tradeName(id){
+    const item=tradeCatalog().find(x=>x.id===id);
+    return item ? item.name : String(id||'');
+  }
+
+  function getOwnedTradeItems(){
     const result=[];
     try{
-      const a=JSON.parse(localStorage.getItem('crOwnedSkins')||'[]');
-      if(Array.isArray(a)) a.forEach(id=>{
-        if(id && id!=='classic' && !result.includes(id)) result.push(id);
-      });
+      const normals=JSON.parse(localStorage.getItem('crOwnedSkins')||'[]');
+      if(Array.isArray(normals)){
+        normals.forEach(id=>{
+          if(!id || id==='classic' || blockedIds.has(id)) return;
+          if(!result.includes(id)) result.push(id);
+        });
+      }
     }catch(e){}
     try{
       const planes=JSON.parse(localStorage.getItem('crOwnedPlaneSkins')||'[]');
-      if(Array.isArray(planes)) planes.forEach(id=>{
-        const tradeId='plane:'+id;
-        if(id && !result.includes(tradeId)) result.push(tradeId);
-      });
+      if(Array.isArray(planes)){
+        planes.forEach(id=>{
+          if(!id) return;
+          const tradeId='plane:'+id;
+          if(!result.includes(tradeId)) result.push(tradeId);
+        });
+      }
     }catch(e){}
-    return result;
+
+    // Nur Sachen anzeigen, die es im Shop wirklich gibt.
+    const valid=new Set(tradeCatalog().map(x=>x.id));
+    return result.filter(id=>valid.has(id));
   }
 
-  function saveOwnedSkins(a){
+  function writeTradeOwnership(ids){
+    const unique=[...new Set((Array.isArray(ids)?ids:[]).filter(Boolean))];
     const normal=[];
     const planes=[];
-    for(const id of [...new Set(a)]){
-      if(!id || id==='classic') continue;
+
+    unique.forEach(id=>{
+      if(id==='classic' || blockedIds.has(id)) return;
       if(isPlaneTradeSkin(id)){
-        planes.push(id.slice(7));
-      }else{
+        const planeId=id.slice(7);
+        if(planeId && !planes.includes(planeId)) planes.push(planeId);
+      }else if(!normal.includes(id)){
         normal.push(id);
       }
-    }
+    });
+
+    // Classic bleibt immer im normalen Shop vorhanden.
+    if(!normal.includes('classic')) normal.unshift('classic');
+
     localStorage.setItem('crOwnedSkins',JSON.stringify(normal));
     localStorage.setItem('crOwnedPlaneSkins',JSON.stringify(planes));
+
+    // Laufzeit-Arrays des Spiels ebenfalls sofort synchronisieren.
+    if(typeof ownedSkins!=='undefined' && Array.isArray(ownedSkins)){
+      ownedSkins.length=0;
+      normal.forEach(id=>ownedSkins.push(id));
+    }
+    if(typeof ownedPlaneSkins!=='undefined' && Array.isArray(ownedPlaneSkins)){
+      ownedPlaneSkins.length=0;
+      planes.forEach(id=>ownedPlaneSkins.push(id));
+    }
+
+    // Falls gerade ein ausgerüsteter Skin verschenkt wurde, auf Classic zurück.
+    if(typeof equippedSkin!=='undefined' && !ownedSkins.includes(equippedSkin)){
+      equippedSkin='classic';
+      if(typeof saveSkins==='function') saveSkins();
+    }
+    if(typeof equippedPlaneSkin!=='undefined' && equippedPlaneSkin && !ownedPlaneSkins.includes(equippedPlaneSkin)){
+      equippedPlaneSkin=null;
+      if(typeof savePlaneSkins==='function') savePlaneSkins();
+    }
+
+    if(typeof saveSkins==='function') saveSkins();
+    if(typeof savePlaneSkins==='function') savePlaneSkins();
+  }
+
+  function syncAfterTrade(sentSkin,receivedSkin){
+    const owned=getOwnedTradeItems();
+    const next=owned.filter(id=>id!==sentSkin);
+    if(receivedSkin && !next.includes(receivedSkin) && !blockedIds.has(receivedSkin)){
+      next.push(receivedSkin);
+    }
+    writeTradeOwnership(next);
+
+    // Shop + Menü sofort neu zeichnen. Kein Reload nötig.
+    try{ if(typeof updateShop==='function') updateShop(); }catch(e){}
+    try{ if(typeof updateMenu==='function') updateMenu(); }catch(e){}
+    try{ if(typeof updateHUD==='function') updateHUD(); }catch(e){}
+    try{ if(typeof save==='function') save(); }catch(e){}
+
+    // Custom Event für andere Teile des Spiels, falls sie ebenfalls reagieren wollen.
+    try{
+      window.dispatchEvent(new CustomEvent('cubeRushTradeUpdated',{detail:{sentSkin,receivedSkin}}));
+    }catch(e){}
   }
 
   function api(url, opts){
-    return fetch(url, Object.assign({headers:{'Content-Type':'application/json'}},opts||{}))
+    return fetch(url,Object.assign({headers:{'Content-Type':'application/json'}},opts||{}))
       .then(async r=>{
         const d=await r.json().catch(()=>({}));
         if(!r.ok) throw new Error(d.error||'Fehler');
@@ -6312,7 +6379,7 @@ setInterval(updateSettingsScore,500);
     panel.classList.add('open');
     panel.setAttribute('aria-hidden','false');
     refresh();
-    if(!pollTimer) pollTimer=setInterval(refresh,1500);
+    if(!pollTimer) pollTimer=setInterval(refresh,1000);
   }
 
   function close(){
@@ -6371,18 +6438,21 @@ setInterval(updateSettingsScore,500);
 
   function renderMySkins(){
     mySkinsBox.innerHTML='';
-    const blockedTradeSkins=new Set(['red','blue','gold']);
-    const owned=getOwnedSkins().filter(id=>id!=='classic' && !blockedTradeSkins.has(String(id)));
-    if(!owned.length){
+    const owned=getOwnedTradeItems();
+    const catalog=tradeCatalog().filter(x=>owned.includes(x.id));
+
+    if(!catalog.length){
       mySkinsBox.innerHTML='<div style="opacity:.7;grid-column:1/-1">Du hast keine tauschbaren Skins.</div>';
       return;
     }
-    owned.forEach(id=>{
+
+    catalog.forEach(item=>{
       const b=document.createElement('button');
       b.type='button';
-      b.className='tradeSkinBtn'+(currentTrade&&currentTrade.myOffer===id?' selected':'');
-      b.textContent=skinNames[id]||id;
-      b.addEventListener('click',()=>setOffer(id));
+      b.className='tradeSkinBtn'+(currentTrade&&currentTrade.myOffer===item.id?' selected':'');
+      b.textContent=item.name;
+      b.title=isPlaneTradeSkin(item.id)?'Flugzeug-Skin':'Skin';
+      b.addEventListener('click',()=>setOffer(item.id));
       mySkinsBox.appendChild(b);
     });
   }
@@ -6398,10 +6468,10 @@ setInterval(updateSettingsScore,500);
     machine.classList.remove('hidden');
     actions.classList.remove('hidden');
     otherNameEl.textContent=t.other||'Spieler';
-    myOfferEl.textContent=t.myOffer ? (skinNames[t.myOffer]||t.myOffer) : 'Kein Skin ausgewählt';
-    otherOfferEl.textContent=t.otherOffer ? (skinNames[t.otherOffer]||t.otherOffer) : 'Kein Skin ausgewählt';
+    myOfferEl.textContent=t.myOffer ? tradeName(t.myOffer) : 'Kein Skin ausgewählt';
+    otherOfferEl.textContent=t.otherOffer ? tradeName(t.otherOffer) : 'Kein Skin ausgewählt';
     confirmBtn.disabled=!!t.myConfirmed;
-    confirmBtn.textContent=t.myConfirmed ? '✅ BESTÄTIGT' : '✅ CONFIRM';
+    confirmBtn.textContent=t.myConfirmed?'✅ BESTÄTIGT':'✅ CONFIRM';
     renderMySkins();
     statusEl.textContent=t.myConfirmed&&t.otherConfirmed ? '✅ Tausch wird ausgeführt …' :
       (t.myConfirmed ? '⏳ Warte auf den anderen Spieler …' : 'Wähle einen Skin und drücke CONFIRM.');
@@ -6411,73 +6481,30 @@ setInterval(updateSettingsScore,500);
     const me=playerName();
     if(!me){statusEl.textContent='Bitte zuerst deinen Spielernamen speichern.';return;}
     try{
-      const d=await api('/api/trade/status?player='+encodeURIComponent(me),{headers:{'Content-Type':'application/json'}});
+      const d=await api('/api/trade/status?player='+encodeURIComponent(me));
       renderOnline(d.onlinePlayers||[]);
       renderIncoming(d.incomingRequests||[]);
+
       if(d.trade){
         renderTrade(d.trade);
       }else if(currentTrade){
-        // Handel beendet oder abgebrochen
         machine.classList.add('hidden');
         actions.classList.add('hidden');
         currentTrade=null;
       }
+
       if(d.completed && d.completed.id){
         const key='crTradeDone_'+d.completed.id;
         if(!sessionStorage.getItem(key)){
+          // Erst markieren, damit ein doppelter Poll nie doppelt addiert.
           sessionStorage.setItem(key,'1');
-          const received=d.completed.receivedSkin;
-          const sentSkin=d.completed.sentSkin;
-          const owned=getOwnedSkins();
-
-          // Wichtig: Nicht nur localStorage ändern, sondern auch die laufenden
-          // Spielvariablen. Sonst sieht der Shop den neuen/entfernten Skin erst
-          // nach einem Reload und Ausrüsten funktioniert nicht sofort.
-          let nextOwned=[...owned];
-          if(sentSkin){
-            nextOwned=nextOwned.filter(id=>id!==sentSkin);
-          }
-          if(received && !nextOwned.includes(received)){
-            nextOwned.push(received);
-          }
-          saveOwnedSkins(nextOwned);
-
-          // Globale Skin-Liste des Shops sofort synchronisieren.
-          if(typeof ownedSkins!=='undefined' && Array.isArray(ownedSkins)){
-            ownedSkins.length=0;
-            nextOwned.forEach(id=>{ if(id && !ownedSkins.includes(id)) ownedSkins.push(id); });
-            if(!ownedSkins.includes('classic')) ownedSkins.push('classic');
-          }
-
-          // Globale Plane-Liste ebenfalls sofort synchronisieren.
-          if(typeof ownedPlaneSkins!=='undefined' && Array.isArray(ownedPlaneSkins)){
-            const nextPlanes=nextOwned
-              .filter(id=>isPlaneTradeSkin(id))
-              .map(id=>id.slice(7));
-            ownedPlaneSkins.length=0;
-            nextPlanes.forEach(id=>{ if(id && !ownedPlaneSkins.includes(id)) ownedPlaneSkins.push(id); });
-          }
-
-          // Wer den eigenen ausgerüsteten Skin weggibt, fällt sofort auf Classic
-          // zurück. Wer einen neuen Skin erhält, kann ihn danach direkt ausrüsten.
-          if(sentSkin && isPlaneTradeSkin(sentSkin)){
-            const planeId=sentSkin.slice(7);
-            if(typeof equippedPlaneSkin!=='undefined' && equippedPlaneSkin===planeId){
-              equippedPlaneSkin=null;
-              savePlaneSkins();
-            }
-          }else if(sentSkin && typeof equippedSkin!=='undefined' && equippedSkin===sentSkin){
-            equippedSkin='classic';
-            saveSkins();
-          }
-
-          // Persistenz nach dem Tausch sicherstellen.
-          if(typeof saveSkins==='function') saveSkins();
-          if(typeof savePlaneSkins==='function') savePlaneSkins();
-          if(typeof updateMenu==='function')updateMenu();
-          if(typeof updateShop==='function')updateShop();
+          const received=d.completed.receivedSkin||'';
+          const sentSkin=d.completed.sentSkin||'';
+          syncAfterTrade(sentSkin,received);
+          statusEl.textContent=received
+            ? '✅ Trade erfolgreich! '+tradeName(received)+' ist jetzt in deinem Shop verfügbar.'
+            : '✅ Trade erfolgreich!';
           renderMySkins();
-          statusEl.textContent='✅ Trade erfolgreich! Du kannst den erhaltenen Skin jetzt ausrüsten.';
         }
       }
     }catch(e){
@@ -6486,73 +6513,64 @@ setInterval(updateSettingsScore,500);
   }
 
   function sendRequest(target){
-    api('/api/trade/request',{
-      method:'POST',
-      body:JSON.stringify({from:playerName(),to:target})
-    }).then(()=>{
-      statusEl.textContent='📨 Anfrage an '+target+' gesendet.';
-    }).catch(e=>statusEl.textContent='❌ '+e.message);
+    api('/api/trade/request',{method:'POST',body:JSON.stringify({from:playerName(),to:target})})
+      .then(()=>{statusEl.textContent='📨 Anfrage an '+target+' gesendet.';})
+      .catch(e=>statusEl.textContent='❌ '+e.message);
   }
 
   function respondRequest(id,accept){
-    api('/api/trade/respond',{
-      method:'POST',
-      body:JSON.stringify({player:playerName(),requestId:id,accept})
-    }).then(d=>{
-      if(d.trade)renderTrade(d.trade);
-      statusEl.textContent=accept?'✅ Trade geöffnet.':'❌ Anfrage abgelehnt.';
-      refresh();
-    }).catch(e=>statusEl.textContent='❌ '+e.message);
+    api('/api/trade/respond',{method:'POST',body:JSON.stringify({player:playerName(),requestId:id,accept})})
+      .then(d=>{
+        if(d.trade) renderTrade(d.trade);
+        statusEl.textContent=accept?'✅ Trade geöffnet.':'❌ Anfrage abgelehnt.';
+        refresh();
+      })
+      .catch(e=>statusEl.textContent='❌ '+e.message);
   }
 
   function setOffer(skinId){
     if(!currentTrade)return;
-    api('/api/trade/offer',{
-      method:'POST',
-      body:JSON.stringify({player:playerName(),tradeId:currentTrade.id,skinId})
-    }).then(d=>{
-      if(d.trade)renderTrade(d.trade);
-    }).catch(e=>statusEl.textContent='❌ '+e.message);
+    // Nur Dinge anbieten, die gerade wirklich im Shop-Besitz stehen.
+    if(!getOwnedTradeItems().includes(skinId)){
+      statusEl.textContent='❌ Dieser Skin ist nicht in deinem Shop-Inventar.';
+      renderMySkins();
+      return;
+    }
+    api('/api/trade/offer',{method:'POST',body:JSON.stringify({player:playerName(),tradeId:currentTrade.id,skinId})})
+      .then(d=>{if(d.trade)renderTrade(d.trade);})
+      .catch(e=>statusEl.textContent='❌ '+e.message);
   }
 
   confirmBtn.addEventListener('click',()=>{
     if(!currentTrade)return;
-    api('/api/trade/confirm',{
-      method:'POST',
-      body:JSON.stringify({player:playerName(),tradeId:currentTrade.id})
-    }).then(d=>{
-      if(d.trade)renderTrade(d.trade);
-      else statusEl.textContent='✅ Bestätigt. Warte auf den anderen Spieler …';
-    }).catch(e=>statusEl.textContent='❌ '+e.message);
+    api('/api/trade/confirm',{method:'POST',body:JSON.stringify({player:playerName(),tradeId:currentTrade.id})})
+      .then(d=>{
+        if(d.trade)renderTrade(d.trade);
+        else statusEl.textContent='✅ Bestätigt. Warte auf den anderen Spieler …';
+        refresh();
+      })
+      .catch(e=>statusEl.textContent='❌ '+e.message);
   });
 
   cancelBtn.addEventListener('click',()=>{
     if(!currentTrade)return;
-    api('/api/trade/cancel',{
-      method:'POST',
-      body:JSON.stringify({player:playerName(),tradeId:currentTrade.id})
-    }).then(()=>{
-      currentTrade=null;
-      machine.classList.add('hidden');
-      actions.classList.add('hidden');
-      statusEl.textContent='Trade abgebrochen.';
-      refresh();
-    }).catch(e=>statusEl.textContent='❌ '+e.message);
+    api('/api/trade/cancel',{method:'POST',body:JSON.stringify({player:playerName(),tradeId:currentTrade.id})})
+      .then(()=>{
+        currentTrade=null;
+        machine.classList.add('hidden');
+        actions.classList.add('hidden');
+        statusEl.textContent='Trade abgebrochen.';
+        refresh();
+      })
+      .catch(e=>statusEl.textContent='❌ '+e.message);
   });
 
+  refreshBtn.addEventListener('click',refresh);
   openBtn.addEventListener('click',open);
   closeBtn.addEventListener('click',close);
-  if(refreshBtn){
-    refreshBtn.addEventListener('click',()=>{
-      statusEl.textContent='🔄 Online-Spieler werden aktualisiert …';
-      refresh();
-    });
-  }
-  panel.addEventListener('click',e=>{if(e.target===panel)close();});
 
-  window.addEventListener('storage',e=>{
-    if(e.key==='crOwnedSkins')renderMySkins();
-  });
+  // Auch nach einem Shop-Update bleibt das Trade-Inventar aktuell.
+  window.addEventListener('cubeRushTradeUpdated',renderMySkins);
 })();
 </script>
 
