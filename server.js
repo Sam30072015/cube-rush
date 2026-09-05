@@ -8,6 +8,7 @@ const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 const SECOND_ADMIN_KEY = process.env.SECOND_ADMIN_KEY || "6301";
 
 const app = express();
+
 app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -17,9 +18,7 @@ const wss = new WebSocket.Server({ server });
 const players = new Map();
 
 let coinEventUntil = 0;
-let tenCoinEventUntil = 0;
 let galaxyEventUntil = 0;
-
 let serverMessages = [];
 let eventRequests = [];
 
@@ -76,10 +75,7 @@ function adminMessageEventOK(req) {
 }
 
 function amountFrom(body) {
-  return Math.max(
-    0,
-    Math.floor(Number(body?.coins) || 0)
-  );
+  return Math.max(0, Math.floor(Number(body?.coins) || 0));
 }
 
 function makeRequestId() {
@@ -249,7 +245,7 @@ wss.on("connection", (ws) => {
 
 
 /* =========================================================
-   OFFLINE SPIELER
+   OFFLINE SPIELER ENTFERNEN
    ========================================================= */
 
 setInterval(() => {
@@ -271,7 +267,7 @@ setInterval(() => {
 
 
 /* =========================================================
-   HAUPT-ADMIN
+   HAUPT-ADMIN 603781
    ========================================================= */
 
 app.post("/api/admin/coins-event", (req, res) => {
@@ -281,9 +277,8 @@ app.post("/api/admin/coins-event", (req, res) => {
     });
   }
 
-  const action = String(
-    req.body?.action || ""
-  );
+  const action =
+    String(req.body?.action || "");
 
   if (action === "start") {
     const durationMs = Math.max(
@@ -296,24 +291,30 @@ app.post("/api/admin/coins-event", (req, res) => {
       )
     );
 
-    return res.json({
-      ok: true,
-      ...executeEvent(
+    const result =
+      executeEvent(
         "coins",
         "start",
         durationMs
-      )
+      );
+
+    return res.json({
+      ok: true,
+      ...result
     });
   }
 
   if (action === "stop") {
-    return res.json({
-      ok: true,
-      ...executeEvent(
+    const result =
+      executeEvent(
         "coins",
         "stop",
         0
-      )
+      );
+
+    return res.json({
+      ok: true,
+      ...result
     });
   }
 
@@ -322,6 +323,7 @@ app.post("/api/admin/coins-event", (req, res) => {
   });
 });
 
+
 app.post("/api/admin/give", (req, res) => {
   if (!adminOK(req)) {
     return res.status(401).json({
@@ -329,11 +331,11 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  const player = cleanName(
-    req.body?.player
-  );
+  const player =
+    cleanName(req.body?.player);
 
-  const coins = amountFrom(req.body);
+  const coins =
+    amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
@@ -342,7 +344,8 @@ app.post("/api/admin/give", (req, res) => {
     });
   }
 
-  const target = players.get(player);
+  const target =
+    players.get(player);
 
   if (
     !target ||
@@ -366,6 +369,7 @@ app.post("/api/admin/give", (req, res) => {
   });
 });
 
+
 app.post("/api/admin/give-all", (req, res) => {
   if (!adminOK(req)) {
     return res.status(401).json({
@@ -373,7 +377,8 @@ app.post("/api/admin/give-all", (req, res) => {
     });
   }
 
-  const coins = amountFrom(req.body);
+  const coins =
+    amountFrom(req.body);
 
   if (coins <= 0) {
     return res.status(400).json({
@@ -391,7 +396,10 @@ app.post("/api/admin/give-all", (req, res) => {
     });
 
   for (const [name, ws] of players) {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (
+      ws.readyState ===
+      WebSocket.OPEN
+    ) {
       ws.send(message);
       count++;
     } else {
@@ -406,6 +414,7 @@ app.post("/api/admin/give-all", (req, res) => {
   });
 });
 
+
 app.post("/api/admin/take", (req, res) => {
   if (!adminOK(req)) {
     return res.status(401).json({
@@ -413,11 +422,11 @@ app.post("/api/admin/take", (req, res) => {
     });
   }
 
-  const player = cleanName(
-    req.body?.player
-  );
+  const player =
+    cleanName(req.body?.player);
 
-  const coins = amountFrom(req.body);
+  const coins =
+    amountFrom(req.body);
 
   if (!player || coins <= 0) {
     return res.status(400).json({
@@ -426,7 +435,8 @@ app.post("/api/admin/take", (req, res) => {
     });
   }
 
-  const target = players.get(player);
+  const target =
+    players.get(player);
 
   if (
     !target ||
@@ -452,149 +462,134 @@ app.post("/api/admin/take", (req, res) => {
 
 
 /* =========================================================
-   GALAXY-EVENT
+   ADMIN: GALAXY-EVENT
    ========================================================= */
 
-app.post(
-  "/api/admin/galaxy-event",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    const action =
-      String(req.body?.action || "");
-
-    if (action === "start") {
-      const durationMs =
-        Math.max(
-          60000,
-          Math.min(
-            10080 * 60 * 1000,
-            Math.floor(
-              Number(
-                req.body?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return res.json({
-        ok: true,
-        ...executeEvent(
-          "galaxy",
-          "start",
-          durationMs
-        )
-      });
-    }
-
-    if (action === "stop") {
-      return res.json({
-        ok: true,
-        ...executeEvent(
-          "galaxy",
-          "stop",
-          0
-        )
-      });
-    }
-
-    return res.status(400).json({
-      error: "Invalid action"
+app.post("/api/admin/galaxy-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res.status(401).json({
+      error: "Unauthorized"
     });
   }
-);
+
+  const action =
+    String(req.body?.action || "");
+
+  if (action === "start") {
+    const durationMs =
+      Math.max(
+        60000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(req.body?.durationMs) || 0
+          )
+        )
+      );
+
+    return res.json({
+      ok: true,
+      ...executeEvent(
+        "galaxy",
+        "start",
+        durationMs
+      )
+    });
+  }
+
+  if (action === "stop") {
+    return res.json({
+      ok: true,
+      ...executeEvent(
+        "galaxy",
+        "stop",
+        0
+      )
+    });
+  }
+
+  return res.status(400).json({
+    error: "Invalid action"
+  });
+});
 
 
 /* =========================================================
    SERVER-NACHRICHTEN
    ========================================================= */
 
-app.post(
-  "/api/admin/message",
-  (req, res) => {
-    if (!adminMessageEventOK(req)) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
-    }
-
-    const text =
-      String(
-        req.body?.text || ""
-      )
-        .trim()
-        .slice(0, 120);
-
-    const minutes =
-      Math.max(
-        0,
-        Math.floor(
-          Number(
-            req.body?.minutes
-          ) || 0
-        )
-      );
-
-    const seconds =
-      Math.max(
-        0,
-        Math.min(
-          59,
-          Math.floor(
-            Number(
-              req.body?.seconds
-            ) || 0
-          )
-        )
-      );
-
-    const duration =
-      (minutes * 60 + seconds) *
-      1000;
-
-    if (!text || duration <= 0) {
-      return res.status(400).json({
-        error:
-          "Text and duration required"
-      });
-    }
-
-    const message = {
-      id:
-        Date.now()
-          .toString(36) +
-        Math.random()
-          .toString(36)
-          .slice(2, 8),
-
-      type:
-        "serverMessage",
-
-      text,
-
-      createdAt:
-        Date.now(),
-
-      endsAt:
-        Date.now() + duration
-    };
-
-    serverMessages.push(
-      message
-    );
-
-    broadcast(message);
-
-    return res.json({
-      ok: true,
-      message
+app.post("/api/admin/message", (req, res) => {
+  if (!adminMessageEventOK(req)) {
+    return res.status(401).json({
+      error: "Unauthorized"
     });
   }
-);
+
+  const text =
+    String(req.body?.text || "")
+      .trim()
+      .slice(0, 120);
+
+  const minutes =
+    Math.max(
+      0,
+      Math.floor(
+        Number(req.body?.minutes) || 0
+      )
+    );
+
+  const seconds =
+    Math.max(
+      0,
+      Math.min(
+        59,
+        Math.floor(
+          Number(req.body?.seconds) || 0
+        )
+      )
+    );
+
+  const duration =
+    (minutes * 60 + seconds) *
+    1000;
+
+  if (!text || duration <= 0) {
+    return res.status(400).json({
+      error:
+        "Text and duration required"
+    });
+  }
+
+  const message = {
+    id:
+      Date.now().toString(36) +
+      Math.random()
+        .toString(36)
+        .slice(2, 7),
+
+    type:
+      "serverMessage",
+
+    text,
+
+    createdAt:
+      Date.now(),
+
+    endsAt:
+      Date.now() + duration
+  };
+
+  // Mehrere Nachrichten gleichzeitig
+  serverMessages.push(message);
+
+  broadcast(message);
+
+  return res.json({
+    ok: true,
+    message
+  });
+});
+
 
 app.post(
   "/api/admin/message/delete",
@@ -625,7 +620,7 @@ app.post(
 
 
 /* =========================================================
-   ZWEITER ADMIN 6301
+   ZWEITES ADMIN 6301
    ========================================================= */
 
 
@@ -651,12 +646,13 @@ app.post(
       );
 
     if (
-      !["coins", "galaxy"]
-        .includes(event)
+      !(
+        event === "coins" ||
+        event === "galaxy"
+      )
     ) {
       return res.status(400).json({
-        error:
-          "Ungültiges Event"
+        error: "Ungültiges Event"
       });
     }
 
@@ -880,7 +876,7 @@ app.post(
 
 
 /* =========================================================
-   ZWEITER ADMIN: EVENT STOPPEN
+   ZWEITER ADMIN: EVENTS STOPPEN
    ========================================================= */
 
 app.post(
@@ -898,39 +894,24 @@ app.post(
       );
 
     if (event === "coins") {
-      const until =
-        executeEvent(
-          "coins",
-          "stop",
-          0
-        );
+      coinEventUntil = 0;
+
+      broadcast({
+        type: "coinEvent",
+        until: 0
+      });
 
       return res.json({
         ok: true,
-        ...until
+        until: 0
       });
     }
 
     if (event === "galaxy") {
-      const until =
-        executeEvent(
-          "galaxy",
-          "stop",
-          0
-        );
-
-      return res.json({
-        ok: true,
-        ...until
-      });
-    }
-
-    if (event === "tenCoins") {
-      tenCoinEventUntil = 0;
+      galaxyEventUntil = 0;
 
       broadcast({
-        type:
-          "tenCoinEvent",
+        type: "galaxyEvent",
         until: 0
       });
 
@@ -943,6 +924,64 @@ app.post(
     return res.status(400).json({
       error:
         "Unbekanntes Event"
+    });
+  }
+);
+
+
+/* =========================================================
+   ONLINE-SPIELER
+   ========================================================= */
+
+// Für den Button "Online-Spieler aktualisieren"
+app.get(
+  "/api/admin/online-players",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const onlinePlayers =
+      [...players.entries()]
+        .filter(
+          ([, ws]) =>
+            ws.readyState ===
+            WebSocket.OPEN
+        )
+        .map(
+          ([name]) => name
+        );
+
+    return res.json({
+      ok: true,
+      onlinePlayers
+    });
+  }
+);
+
+
+/* ---------- Allgemeiner Status ---------- */
+
+app.get(
+  "/api/status",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    res.json({
+      onlinePlayers:
+        [...players.keys()],
+
+      galaxyEventUntil:
+        galaxyEventUntil >
+        Date.now()
+          ? galaxyEventUntil
+          : 0
     });
   }
 );
@@ -1110,7 +1149,11 @@ app.post(
       });
     }
 
-    if (getTradeForPlayer(from)) {
+    if (
+      getTradeForPlayer(
+        from
+      )
+    ) {
       return res.status(409).json({
         error:
           "Du bist bereits in einem Trade"
@@ -1309,7 +1352,9 @@ app.post(
 
     return res.json({
       ok: true,
-      accepted: true,
+
+      accepted:
+        true,
 
       trade:
         getTradeForPlayer(
@@ -1458,6 +1503,7 @@ app.post(
         true;
     }
 
+    // Beide müssen bestätigen
     if (
       trade.fromConfirmed &&
       trade.toConfirmed
@@ -1538,13 +1584,16 @@ app.post(
 
       return res.json({
         ok: true,
-        completed: true
+        completed:
+          true
       });
     }
 
     return res.json({
       ok: true,
-      completed: false,
+
+      completed:
+        false,
 
       trade:
         getTradeForPlayer(
@@ -1598,7 +1647,9 @@ app.post(
         : trade.from;
 
     const otherWs =
-      players.get(other);
+      players.get(
+        other
+      );
 
     if (otherWs) {
       send(otherWs, {
@@ -1659,18 +1710,18 @@ setInterval(() => {
 
   serverMessages =
     serverMessages.filter(
-      m =>
+      message =>
         Number(
-          m.endsAt || 0
+          message.endsAt || 0
         ) > now
     );
 
   eventRequests =
     eventRequests.filter(
-      r =>
+      request =>
         now -
           Number(
-            r.createdAt || 0
+            request.createdAt || 0
           ) <
         10 * 60 * 1000
     );
