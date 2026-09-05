@@ -411,6 +411,18 @@ html,body{
   box-shadow:0 5px 0 #17143b,0 10px 20px rgba(23,20,59,.2) !important;
   font-weight:1000;
 }
+/* Münz-Anzeige sicher innerhalb des gelben Kastens */
+#menuCoins{
+  width:min(520px,90vw);
+  max-width:90vw;
+  padding:5px 24px !important;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:clip;
+  font-size:clamp(17px,2.2vw,24px) !important;
+  line-height:1.2;
+}
 #levels{
   background:rgba(255,255,255,.22) !important;
   border:4px solid #17143b !important;
@@ -1106,6 +1118,74 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
     color: #fff !important;
   }
 }
+
+/* ---------- NEUES GELBES MÜNZEN-DESIGN ---------- */
+#menuCoins,
+#shopBalance,
+#coins{
+  position:relative;
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  color:#fff !important;
+  background:linear-gradient(135deg,#ffe35a 0%,#ffcf20 45%,#f0a900 100%) !important;
+  border:4px solid #17143b !important;
+  border-radius:999px !important;
+  box-shadow:0 5px 0 #17143b,0 10px 20px rgba(23,20,59,.22),inset 0 3px 0 rgba(255,255,255,.55),inset 0 -4px 0 rgba(170,103,0,.22) !important;
+  text-shadow:0 3px 0 rgba(23,20,59,.45) !important;
+  overflow:hidden;
+}
+
+#menuCoins::before,
+#shopBalance::before,
+#coins::before{
+  content:"";
+  flex:0 0 auto;
+  width:27px;
+  height:27px;
+  border-radius:50%;
+  background:
+    linear-gradient(135deg,transparent 0 38%,rgba(255,247,154,.75) 39% 51%,transparent 52%),
+    radial-gradient(circle at 36% 30%,#fff58a 0 10%,#ffd52b 28%,#ffbd00 63%,#e69500 100%);
+  border:3px solid #fff0a0;
+  box-shadow:
+    0 0 0 2px #c98400,
+    inset 2px 2px 0 rgba(255,255,255,.55),
+    inset -3px -3px 0 rgba(166,94,0,.28);
+}
+
+#menuCoins{
+  padding:7px 22px !important;
+  width:min(520px,90vw);
+  max-width:90vw;
+  font-size:clamp(17px,2.2vw,24px) !important;
+  line-height:1.15;
+  white-space:nowrap;
+}
+
+#shopBalance{
+  padding:8px 16px !important;
+}
+
+#coins{
+  padding:7px 14px !important;
+}
+
+@media(max-width:700px){
+  #menuCoins{
+    padding:6px 15px !important;
+    font-size:17px !important;
+  }
+  #menuCoins::before,
+  #shopBalance::before,
+  #coins::before{
+    width:22px;
+    height:22px;
+    border-width:2px;
+  }
+}
+
 </style>
 
 <style>
@@ -1261,7 +1341,7 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 </div>
 <div class="screen" id="menu">
 <h1>CUBE RUSH</h1>
-<div id="menuCoins">🪙 Münzen: 0</div>
+<div id="menuCoins">Münzen: 0</div>
 <div id="levels"></div>
 <div id="menuShopActions">
 <button id="tradeOpen" type="button">🤝 TRADE</button>
@@ -1272,7 +1352,7 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 <div class="hidden" id="shop">
 <div class="shopPanel">
 <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
-<div class="shopBalance" id="shopBalance">🪙 Münzen: 0</div>
+<div class="shopBalance" id="shopBalance">Münzen: 0</div>
 <div class="skinGrid" id="skinGrid"></div>
 <h3 class="shopTitle" style="font-size:28px;margin:28px 0 6px">✈️ FLUGZEUG-SKINS</h3>
 <div style="color:#cbd3ff;font-weight:700;margin-bottom:14px">Diese Skins werden sichtbar, sobald du dich im Level in ein Flugzeug verwandelst.</div>
@@ -1318,7 +1398,7 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 <button aria-label="Springen" id="mobileJump" type="button">↑</button>
 <div id="hud">
 <div id="score">Punkte: 0</div>
-<div class="gold" id="coins">🪙 Münzen: 0</div>
+<div class="gold" id="coins">Münzen: 0</div>
 <div id="level">LEVEL 1</div>
 <div id="mode">MODUS: 🟨 WÜRFEL</div>
 <div id="percent">0%</div>
@@ -2615,7 +2695,7 @@ function updateShop(){
   const grid=document.getElementById("skinGrid");
   if(!balance||!grid)return;
 
-  balance.textContent="🪙 Münzen: "+coins;
+  balance.textContent="Münzen: "+coins;
   grid.innerHTML="";
 
   SKINS.forEach(skin=>{
@@ -2937,7 +3017,7 @@ function updateMenu(){
     typeof world3Unlocked==="function" && world3Unlocked()
   );
   if(!Array.isArray(completed)) completed=[];
-  document.getElementById("menuCoins").textContent="🪙 Münzen: "+coins;
+  document.getElementById("menuCoins").textContent="Münzen: "+coins;
 
   const box=document.getElementById("levels");
   box.innerHTML="";
@@ -3184,7 +3264,7 @@ musicOn=musicWasOn;
 }
 
 function updateHUD(){
- document.getElementById("coins").textContent="🪙 Münzen: "+coins;
+ document.getElementById("coins").textContent="Münzen: "+coins;
  updateAbilityHud();
  document.getElementById("level").textContent=(levelIndex<10?"WELT 1 · ":(levelIndex<20?"WELT 2 · ":(levelIndex<30?"WELT 3 · ":(levelIndex<40?"LUCK · ":"GALAXY · "))))+levels[levelIndex].name;
  document.getElementById("mode").textContent=mode==="ship"?"MODUS: ✈️ FLUGZEUG":"MODUS: 🟨 WÜRFEL";
@@ -4549,10 +4629,10 @@ const loungeBass=[98,123.47,146.83,130.81];
       if(typeof updateHUD==="function")updateHUD();
 
       const menuCoinsEl=document.getElementById("menuCoins");
-      if(menuCoinsEl) menuCoinsEl.textContent="🪙 Münzen: "+coins;
+      if(menuCoinsEl) menuCoinsEl.textContent="Münzen: "+coins;
 
       const shopBalanceEl=document.getElementById("shopBalance");
-      if(shopBalanceEl) shopBalanceEl.textContent="🪙 Münzen: "+coins;
+      if(shopBalanceEl) shopBalanceEl.textContent="Münzen: "+coins;
 
       msg.textContent="✅ Code 67 eingelöst: +670 Münzen!";
       input.value="";
