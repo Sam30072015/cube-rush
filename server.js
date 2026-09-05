@@ -25,12 +25,12 @@ const players = new Map();
    EVENTS
    ========================================================= */
 
-let coinEventUntil = 0;       // 2x
-let tenCoinEventUntil = 0;    // 10x
-let galaxyEventUntil = 0;     // Galaxy
+let coinEventUntil = 0;
+let tenCoinEventUntil = 0;
+let galaxyEventUntil = 0;
 
 /* =========================================================
-   NACHRICHTEN / ANFRAGEN
+   SERVERNACHRICHTEN / EVENT-ANFRAGEN
    ========================================================= */
 
 let serverMessages = [];
@@ -44,19 +44,6 @@ const tradeRequests = [];
 const activeTrades = new Map();
 const completedTrades = new Map();
 
-const VALID_TRADE_SKINS = new Set([
-  "rainbow",
-  "fire",
-  "ocean",
-  "shadow",
-  "sunset",
-  "cat",
-  "magma",
-  "poop",
-  "plane:rainbow",
-  "plane:magma",
-  "plane:galaxy"
-]);
 
 /* =========================================================
    HILFSFUNKTIONEN
@@ -135,8 +122,10 @@ function publicRequests() {
       id: request.id,
       event: request.event,
       action: request.action,
-      durationMs: request.durationMs,
-      createdAt: request.createdAt
+      durationMs:
+        request.durationMs,
+      createdAt:
+        request.createdAt
     })
   );
 }
@@ -155,8 +144,9 @@ function cleanupEventRequests() {
     );
 }
 
+
 /* =========================================================
-   EVENT FUNKTIONEN
+   EVENTS
    ========================================================= */
 
 function startCoinEvent(
@@ -192,7 +182,8 @@ function startTenCoinEvent(
 
   broadcast({
     type: "tenCoinEvent",
-    until: tenCoinEventUntil
+    until:
+      tenCoinEventUntil
   });
 
   return tenCoinEventUntil;
@@ -217,7 +208,8 @@ function startGalaxyEvent(
 
   broadcast({
     type: "galaxyEvent",
-    until: galaxyEventUntil
+    until:
+      galaxyEventUntil
   });
 
   return galaxyEventUntil;
@@ -297,6 +289,7 @@ function executeEvent(
     "Ungültiges Event"
   );
 }
+
 
 /* =========================================================
    WEBSOCKET
@@ -459,8 +452,9 @@ wss.on(
   }
 );
 
+
 /* =========================================================
-   OFFLINE SPIELER ENTFERNEN
+   OFFLINE SPIELER
    ========================================================= */
 
 setInterval(
@@ -493,8 +487,9 @@ setInterval(
   15000
 );
 
+
 /* =========================================================
-   HAUPT-ADMIN: 2x
+   ADMIN: 2x MÜNZEN
    ========================================================= */
 
 app.post(
@@ -536,11 +531,10 @@ app.post(
 
       return res.json({
         ok: true,
-        ...executeEvent(
-          "coins",
-          "start",
-          durationMs
-        )
+        until:
+          startCoinEvent(
+            durationMs
+          )
       });
     }
 
@@ -549,11 +543,8 @@ app.post(
     ) {
       return res.json({
         ok: true,
-        ...executeEvent(
-          "coins",
-          "stop",
-          0
-        )
+        until:
+          stopCoinEvent()
       });
     }
 
@@ -566,8 +557,9 @@ app.post(
   }
 );
 
+
 /* =========================================================
-   HAUPT-ADMIN: 10x
+   ADMIN: 10x MÜNZEN
    ========================================================= */
 
 app.post(
@@ -609,11 +601,10 @@ app.post(
 
       return res.json({
         ok: true,
-        ...executeEvent(
-          "tenCoins",
-          "start",
-          durationMs
-        )
+        until:
+          startTenCoinEvent(
+            durationMs
+          )
       });
     }
 
@@ -622,11 +613,8 @@ app.post(
     ) {
       return res.json({
         ok: true,
-        ...executeEvent(
-          "tenCoins",
-          "stop",
-          0
-        )
+        until:
+          stopTenCoinEvent()
       });
     }
 
@@ -639,8 +627,9 @@ app.post(
   }
 );
 
+
 /* =========================================================
-   HAUPT-ADMIN: GALAXY
+   ADMIN: GALAXY
    ========================================================= */
 
 app.post(
@@ -682,11 +671,10 @@ app.post(
 
       return res.json({
         ok: true,
-        ...executeEvent(
-          "galaxy",
-          "start",
-          durationMs
-        )
+        until:
+          startGalaxyEvent(
+            durationMs
+          )
       });
     }
 
@@ -695,11 +683,8 @@ app.post(
     ) {
       return res.json({
         ok: true,
-        ...executeEvent(
-          "galaxy",
-          "stop",
-          0
-        )
+        until:
+          stopGalaxyEvent()
       });
     }
 
@@ -711,6 +696,7 @@ app.post(
     });
   }
 );
+
 
 /* =========================================================
    MÜNZEN GEBEN
@@ -771,10 +757,8 @@ app.post(
     send(target, {
       type:
         "gift",
-
       target:
         player,
-
       coins
     });
 
@@ -785,6 +769,7 @@ app.post(
     });
   }
 );
+
 
 /* =========================================================
    MÜNZEN AN ALLE
@@ -838,7 +823,6 @@ app.post(
         ws.send(
           message
         );
-
         count++;
       } else {
         players.delete(
@@ -854,6 +838,7 @@ app.post(
     });
   }
 );
+
 
 /* =========================================================
    MÜNZEN ABZIEHEN
@@ -914,10 +899,8 @@ app.post(
     send(target, {
       type:
         "takeCoins",
-
       target:
         player,
-
       coins
     });
 
@@ -1007,13 +990,8 @@ app.post(
         now.toString(36) +
         "-" +
         Math.random()
-          .toString(
-            36
-          )
-          .slice(
-            2,
-            9
-          ),
+          .toString(36)
+          .slice(2, 10),
 
       type:
         "serverMessage",
@@ -1041,8 +1019,6 @@ app.post(
 );
 
 
-/* ---------- Alle Nachrichten löschen ---------- */
-
 app.post(
   "/api/admin/message/delete",
   (req, res) => {
@@ -1055,8 +1031,7 @@ app.post(
       });
     }
 
-    serverMessages =
-      [];
+    serverMessages = [];
 
     broadcast({
       type:
@@ -1071,7 +1046,7 @@ app.post(
 
 
 /* =========================================================
-   EVENT-ANFRAGE VON ADMIN 2
+   EVENT-ANFRAGEN VON ADMIN 2
    ========================================================= */
 
 app.post(
@@ -1092,22 +1067,12 @@ app.post(
           ""
       );
 
-    const action =
-      String(
-        req.body?.action ||
-          "start"
-      );
-
-    const allowedEvents = [
-      "coins",
-      "tenCoins",
-      "galaxy"
-    ];
-
     if (
-      !allowedEvents.includes(
-        event
-      )
+      ![
+        "coins",
+        "tenCoins",
+        "galaxy"
+      ].includes(event)
     ) {
       return res.status(
         400
@@ -1117,37 +1082,36 @@ app.post(
       });
     }
 
-    if (
-      action !== "start"
-    ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Nur Start-Anfragen sind erlaubt"
-      });
-    }
-
-    const minDuration =
-      event === "galaxy"
-        ? 60000
-        : 1000;
-
     const durationMs =
-      Math.max(
-        minDuration,
-        Math.min(
-          10080 *
-            60 *
-            1000,
-          Math.floor(
-            Number(
-              req.body
-                ?.durationMs
-            ) || 0
+      event === "galaxy"
+        ? Math.max(
+            60000,
+            Math.min(
+              10080 *
+                60 *
+                1000,
+              Math.floor(
+                Number(
+                  req.body
+                    ?.durationMs
+                ) || 0
+              )
+            )
           )
-        )
-      );
+        : Math.max(
+            1000,
+            Math.min(
+              10080 *
+                60 *
+                1000,
+              Math.floor(
+                Number(
+                  req.body
+                    ?.durationMs
+                ) || 0
+              )
+            )
+          );
 
     const existing =
       eventRequests.find(
@@ -1163,9 +1127,7 @@ app.post(
         ok: true,
         pending: true,
         id:
-          existing.id,
-        duplicate:
-          true
+          existing.id
       });
     }
 
@@ -1199,7 +1161,7 @@ app.post(
 
 
 /* =========================================================
-   EVENT-ANFRAGEN ABRUFEN
+   EVENT-ANFRAGEN FÜR ADMIN 1
    ========================================================= */
 
 app.get(
@@ -1297,7 +1259,9 @@ app.post(
         request,
         ...result
       });
-    } catch (error) {
+    } catch (
+      error
+    ) {
       return res.status(
         400
       ).json({
@@ -1378,7 +1342,7 @@ app.post(
 
 
 /* =========================================================
-   ADMIN 2: EVENTS STOPPEN
+   ZWEITER ADMIN: EVENTS STOPPEN
    ========================================================= */
 
 app.post(
@@ -1437,257 +1401,6 @@ app.post(
     });
   }
 );
-
-
-/* =========================================================
-   ZWEITER ADMIN: DIREKTE KOMPATIBILITÄT
-   ========================================================= */
-
-app.post(
-  "/api/second-admin/coins-event",
-  (req, res) => {
-    if (!secondAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const action =
-      String(
-        req.body?.action ||
-          ""
-      );
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopCoinEvent()
-      });
-    }
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          1000,
-          Math.min(
-            10080 *
-              60 *
-              1000,
-            Math.floor(
-              Number(
-                req.body
-                  ?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return createSecondAdminRequest(
-        res,
-        "coins",
-        durationMs
-      );
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Invalid action"
-    });
-  }
-);
-
-
-app.post(
-  "/api/second-admin/ten-coin-event",
-  (req, res) => {
-    if (!secondAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const action =
-      String(
-        req.body?.action ||
-          ""
-      );
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopTenCoinEvent()
-      });
-    }
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          1000,
-          Math.min(
-            10080 *
-              60 *
-              1000,
-            Math.floor(
-              Number(
-                req.body
-                  ?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return createSecondAdminRequest(
-        res,
-        "tenCoins",
-        durationMs
-      );
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Invalid action"
-    });
-  }
-);
-
-
-app.post(
-  "/api/second-admin/galaxy-event",
-  (req, res) => {
-    if (!secondAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const action =
-      String(
-        req.body?.action ||
-          ""
-      );
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopGalaxyEvent()
-      });
-    }
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          60000,
-          Math.min(
-            10080 *
-              60 *
-              1000,
-            Math.floor(
-              Number(
-                req.body
-                  ?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return createSecondAdminRequest(
-        res,
-        "galaxy",
-        durationMs
-      );
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Invalid action"
-    });
-  }
-);
-
-
-/* =========================================================
-   HELFER FÜR ADMIN-2-ANFRAGEN
-   ========================================================= */
-
-function createSecondAdminRequest(
-  res,
-  event,
-  durationMs
-) {
-  const existing =
-    eventRequests.find(
-      (request) =>
-        request.event ===
-          event &&
-        request.action ===
-          "start"
-    );
-
-  if (existing) {
-    return res.json({
-      ok: true,
-      pending: true,
-      id: existing.id,
-      duplicate: true
-    });
-  }
-
-  const request = {
-    id:
-      makeRequestId(),
-
-    event,
-
-    action:
-      "start",
-
-    durationMs,
-
-    createdAt:
-      Date.now()
-  };
-
-  eventRequests.push(
-    request
-  );
-
-  return res.json({
-    ok: true,
-    pending: true,
-    id:
-      request.id
-  });
-}
 
 
 /* =========================================================
@@ -1772,7 +1485,7 @@ app.get(
 
 
 /* =========================================================
-   TRADE
+   TRADE STATUS
    ========================================================= */
 
 function getTradeForPlayer(
@@ -1822,7 +1535,9 @@ function getTradeForPlayer(
 }
 
 
-/* ---------- Trade-Status ---------- */
+/* =========================================================
+   ONLINE-SPIELER + TRADE STATUS
+   ========================================================= */
 
 app.get(
   "/api/trade/status",
@@ -1851,8 +1566,7 @@ app.get(
     const incomingRequests =
       tradeRequests.filter(
         request =>
-          request.to ===
-          player
+          request.to === player
       );
 
     const trade =
@@ -1873,16 +1587,22 @@ app.get(
 
     return res.json({
       ok: true,
+
       onlinePlayers,
+
       incomingRequests,
+
       trade,
+
       completed
     });
   }
 );
 
 
-/* ---------- Trade-Anfrage ---------- */
+/* =========================================================
+   TRADE-ANFRAGE
+   ========================================================= */
 
 app.post(
   "/api/trade/request",
@@ -1975,7 +1695,9 @@ app.post(
     );
 
     const target =
-      players.get(to);
+      players.get(
+        to
+      );
 
     if (target) {
       send(target, {
@@ -1994,7 +1716,9 @@ app.post(
 );
 
 
-/* ---------- Trade annehmen/ablehnen ---------- */
+/* =========================================================
+   TRADE-ANFRAGE BEANTWORTEN
+   ========================================================= */
 
 app.post(
   "/api/trade/respond",
@@ -2006,8 +1730,7 @@ app.post(
 
     const requestId =
       String(
-        req.body
-          ?.requestId ||
+        req.body?.requestId ||
         ""
       );
 
@@ -2024,7 +1747,9 @@ app.post(
             player
       );
 
-    if (index < 0) {
+    if (
+      index < 0
+    ) {
       return res.status(
         404
       ).json({
@@ -2149,6 +1874,7 @@ app.post(
 
     return res.json({
       ok: true,
+
       accepted:
         true,
 
@@ -2161,7 +1887,19 @@ app.post(
 );
 
 
-/* ---------- Skin anbieten ---------- */
+/* =========================================================
+   SKIN ANGEBOTEN
+   ========================================================= */
+
+/*
+ * Keine feste Skin-Liste mehr.
+ *
+ * Der Client darf jeden eigenen Skin senden,
+ * den er tatsächlich besitzt.
+ *
+ * Damit sind auch zukünftige Skins automatisch
+ * handelbar, ohne den Server ändern zu müssen.
+ */
 
 app.post(
   "/api/trade/offer",
@@ -2173,8 +1911,7 @@ app.post(
 
     const tradeId =
       String(
-        req.body
-          ?.tradeId ||
+        req.body?.tradeId ||
         ""
       );
 
@@ -2182,18 +1919,19 @@ app.post(
       String(
         req.body?.skinId ||
         ""
-      );
-
-    if (
-      !VALID_TRADE_SKINS.has(
-        skinId
       )
-    ) {
+        .trim()
+        .slice(
+          0,
+          120
+        );
+
+    if (!skinId) {
       return res.status(
         400
       ).json({
         error:
-          "Dieser Skin kann nicht getauscht werden"
+          "Skin fehlt"
       });
     }
 
@@ -2219,6 +1957,12 @@ app.post(
       });
     }
 
+    /*
+     * Der Server speichert hier nur die Auswahl.
+     * Der Client darf ausschließlich Skins anbieten,
+     * die er selbst besitzt.
+     */
+
     if (
       trade.from ===
       player
@@ -2236,6 +1980,12 @@ app.post(
 
       trade.fromOffer =
         skinId;
+
+      // Bestätigung zurücksetzen,
+      // falls das Angebot geändert wurde.
+      trade.fromConfirmed =
+        false;
+
     } else {
       if (
         trade.toConfirmed
@@ -2250,10 +2000,14 @@ app.post(
 
       trade.toOffer =
         skinId;
+
+      trade.toConfirmed =
+        false;
     }
 
     return res.json({
       ok: true,
+
       trade:
         getTradeForPlayer(
           player
@@ -2263,7 +2017,9 @@ app.post(
 );
 
 
-/* ---------- Trade bestätigen ---------- */
+/* =========================================================
+   TRADE BESTÄTIGEN
+   ========================================================= */
 
 app.post(
   "/api/trade/confirm",
@@ -2275,8 +2031,7 @@ app.post(
 
     const tradeId =
       String(
-        req.body
-          ?.tradeId ||
+        req.body?.tradeId ||
         ""
       );
 
@@ -2319,6 +2074,7 @@ app.post(
 
       trade.fromConfirmed =
         true;
+
     } else {
       if (
         !trade.toOffer
@@ -2335,6 +2091,9 @@ app.post(
         true;
     }
 
+    /*
+     * Beide müssen bestätigen.
+     */
     if (
       trade.fromConfirmed &&
       trade.toConfirmed
@@ -2354,6 +2113,12 @@ app.post(
       activeTrades.delete(
         trade.id
       );
+
+      /*
+       * Der Client übernimmt beim "tradeComplete"
+       * das Entfernen des gesendeten Skins und das
+       * Hinzufügen des erhaltenen Skins.
+       */
 
       completedTrades.set(
         fromPlayer,
@@ -2399,7 +2164,13 @@ app.post(
             "tradeComplete",
 
           tradeId:
-            trade.id
+            trade.id,
+
+          sentSkin:
+            fromSkin,
+
+          receivedSkin:
+            toSkin
         });
       }
 
@@ -2409,7 +2180,13 @@ app.post(
             "tradeComplete",
 
           tradeId:
-            trade.id
+            trade.id,
+
+          sentSkin:
+            toSkin,
+
+          receivedSkin:
+            fromSkin
         });
       }
 
@@ -2422,6 +2199,7 @@ app.post(
 
     return res.json({
       ok: true,
+
       completed:
         false,
 
@@ -2434,7 +2212,9 @@ app.post(
 );
 
 
-/* ---------- Trade abbrechen ---------- */
+/* =========================================================
+   TRADE ABBRECHEN
+   ========================================================= */
 
 app.post(
   "/api/trade/cancel",
@@ -2446,8 +2226,7 @@ app.post(
 
     const tradeId =
       String(
-        req.body
-          ?.tradeId ||
+        req.body?.tradeId ||
         ""
       );
 
@@ -2493,8 +2272,7 @@ app.post(
         type:
           "tradeCancelled",
 
-        tradeId:
-          tradeId
+        tradeId
       });
     }
 
@@ -2514,6 +2292,9 @@ setInterval(
     const now =
       Date.now();
 
+    /*
+     * Alte Trade-Anfragen entfernen.
+     */
     for (
       let i =
         tradeRequests.length -
@@ -2538,6 +2319,9 @@ setInterval(
       }
     }
 
+    /*
+     * Alte aktive Trades entfernen.
+     */
     for (
       const [
         id,
@@ -2563,7 +2347,7 @@ setInterval(
 
 
 /* =========================================================
-   AUTOMATISCHES AUFRÄUMEN
+   ALLGEMEINES AUFRÄUMEN
    ========================================================= */
 
 setInterval(
@@ -2573,7 +2357,7 @@ setInterval(
 
     serverMessages =
       serverMessages.filter(
-        message =>
+        (message) =>
           Number(
             message.endsAt ||
               0
@@ -2582,7 +2366,6 @@ setInterval(
 
     cleanupEventRequests();
 
-    // 2x beenden
     if (
       coinEventUntil >
         0 &&
@@ -2592,7 +2375,6 @@ setInterval(
       stopCoinEvent();
     }
 
-    // 10x beenden
     if (
       tenCoinEventUntil >
         0 &&
@@ -2602,7 +2384,6 @@ setInterval(
       stopTenCoinEvent();
     }
 
-    // Galaxy beenden
     if (
       galaxyEventUntil >
         0 &&
@@ -2653,11 +2434,11 @@ server.listen(
     );
 
     console.log(
-      "Events: 2x / 10x / Galaxy"
+      "2x / 10x / Galaxy aktiviert"
     );
 
     console.log(
-      "Trade-System aktiviert."
+      "Trade-System aktiviert"
     );
   }
 );
