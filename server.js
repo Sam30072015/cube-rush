@@ -4,62 +4,36 @@ const express = require("express");
 const WebSocket = require("ws");
 
 const PORT = Number(process.env.PORT || 3000);
-
 const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
-const SECOND_ADMIN_KEY =
-  process.env.SECOND_ADMIN_KEY || "6301";
+const SECOND_ADMIN_KEY = process.env.SECOND_ADMIN_KEY || "6301";
 
 const app = express();
-
 app.use(express.json({ limit: "50kb" }));
-app.use(
-  express.static(path.join(__dirname, "public"))
-);
+app.use(express.static(path.join(__dirname, "public")));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const players = new Map();
 
-/* =========================================================
-   EVENTS
-   ========================================================= */
-
 let coinEventUntil = 0;
 let tenCoinEventUntil = 0;
 let galaxyEventUntil = 0;
 
-/* =========================================================
-   SERVERNACHRICHTEN / EVENT-ANFRAGEN
-   ========================================================= */
-
 let serverMessages = [];
 let eventRequests = [];
 
-/* =========================================================
-   TRADE
-   ========================================================= */
-
-const tradeRequests = [];
+// Trade-System
+let tradeRequests = [];
 const activeTrades = new Map();
 const completedTrades = new Map();
 
-
-/* =========================================================
-   HILFSFUNKTIONEN
-   ========================================================= */
-
 function cleanName(name) {
-  return String(name || "")
-    .trim()
-    .slice(0, 40);
+  return String(name || "").trim().slice(0, 40);
 }
 
 function send(ws, payload) {
-  if (
-    ws &&
-    ws.readyState === WebSocket.OPEN
-  ) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(payload));
   }
 }
@@ -68,974 +42,622 @@ function broadcast(payload) {
   const data = JSON.stringify(payload);
 
   for (const ws of wss.clients) {
-    if (
-      ws.readyState === WebSocket.OPEN
-    ) {
+    if (ws.readyState === WebSocket.OPEN) {
       ws.send(data);
     }
   }
 }
 
 function adminOK(req) {
-  return (
-    req.headers["x-admin-key"] ===
-    ADMIN_KEY
-  );
+  return req.headers["x-admin-key"] === ADMIN_KEY;
 }
 
 function secondAdminOK(req) {
-  return (
-    req.headers["x-admin-key"] ===
-    SECOND_ADMIN_KEY
-  );
+  return req.headers["x-admin-key"] === SECOND_ADMIN_KEY;
 }
 
-function anyAdminOK(req) {
-  return (
-    adminOK(req) ||
-    secondAdminOK(req)
-  );
+function adminMessageEventOK(req) {
+  const key = req.headers["x-admin-key"];
+  return key === ADMIN_KEY || key === SECOND_ADMIN_KEY;
 }
 
 function amountFrom(body) {
-  return Math.max(
-    0,
-    Math.floor(
-      Number(body?.coins) || 0
-    )
-  );
+  return Math.max(0, Math.floor(Number(body?.coins) || 0));
 }
 
 function makeRequestId() {
   return (
     Date.now().toString(36) +
-    "-" +
-    Math.random()
-      .toString(36)
-      .slice(2, 10)
+    Math.random().toString(36).slice(2, 9)
   );
 }
 
 function publicRequests() {
-  return eventRequests.map(
-    (request) => ({
-      id: request.id,
-      event: request.event,
-      action: request.action,
-      durationMs:
-        request.durationMs,
-      createdAt:
-        request.createdAt
-    })
-  );
+  return eventRequests.map((r) => ({
+    id: r.id,
+    event: r.event,
+    action: r.action,
+    durationMs: r.durationMs,
+    createdAt: r.createdAt
+  }));
 }
 
-function cleanupEventRequests() {
-  const now = Date.now();
-
-  eventRequests =
-    eventRequests.filter(
-      (request) =>
-        now -
-          Number(
-            request.createdAt || 0
-          ) <
-        10 * 60 * 1000
-    );
-}
-
-
-/* =========================================================
-   EVENTS
-   ========================================================= */
-
-function startCoinEvent(
-  durationMs
-) {
-  coinEventUntil =
-    Date.now() + durationMs;
-
-  broadcast({
-    type: "coinEvent",
-    until: coinEventUntil
-  });
-
-  return coinEventUntil;
-}
-
-function stopCoinEvent() {
-  coinEventUntil = 0;
-
-  broadcast({
-    type: "coinEvent",
-    until: 0
-  });
-
-  return 0;
-}
-
-function startTenCoinEvent(
-  durationMs
-) {
-  tenCoinEventUntil =
-    Date.now() + durationMs;
-
-  broadcast({
-    type: "tenCoinEvent",
-    until:
-      tenCoinEventUntil
-  });
-
-  return tenCoinEventUntil;
-}
-
-function stopTenCoinEvent() {
-  tenCoinEventUntil = 0;
-
-  broadcast({
-    type: "tenCoinEvent",
-    until: 0
-  });
-
-  return 0;
-}
-
-function startGalaxyEvent(
-  durationMs
-) {
-  galaxyEventUntil =
-    Date.now() + durationMs;
-
-  broadcast({
-    type: "galaxyEvent",
-    until:
-      galaxyEventUntil
-  });
-
-  return galaxyEventUntil;
-}
-
-function stopGalaxyEvent() {
-  galaxyEventUntil = 0;
-
-  broadcast({
-    type: "galaxyEvent",
-    until: 0
-  });
-
-  return 0;
-}
-
-function executeEvent(
-  event,
-  action,
-  durationMs
-) {
+function executeEvent(event, action, durationMs) {
   if (event === "coins") {
     if (action === "start") {
+      coinEventUntil = Date.now() + durationMs;
+
+      broadcast({
+        type: "coinEvent",
+        until: coinEventUntil
+      });
+
       return {
-        until:
-          startCoinEvent(
-            durationMs
-          )
+        until: coinEventUntil
       };
     }
 
     if (action === "stop") {
+      coinEventUntil = 0;
+
+      broadcast({
+        type: "coinEvent",
+        until: 0
+      });
+
       return {
-        until:
-          stopCoinEvent()
+        until: 0
       };
     }
   }
 
   if (event === "tenCoins") {
     if (action === "start") {
+      tenCoinEventUntil = Date.now() + durationMs;
+
+      broadcast({
+        type: "tenCoinEvent",
+        until: tenCoinEventUntil
+      });
+
       return {
-        until:
-          startTenCoinEvent(
-            durationMs
-          )
+        until: tenCoinEventUntil
       };
     }
 
     if (action === "stop") {
+      tenCoinEventUntil = 0;
+
+      broadcast({
+        type: "tenCoinEvent",
+        until: 0
+      });
+
       return {
-        until:
-          stopTenCoinEvent()
+        until: 0
       };
     }
   }
 
   if (event === "galaxy") {
     if (action === "start") {
+      galaxyEventUntil = Date.now() + durationMs;
+
+      broadcast({
+        type: "galaxyEvent",
+        until: galaxyEventUntil
+      });
+
       return {
-        until:
-          startGalaxyEvent(
-            durationMs
-          )
+        until: galaxyEventUntil
       };
     }
 
     if (action === "stop") {
+      galaxyEventUntil = 0;
+
+      broadcast({
+        type: "galaxyEvent",
+        until: 0
+      });
+
       return {
-        until:
-          stopGalaxyEvent()
+        until: 0
       };
     }
   }
 
-  throw new Error(
-    "Ungültiges Event"
-  );
+  throw new Error("Ungültiges Event");
 }
-
 
 /* =========================================================
    WEBSOCKET
    ========================================================= */
 
-wss.on(
-  "connection",
-  (ws) => {
-    ws.playerName = "";
-    ws.lastHeartbeat =
-      Date.now();
+wss.on("connection", (ws) => {
+  ws.playerName = "";
+  ws.lastHeartbeat = Date.now();
 
-    ws.on(
-      "message",
-      (raw) => {
-        let msg;
+  ws.on("message", (raw) => {
+    let msg;
 
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    ws.lastHeartbeat = Date.now();
+
+    if (msg.type === "identify") {
+      let name = cleanName(msg.name);
+
+      if (!name) {
+        name =
+          "Spieler-" +
+          Math.random()
+            .toString(36)
+            .slice(2, 8)
+            .toUpperCase();
+      }
+
+      const oldSocket = players.get(name);
+
+      if (oldSocket && oldSocket !== ws) {
         try {
-          msg = JSON.parse(
-            raw.toString()
-          );
-        } catch {
-          return;
-        }
-
-        ws.lastHeartbeat =
-          Date.now();
-
-        if (
-          msg.type ===
-          "identify"
-        ) {
-          let name =
-            cleanName(
-              msg.name
-            );
-
-          if (!name) {
-            name =
-              "Spieler-" +
-              Math.random()
-                .toString(
-                  36
-                )
-                .slice(
-                  2,
-                  8
-                )
-                .toUpperCase();
-          }
-
-          const oldSocket =
-            players.get(name);
-
-          if (
-            oldSocket &&
-            oldSocket !== ws
-          ) {
-            try {
-              oldSocket.terminate();
-            } catch {}
-
-            players.delete(
-              name
-            );
-          }
-
-          if (
-            ws.playerName &&
-            players.get(
-              ws.playerName
-            ) === ws
-          ) {
-            players.delete(
-              ws.playerName
-            );
-          }
-
-          ws.playerName =
-            name;
-
-          players.set(
-            name,
-            ws
-          );
-
-          send(ws, {
-            type:
-              "connected",
-
-            name,
-
-            coinEventUntil:
-              coinEventUntil >
-              Date.now()
-                ? coinEventUntil
-                : 0,
-
-            tenCoinEventUntil:
-              tenCoinEventUntil >
-              Date.now()
-                ? tenCoinEventUntil
-                : 0,
-
-            galaxyEventUntil:
-              galaxyEventUntil >
-              Date.now()
-                ? galaxyEventUntil
-                : 0,
-
-            serverMessages
-          });
-
-          return;
-        }
-
-        if (
-          msg.type ===
-          "heartbeat"
-        ) {
-          send(ws, {
-            type:
-              "heartbeatAck"
-          });
-        }
-      }
-    );
-
-    ws.on(
-      "close",
-      () => {
-        if (
-          ws.playerName &&
-          players.get(
-            ws.playerName
-          ) === ws
-        ) {
-          players.delete(
-            ws.playerName
-          );
-        }
-      }
-    );
-
-    ws.on(
-      "error",
-      () => {
-        if (
-          ws.playerName &&
-          players.get(
-            ws.playerName
-          ) === ws
-        ) {
-          players.delete(
-            ws.playerName
-          );
-        }
-      }
-    );
-  }
-);
-
-
-/* =========================================================
-   OFFLINE SPIELER
-   ========================================================= */
-
-setInterval(
-  () => {
-    const now =
-      Date.now();
-
-    for (
-      const [name, ws]
-      of players
-    ) {
-      if (
-        ws.readyState !==
-          WebSocket.OPEN ||
-        now -
-          (ws.lastHeartbeat ||
-            0) >
-          30000
-      ) {
-        players.delete(
-          name
-        );
-
-        try {
-          ws.terminate();
+          oldSocket.terminate();
         } catch {}
+
+        players.delete(name);
       }
-    }
-  },
-  15000
-);
 
-
-/* =========================================================
-   ADMIN: 2x MÜNZEN
-   ========================================================= */
-
-app.post(
-  "/api/admin/coins-event",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const action =
-      String(
-        req.body?.action ||
-          ""
-      );
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          1000,
-          Math.min(
-            10080 *
-              60 *
-              1000,
-            Math.floor(
-              Number(
-                req.body
-                  ?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return res.json({
-        ok: true,
-        until:
-          startCoinEvent(
-            durationMs
-          )
-      });
-    }
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopCoinEvent()
-      });
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Invalid action"
-    });
-  }
-);
-
-
-/* =========================================================
-   ADMIN: 10x MÜNZEN
-   ========================================================= */
-
-app.post(
-  "/api/admin/ten-coin-event",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const action =
-      String(
-        req.body?.action ||
-          ""
-      );
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          1000,
-          Math.min(
-            10080 *
-              60 *
-              1000,
-            Math.floor(
-              Number(
-                req.body
-                  ?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return res.json({
-        ok: true,
-        until:
-          startTenCoinEvent(
-            durationMs
-          )
-      });
-    }
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopTenCoinEvent()
-      });
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Invalid action"
-    });
-  }
-);
-
-
-/* =========================================================
-   ADMIN: GALAXY
-   ========================================================= */
-
-app.post(
-  "/api/admin/galaxy-event",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const action =
-      String(
-        req.body?.action ||
-          ""
-      );
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          60000,
-          Math.min(
-            10080 *
-              60 *
-              1000,
-            Math.floor(
-              Number(
-                req.body
-                  ?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return res.json({
-        ok: true,
-        until:
-          startGalaxyEvent(
-            durationMs
-          )
-      });
-    }
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopGalaxyEvent()
-      });
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Invalid action"
-    });
-  }
-);
-
-
-/* =========================================================
-   MÜNZEN GEBEN
-   ========================================================= */
-
-app.post(
-  "/api/admin/give",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const coins =
-      amountFrom(
-        req.body
-      );
-
-    if (
-      !player ||
-      coins <= 0
-    ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Player and a coin amount are required"
-      });
-    }
-
-    const target =
-      players.get(
-        player
-      );
-
-    if (
-      !target ||
-      target.readyState !==
-        WebSocket.OPEN
-    ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Player is not online"
-      });
-    }
-
-    send(target, {
-      type:
-        "gift",
-      target:
-        player,
-      coins
-    });
-
-    return res.json({
-      ok: true,
-      player,
-      coins
-    });
-  }
-);
-
-
-/* =========================================================
-   MÜNZEN AN ALLE
-   ========================================================= */
-
-app.post(
-  "/api/admin/give-all",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const coins =
-      amountFrom(
-        req.body
-      );
-
-    if (
-      coins <= 0
-    ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "A coin amount greater than 0 is required"
-      });
-    }
-
-    let count = 0;
-
-    const message =
-      JSON.stringify({
-        type:
-          "giftAll",
-        coins
-      });
-
-    for (
-      const [name, ws]
-      of players
-    ) {
       if (
-        ws.readyState ===
-        WebSocket.OPEN
+        ws.playerName &&
+        players.get(ws.playerName) === ws
       ) {
-        ws.send(
-          message
-        );
-        count++;
-      } else {
-        players.delete(
-          name
-        );
+        players.delete(ws.playerName);
       }
+
+      ws.playerName = name;
+      players.set(name, ws);
+
+      send(ws, {
+        type: "connected",
+        name,
+
+        coinEventUntil:
+          coinEventUntil > Date.now()
+            ? coinEventUntil
+            : 0,
+
+        tenCoinEventUntil:
+          tenCoinEventUntil > Date.now()
+            ? tenCoinEventUntil
+            : 0,
+
+        galaxyEventUntil:
+          galaxyEventUntil > Date.now()
+            ? galaxyEventUntil
+            : 0,
+
+        serverMessages
+      });
+
+      return;
     }
 
-    return res.json({
-      ok: true,
-      coins,
-      count
-    });
-  }
-);
+    if (msg.type === "heartbeat") {
+      send(ws, {
+        type: "heartbeatAck"
+      });
+    }
+  });
 
+  ws.on("close", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+
+  ws.on("error", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+});
+
+setInterval(() => {
+  const now = Date.now();
+
+  for (const [name, ws] of players) {
+    if (
+      ws.readyState !== WebSocket.OPEN ||
+      now - (ws.lastHeartbeat || 0) > 30000
+    ) {
+      players.delete(name);
+
+      try {
+        ws.terminate();
+      } catch {}
+    }
+  }
+}, 15000);
 
 /* =========================================================
-   MÜNZEN ABZIEHEN
+   HAUPT-ADMIN
    ========================================================= */
 
-app.post(
-  "/api/admin/take",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const coins =
-      amountFrom(
-        req.body
-      );
-
-    if (
-      !player ||
-      coins <= 0
-    ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Player and a coin amount are required"
-      });
-    }
-
-    const target =
-      players.get(
-        player
-      );
-
-    if (
-      !target ||
-      target.readyState !==
-        WebSocket.OPEN
-    ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Player is not online"
-      });
-    }
-
-    send(target, {
-      type:
-        "takeCoins",
-      target:
-        player,
-      coins
-    });
-
-    return res.json({
-      ok: true,
-      player,
-      coins
-    });
+app.post("/api/admin/coins-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
   }
-);
 
+  const action = String(req.body?.action || "");
 
-/* =========================================================
-   SERVERNACHRICHTEN
-   ========================================================= */
-
-app.post(
-  "/api/admin/message",
-  (req, res) => {
-    if (!anyAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const text =
-      String(
-        req.body?.text ||
-          ""
+  if (action === "start") {
+    const durationMs = Math.max(
+      1000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(Number(req.body?.durationMs) || 0)
       )
-        .trim()
-        .slice(
-          0,
-          120
-        );
-
-    const minutes =
-      Math.max(
-        0,
-        Math.floor(
-          Number(
-            req.body
-              ?.minutes
-          ) || 0
-        )
-      );
-
-    const seconds =
-      Math.max(
-        0,
-        Math.min(
-          59,
-          Math.floor(
-            Number(
-              req.body
-                ?.seconds
-            ) || 0
-          )
-        )
-      );
-
-    const duration =
-      (minutes * 60 +
-        seconds) *
-      1000;
-
-    if (
-      !text ||
-      duration <= 0
-    ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Text and duration required"
-      });
-    }
-
-    const now =
-      Date.now();
-
-    const message = {
-      id:
-        now.toString(36) +
-        "-" +
-        Math.random()
-          .toString(36)
-          .slice(2, 10),
-
-      type:
-        "serverMessage",
-
-      text,
-
-      createdAt:
-        now,
-
-      endsAt:
-        now + duration
-    };
-
-    serverMessages.push(
-      message
     );
 
-    broadcast(message);
+    const result = executeEvent(
+      "coins",
+      "start",
+      durationMs
+    );
 
     return res.json({
       ok: true,
-      message
+      ...result
     });
   }
-);
 
+  if (action === "stop") {
+    const result = executeEvent(
+      "coins",
+      "stop",
+      0
+    );
+
+    return res.json({
+      ok: true,
+      ...result
+    });
+  }
+
+  return res
+    .status(400)
+    .json({ error: "Invalid action" });
+});
+
+/* =========================================================
+   10X EVENT
+   ========================================================= */
+
+app.post("/api/admin/ten-coins-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
+  }
+
+  const action = String(req.body?.action || "");
+
+  if (action === "start") {
+    const durationMs = Math.max(
+      1000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(Number(req.body?.durationMs) || 0)
+      )
+    );
+
+    const result = executeEvent(
+      "tenCoins",
+      "start",
+      durationMs
+    );
+
+    return res.json({
+      ok: true,
+      ...result
+    });
+  }
+
+  if (action === "stop") {
+    const result = executeEvent(
+      "tenCoins",
+      "stop",
+      0
+    );
+
+    return res.json({
+      ok: true,
+      ...result
+    });
+  }
+
+  return res
+    .status(400)
+    .json({ error: "Invalid action" });
+});
+
+/* =========================================================
+   COINS GEBEN
+   ========================================================= */
+
+app.post("/api/admin/give", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
+  }
+
+  const player = cleanName(req.body?.player);
+  const coins = amountFrom(req.body);
+
+  if (!player || coins <= 0) {
+    return res.status(400).json({
+      error:
+        "Player and a coin amount are required"
+    });
+  }
+
+  const target = players.get(player);
+
+  if (
+    !target ||
+    target.readyState !== WebSocket.OPEN
+  ) {
+    if (players.get(player) === target) {
+      players.delete(player);
+    }
+
+    return res
+      .status(404)
+      .json({ error: "Player is not online" });
+  }
+
+  send(target, {
+    type: "gift",
+    target: player,
+    coins
+  });
+
+  return res.json({
+    ok: true,
+    player,
+    coins
+  });
+});
+
+/* =========================================================
+   ALLEN SPIELERN COINS GEBEN
+   ========================================================= */
+
+app.post("/api/admin/give-all", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
+  }
+
+  const coins = amountFrom(req.body);
+
+  if (coins <= 0) {
+    return res.status(400).json({
+      error:
+        "A coin amount greater than 0 is required"
+    });
+  }
+
+  let count = 0;
+
+  const message = JSON.stringify({
+    type: "giftAll",
+    coins
+  });
+
+  for (const [name, ws] of players) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+      count++;
+    } else {
+      players.delete(name);
+    }
+  }
+
+  return res.json({
+    ok: true,
+    coins,
+    count
+  });
+});
+
+/* =========================================================
+   COINS WEGNEHMEN
+   ========================================================= */
+
+app.post("/api/admin/take", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
+  }
+
+  const player = cleanName(req.body?.player);
+  const coins = amountFrom(req.body);
+
+  if (!player || coins <= 0) {
+    return res.status(400).json({
+      error:
+        "Player and a coin amount are required"
+    });
+  }
+
+  const target = players.get(player);
+
+  if (
+    !target ||
+    target.readyState !== WebSocket.OPEN
+  ) {
+    if (players.get(player) === target) {
+      players.delete(player);
+    }
+
+    return res
+      .status(404)
+      .json({ error: "Player is not online" });
+  }
+
+  send(target, {
+    type: "takeCoins",
+    target: player,
+    coins
+  });
+
+  return res.json({
+    ok: true,
+    player,
+    coins
+  });
+});
+
+/* =========================================================
+   GALAXY EVENT
+   ========================================================= */
+
+app.post("/api/admin/galaxy-event", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
+  }
+
+  const action = String(req.body?.action || "");
+
+  if (action === "start") {
+    const durationMs = Math.max(
+      60000,
+      Math.min(
+        10080 * 60 * 1000,
+        Math.floor(Number(req.body?.durationMs) || 0)
+      )
+    );
+
+    return res.json({
+      ok: true,
+      ...executeEvent(
+        "galaxy",
+        "start",
+        durationMs
+      )
+    });
+  }
+
+  if (action === "stop") {
+    return res.json({
+      ok: true,
+      ...executeEvent(
+        "galaxy",
+        "stop",
+        0
+      )
+    });
+  }
+
+  return res
+    .status(400)
+    .json({ error: "Invalid action" });
+});
+
+/* =========================================================
+   SERVER-NACHRICHTEN
+   ========================================================= */
+
+app.post("/api/admin/message", (req, res) => {
+  if (!adminMessageEventOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
+  }
+
+  const text = String(
+    req.body?.text || ""
+  )
+    .trim()
+    .slice(0, 120);
+
+  const minutes = Math.max(
+    0,
+    Math.floor(Number(req.body?.minutes) || 0)
+  );
+
+  const seconds = Math.max(
+    0,
+    Math.min(
+      59,
+      Math.floor(Number(req.body?.seconds) || 0)
+    )
+  );
+
+  const duration =
+    (minutes * 60 + seconds) * 1000;
+
+  if (!text || duration <= 0) {
+    return res.status(400).json({
+      error: "Text and duration required"
+    });
+  }
+
+  const message = {
+    id:
+      Date.now().toString(36) +
+      Math.random().toString(36).slice(2, 7),
+
+    type: "serverMessage",
+    text,
+    endsAt: Date.now() + duration
+  };
+
+  serverMessages.push(message);
+
+  broadcast(message);
+
+  return res.json({
+    ok: true,
+    message
+  });
+});
 
 app.post(
   "/api/admin/message/delete",
   (req, res) => {
-    if (!anyAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
+    if (!adminMessageEventOK(req)) {
+      return res
+        .status(401)
+        .json({ error: "Unauthorized" });
     }
 
     serverMessages = [];
 
     broadcast({
-      type:
-        "serverMessagesClear"
+      type: "serverMessagesClear"
+    });
+
+    broadcast({
+      type: "serverMessageDelete"
     });
 
     return res.json({
@@ -1044,28 +666,26 @@ app.post(
   }
 );
 
-
 /* =========================================================
-   EVENT-ANFRAGEN VON ADMIN 2
+   ZWEITES ADMIN-PANEL
    ========================================================= */
 
 app.post(
   "/api/second-admin/event-request",
   (req, res) => {
     if (!secondAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
+      return res
+        .status(401)
+        .json({ error: "Unauthorized" });
     }
 
-    const event =
-      String(
-        req.body?.event ||
-          ""
-      );
+    const event = String(
+      req.body?.event || ""
+    );
+
+    const action = String(
+      req.body?.action || ""
+    );
 
     if (
       ![
@@ -1074,349 +694,244 @@ app.post(
         "galaxy"
       ].includes(event)
     ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Unbekanntes Event"
-      });
+      return res
+        .status(400)
+        .json({ error: "Ungültiges Event" });
     }
 
-    const durationMs =
-      event === "galaxy"
-        ? Math.max(
-            60000,
-            Math.min(
-              10080 *
-                60 *
-                1000,
-              Math.floor(
-                Number(
-                  req.body
-                    ?.durationMs
-                ) || 0
-              )
-            )
+    if (
+      !["start", "stop"].includes(action)
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Ungültige Aktion" });
+    }
+
+    let durationMs = 0;
+
+    if (action === "start") {
+      const value =
+        Math.floor(
+          Number(req.body?.durationMs) || 0
+        );
+
+      if (event === "galaxy") {
+        durationMs = Math.max(
+          60000,
+          Math.min(
+            10080 * 60 * 1000,
+            value
           )
-        : Math.max(
-            1000,
-            Math.min(
-              10080 *
-                60 *
-                1000,
-              Math.floor(
-                Number(
-                  req.body
-                    ?.durationMs
-                ) || 0
-              )
-            )
-          );
+        );
+      } else {
+        durationMs = Math.max(
+          1000,
+          Math.min(
+            10080 * 60 * 1000,
+            value
+          )
+        );
+      }
+    }
 
-    const existing =
-      eventRequests.find(
-        (request) =>
-          request.event ===
-            event &&
-          request.action ===
-            "start"
-      );
+    const duplicate = eventRequests.find(
+      (r) =>
+        r.event === event &&
+        r.action === action
+    );
 
-    if (existing) {
+    if (duplicate) {
       return res.json({
         ok: true,
         pending: true,
-        id:
-          existing.id
+        id: duplicate.id
       });
     }
 
     const request = {
-      id:
-        makeRequestId(),
-
+      id: makeRequestId(),
       event,
-
-      action:
-        "start",
-
+      action,
       durationMs,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
-    eventRequests.push(
-      request
-    );
+    eventRequests.push(request);
 
     return res.json({
       ok: true,
       pending: true,
-      id:
-        request.id
+      id: request.id
     });
   }
 );
 
-
 /* =========================================================
-   EVENT-ANFRAGEN FÜR ADMIN 1
+   EVENT REQUESTS ABRUFEN
    ========================================================= */
 
 app.get(
   "/api/admin/event-requests",
   (req, res) => {
     if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
+      return res
+        .status(401)
+        .json({ error: "Unauthorized" });
     }
-
-    cleanupEventRequests();
 
     return res.json({
       ok: true,
-      requests:
-        publicRequests()
+      requests: publicRequests()
     });
   }
 );
 
-
 /* =========================================================
-   EVENT-ANFRAGE ANNEHMEN
+   EVENT REQUEST APPROVE / DENY
    ========================================================= */
 
 app.post(
-  [
-    "/api/admin/event-requests/:id/approve",
-    "/api/admin/event-requests/approve"
-  ],
+  "/api/admin/event-request/respond",
   (req, res) => {
     if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
+      return res
+        .status(401)
+        .json({ error: "Unauthorized" });
     }
 
-    cleanupEventRequests();
-
-    const id =
-      String(
-        req.params.id ||
-        req.body?.id ||
-        req.body
-          ?.requestId ||
-        ""
-      );
-
-    const index =
-      eventRequests.findIndex(
-        (request) =>
-          request.id ===
-          id
-      );
-
-    if (
-      index < 0
-    ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Anfrage nicht gefunden"
-      });
-    }
-
-    const request =
-      eventRequests[
-        index
-      ];
-
-    eventRequests.splice(
-      index,
-      1
+    const requestId = String(
+      req.body?.requestId || ""
     );
 
-    try {
-      const result =
-        executeEvent(
-          request.event,
-          request.action,
-          request.durationMs
-        );
+    const approve =
+      req.body?.approve === true;
 
+    const index = eventRequests.findIndex(
+      (r) => r.id === requestId
+    );
+
+    if (index < 0) {
+      return res.status(404).json({
+        error: "Anfrage nicht gefunden"
+      });
+    }
+
+    const request = eventRequests[index];
+
+    eventRequests.splice(index, 1);
+
+    if (!approve) {
       return res.json({
         ok: true,
-        approved: true,
-        request,
-        ...result
-      });
-    } catch (
-      error
-    ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          error.message ||
-          "Event konnte nicht gestartet werden"
-      });
-    }
-  }
-);
-
-
-/* =========================================================
-   EVENT-ANFRAGE ABLEHNEN
-   ========================================================= */
-
-app.post(
-  [
-    "/api/admin/event-requests/:id/deny",
-    "/api/admin/event-requests/reject"
-  ],
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
+        approved: false
       });
     }
 
-    cleanupEventRequests();
-
-    const id =
-      String(
-        req.params.id ||
-        req.body?.id ||
-        req.body
-          ?.requestId ||
-        ""
-      );
-
-    const index =
-      eventRequests.findIndex(
-        (request) =>
-          request.id ===
-          id
-      );
-
-    if (
-      index < 0
-    ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Anfrage nicht gefunden"
-      });
-    }
-
-    const request =
-      eventRequests[
-        index
-      ];
-
-    eventRequests.splice(
-      index,
-      1
+    const result = executeEvent(
+      request.event,
+      request.action,
+      request.durationMs
     );
 
     return res.json({
       ok: true,
-      denied: true,
-      request
+      approved: true,
+      ...result
     });
   }
 );
 
-
 /* =========================================================
-   ZWEITER ADMIN: EVENTS STOPPEN
+   SECOND ADMIN 2X EVENT STOP
    ========================================================= */
 
 app.post(
-  "/api/second-admin/event-stop",
+  "/api/second-admin/coins-event",
   (req, res) => {
     if (!secondAdminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
+      return res
+        .status(401)
+        .json({ error: "Unauthorized" });
+    }
+
+    const action = String(
+      req.body?.action || ""
+    );
+
+    if (action === "stop") {
+      coinEventUntil = 0;
+
+      broadcast({
+        type: "coinEvent",
+        until: 0
+      });
+
+      return res.json({
+        ok: true,
+        until: 0
       });
     }
 
-    const event =
-      String(
-        req.body?.event ||
-          ""
+    if (action === "start") {
+      const durationMs = Math.max(
+        1000,
+        Math.min(
+          10080 * 60 * 1000,
+          Math.floor(
+            Number(req.body?.durationMs) || 0
+          )
+        )
       );
 
-    if (
-      event === "coins"
-    ) {
+      const duplicate =
+        eventRequests.find(
+          (r) =>
+            r.event === "coins" &&
+            r.action === "start"
+        );
+
+      if (duplicate) {
+        return res.json({
+          ok: true,
+          pending: true,
+          id: duplicate.id
+        });
+      }
+
+      const request = {
+        id: makeRequestId(),
+        event: "coins",
+        action: "start",
+        durationMs,
+        createdAt: Date.now()
+      };
+
+      eventRequests.push(request);
+
       return res.json({
         ok: true,
-        until:
-          stopCoinEvent()
+        pending: true,
+        id: request.id
       });
     }
 
-    if (
-      event === "tenCoins"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopTenCoinEvent()
-      });
-    }
-
-    if (
-      event === "galaxy"
-    ) {
-      return res.json({
-        ok: true,
-        until:
-          stopGalaxyEvent()
-      });
-    }
-
-    return res.status(
-      400
-    ).json({
-      error:
-        "Unbekanntes Event"
+    return res.status(400).json({
+      error: "Invalid action"
     });
   }
 );
 
-
 /* =========================================================
-   ONLINE-SPIELER
+   ONLINE SPIELER
    ========================================================= */
 
 app.get(
   "/api/admin/online-players",
   (req, res) => {
     if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
+      return res
+        .status(401)
+        .json({ error: "Unauthorized" });
     }
 
     const onlinePlayers =
@@ -1426,10 +941,7 @@ app.get(
             ws.readyState ===
             WebSocket.OPEN
         )
-        .map(
-          ([name]) =>
-            name
-        );
+        .map(([name]) => name);
 
     return res.json({
       ok: true,
@@ -1438,95 +950,80 @@ app.get(
   }
 );
 
-
 /* =========================================================
-   ALLGEMEINER STATUS
+   STATUS
    ========================================================= */
 
-app.get(
-  "/api/status",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res.status(
-        401
-      ).json({
-        error:
-          "Unauthorized"
-      });
-    }
-
-    const now =
-      Date.now();
-
-    res.json({
-      onlinePlayers:
-        [...players.keys()],
-
-      coinEventUntil:
-        coinEventUntil >
-        now
-          ? coinEventUntil
-          : 0,
-
-      tenCoinEventUntil:
-        tenCoinEventUntil >
-        now
-          ? tenCoinEventUntil
-          : 0,
-
-      galaxyEventUntil:
-        galaxyEventUntil >
-        now
-          ? galaxyEventUntil
-          : 0
-    });
+app.get("/api/status", (req, res) => {
+  if (!adminOK(req)) {
+    return res
+      .status(401)
+      .json({ error: "Unauthorized" });
   }
-);
 
+  return res.json({
+    onlinePlayers: [...players.keys()],
+
+    coinEventUntil:
+      coinEventUntil > Date.now()
+        ? coinEventUntil
+        : 0,
+
+    tenCoinEventUntil:
+      tenCoinEventUntil > Date.now()
+        ? tenCoinEventUntil
+        : 0,
+
+    galaxyEventUntil:
+      galaxyEventUntil > Date.now()
+        ? galaxyEventUntil
+        : 0
+  });
+});
 
 /* =========================================================
-   TRADE STATUS
+   TRADE
    ========================================================= */
 
-function getTradeForPlayer(
-  player
-) {
-  for (
-    const trade
-    of activeTrades.values()
-  ) {
+function getTradeForPlayer(player) {
+  for (const trade of activeTrades.values()) {
     if (
       trade.from === player ||
       trade.to === player
     ) {
+      const mine =
+        trade.from === player
+          ? trade.fromOffer
+          : trade.toOffer;
+
+      const theirs =
+        trade.from === player
+          ? trade.toOffer
+          : trade.fromOffer;
+
+      const mineConfirmed =
+        trade.from === player
+          ? trade.fromConfirmed
+          : trade.toConfirmed;
+
+      const theirsConfirmed =
+        trade.from === player
+          ? trade.toConfirmed
+          : trade.fromConfirmed;
+
       return {
-        id:
-          trade.id,
+        id: trade.id,
 
         other:
           trade.from === player
             ? trade.to
             : trade.from,
 
-        myOffer:
-          trade.from === player
-            ? trade.fromOffer
-            : trade.toOffer,
+        myOffer: mine,
+        otherOffer: theirs,
 
-        otherOffer:
-          trade.from === player
-            ? trade.toOffer
-            : trade.fromOffer,
-
-        myConfirmed:
-          trade.from === player
-            ? trade.fromConfirmed
-            : trade.toConfirmed,
-
-        otherConfirmed:
-          trade.from === player
-            ? trade.toConfirmed
-            : trade.fromConfirmed
+        myConfirmed: mineConfirmed,
+        otherConfirmed: theirsConfirmed
       };
     }
   }
@@ -1534,128 +1031,90 @@ function getTradeForPlayer(
   return null;
 }
 
-
 /* =========================================================
-   ONLINE-SPIELER + TRADE STATUS
+   TRADE STATUS
    ========================================================= */
 
-app.get(
-  "/api/trade/status",
-  (req, res) => {
-    const player =
-      cleanName(
-        req.query.player
-      );
+app.get("/api/trade/status", (req, res) => {
+  const player = cleanName(
+    req.query.player
+  );
 
-    if (!player) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Spielername fehlt"
-      });
-    }
-
-    const onlinePlayers =
-      [...players.keys()]
-        .filter(
-          name =>
-            name !== player
-        );
-
-    const incomingRequests =
-      tradeRequests.filter(
-        request =>
-          request.to === player
-      );
-
-    const trade =
-      getTradeForPlayer(
-        player
-      );
-
-    const completed =
-      completedTrades.get(
-        player
-      ) || null;
-
-    if (completed) {
-      completedTrades.delete(
-        player
-      );
-    }
-
-    return res.json({
-      ok: true,
-
-      onlinePlayers,
-
-      incomingRequests,
-
-      trade,
-
-      completed
+  if (!player) {
+    return res.status(400).json({
+      error: "Spielername fehlt"
     });
   }
-);
 
+  const onlinePlayers =
+    [...players.keys()].filter(
+      (name) => name !== player
+    );
+
+  const incomingRequests =
+    tradeRequests.filter(
+      (request) => request.to === player
+    );
+
+  const trade =
+    getTradeForPlayer(player);
+
+  const completed =
+    completedTrades.get(player) ||
+    null;
+
+  if (completed) {
+    completedTrades.delete(player);
+  }
+
+  return res.json({
+    ok: true,
+    onlinePlayers,
+    incomingRequests,
+    trade,
+    completed
+  });
+});
 
 /* =========================================================
-   TRADE-ANFRAGE
+   TRADE REQUEST
    ========================================================= */
 
 app.post(
   "/api/trade/request",
   (req, res) => {
-    const from =
-      cleanName(
-        req.body?.from
-      );
+    const from = cleanName(
+      req.body?.from
+    );
 
-    const to =
-      cleanName(
-        req.body?.to
-      );
+    const to = cleanName(
+      req.body?.to
+    );
 
     if (
       !from ||
       !to ||
       from === to
     ) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Ungültiger Spieler"
+      return res.status(400).json({
+        error: "Ungültiger Spieler"
       });
     }
 
     if (!players.has(from)) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Du bist nicht online"
+      return res.status(400).json({
+        error: "Du bist nicht online"
       });
     }
 
     if (!players.has(to)) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Spieler ist nicht online"
+      return res.status(404).json({
+        error: "Spieler ist nicht online"
       });
     }
 
-    if (
-      getTradeForPlayer(
-        from
-      )
-    ) {
-      return res.status(
-        409
-      ).json({
+    if (getTradeForPlayer(from)) {
+      return res.status(409).json({
         error:
           "Du bist bereits in einem Trade"
       });
@@ -1663,47 +1122,31 @@ app.post(
 
     if (
       tradeRequests.some(
-        request =>
-          request.from ===
-            from &&
-          request.to ===
-            to
+        (r) =>
+          r.from === from &&
+          r.to === to
       )
     ) {
-      return res.status(
-        409
-      ).json({
+      return res.status(409).json({
         error:
           "Anfrage wurde bereits gesendet"
       });
     }
 
     const request = {
-      id:
-        makeRequestId(),
-
+      id: makeRequestId(),
       from,
-
       to,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
-    tradeRequests.push(
-      request
-    );
+    tradeRequests.push(request);
 
-    const target =
-      players.get(
-        to
-      );
+    const target = players.get(to);
 
     if (target) {
       send(target, {
-        type:
-          "tradeRequest",
-
+        type: "tradeRequest",
         request
       });
     }
@@ -1715,141 +1158,94 @@ app.post(
   }
 );
 
-
 /* =========================================================
-   TRADE-ANFRAGE BEANTWORTEN
+   TRADE ACCEPT / DECLINE
    ========================================================= */
 
 app.post(
   "/api/trade/respond",
   (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
+    const player = cleanName(
+      req.body?.player
+    );
 
-    const requestId =
-      String(
-        req.body?.requestId ||
-        ""
-      );
+    const requestId = String(
+      req.body?.requestId || ""
+    );
 
     const accept =
-      req.body?.accept ===
-      true;
+      req.body?.accept === true;
 
     const index =
       tradeRequests.findIndex(
-        request =>
-          request.id ===
-            requestId &&
-          request.to ===
-            player
+        (request) =>
+          request.id === requestId &&
+          request.to === player
       );
 
-    if (
-      index < 0
-    ) {
-      return res.status(
-        404
-      ).json({
+    if (index < 0) {
+      return res.status(404).json({
         error:
           "Trade-Anfrage nicht gefunden"
       });
     }
 
     const request =
-      tradeRequests[
-        index
-      ];
+      tradeRequests[index];
 
-    tradeRequests.splice(
-      index,
-      1
-    );
+    tradeRequests.splice(index, 1);
 
     if (!accept) {
       const fromWs =
-        players.get(
-          request.from
-        );
+        players.get(request.from);
 
       if (fromWs) {
         send(fromWs, {
-          type:
-            "tradeRequestResult",
-
-          requestId:
-            request.id,
-
-          accepted:
-            false
+          type: "tradeRequestResult",
+          requestId: request.id,
+          accepted: false
         });
       }
 
       return res.json({
         ok: true,
-        accepted:
-          false
+        accepted: false
       });
     }
 
     if (
-      !players.has(
-        request.from
-      ) ||
-      !players.has(
-        request.to
-      )
+      !players.has(request.from) ||
+      !players.has(request.to)
     ) {
-      return res.status(
-        409
-      ).json({
+      return res.status(409).json({
         error:
           "Spieler ist nicht mehr online"
       });
     }
 
     if (
-      getTradeForPlayer(
-        request.from
-      ) ||
-      getTradeForPlayer(
-        request.to
-      )
+      getTradeForPlayer(request.from) ||
+      getTradeForPlayer(request.to)
     ) {
-      return res.status(
-        409
-      ).json({
+      return res.status(409).json({
         error:
           "Ein Spieler ist bereits in einem Trade"
       });
     }
 
     const trade = {
-      id:
-        makeRequestId(),
+      id: makeRequestId(),
 
-      from:
-        request.from,
+      from: request.from,
+      to: request.to,
 
-      to:
-        request.to,
+      fromOffer: null,
+      toOffer: null,
 
-      fromOffer:
-        null,
+      fromConfirmed: false,
+      toConfirmed: false,
 
-      toOffer:
-        null,
-
-      fromConfirmed:
-        false,
-
-      toConfirmed:
-        false,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
     activeTrades.set(
@@ -1858,242 +1254,166 @@ app.post(
     );
 
     const fromWs =
-      players.get(
-        request.from
-      );
+      players.get(request.from);
 
     if (fromWs) {
       send(fromWs, {
-        type:
-          "tradeAccepted",
-
-        tradeId:
-          trade.id
+        type: "tradeAccepted",
+        tradeId: trade.id
       });
     }
 
     return res.json({
       ok: true,
-
-      accepted:
-        true,
-
+      accepted: true,
       trade:
-        getTradeForPlayer(
-          player
-        )
+        getTradeForPlayer(player)
     });
   }
 );
 
-
 /* =========================================================
-   SKIN ANGEBOTEN
+   TRADE OFFER
    ========================================================= */
-
-/*
- * Keine feste Skin-Liste mehr.
- *
- * Der Client darf jeden eigenen Skin senden,
- * den er tatsächlich besitzt.
- *
- * Damit sind auch zukünftige Skins automatisch
- * handelbar, ohne den Server ändern zu müssen.
- */
 
 app.post(
   "/api/trade/offer",
   (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
+    const player = cleanName(
+      req.body?.player
+    );
 
-    const tradeId =
-      String(
-        req.body?.tradeId ||
-        ""
-      );
+    const tradeId = String(
+      req.body?.tradeId || ""
+    );
 
-    const skinId =
-      String(
-        req.body?.skinId ||
-        ""
-      )
-        .trim()
-        .slice(
-          0,
-          120
-        );
+    const skinId = String(
+      req.body?.skinId || ""
+    ).trim();
 
     if (!skinId) {
-      return res.status(
-        400
-      ).json({
-        error:
-          "Skin fehlt"
+      return res.status(400).json({
+        error: "Ungültiger Skin"
       });
     }
 
     const trade =
-      activeTrades.get(
-        tradeId
-      );
+      activeTrades.get(tradeId);
 
     if (
       !trade ||
-      (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
-      )
+      (trade.from !== player &&
+        trade.to !== player)
     ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Trade nicht gefunden"
+      return res.status(404).json({
+        error: "Trade nicht gefunden"
       });
     }
 
-    /*
-     * Der Server speichert hier nur die Auswahl.
-     * Der Client darf ausschließlich Skins anbieten,
-     * die er selbst besitzt.
-     */
-
-    if (
-      trade.from ===
-      player
-    ) {
-      if (
-        trade.fromConfirmed
-      ) {
-        return res.status(
-          409
-        ).json({
-          error:
-            "Bereits bestätigt"
+    if (trade.from === player) {
+      if (trade.fromConfirmed) {
+        return res.status(409).json({
+          error: "Bereits bestätigt"
         });
       }
 
-      trade.fromOffer =
-        skinId;
-
-      // Bestätigung zurücksetzen,
-      // falls das Angebot geändert wurde.
-      trade.fromConfirmed =
-        false;
-
+      trade.fromOffer = skinId;
     } else {
-      if (
-        trade.toConfirmed
-      ) {
-        return res.status(
-          409
-        ).json({
-          error:
-            "Bereits bestätigt"
+      if (trade.toConfirmed) {
+        return res.status(409).json({
+          error: "Bereits bestätigt"
         });
       }
 
-      trade.toOffer =
-        skinId;
+      trade.toOffer = skinId;
+    }
 
-      trade.toConfirmed =
-        false;
+    // Beide Spieler sofort über die neue Auswahl informieren
+    const fromWs =
+      players.get(trade.from);
+
+    const toWs =
+      players.get(trade.to);
+
+    if (fromWs) {
+      send(fromWs, {
+        type: "tradeUpdated",
+        trade:
+          getTradeForPlayer(trade.from)
+      });
+    }
+
+    if (toWs) {
+      send(toWs, {
+        type: "tradeUpdated",
+        trade:
+          getTradeForPlayer(trade.to)
+      });
     }
 
     return res.json({
       ok: true,
-
       trade:
-        getTradeForPlayer(
-          player
-        )
+        getTradeForPlayer(player)
     });
   }
 );
 
-
 /* =========================================================
-   TRADE BESTÄTIGEN
+   TRADE CONFIRM
    ========================================================= */
 
 app.post(
   "/api/trade/confirm",
   (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
+    const player = cleanName(
+      req.body?.player
+    );
 
-    const tradeId =
-      String(
-        req.body?.tradeId ||
-        ""
-      );
+    const tradeId = String(
+      req.body?.tradeId || ""
+    );
 
     const trade =
-      activeTrades.get(
-        tradeId
-      );
+      activeTrades.get(tradeId);
 
     if (
       !trade ||
-      (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
-      )
+      (trade.from !== player &&
+        trade.to !== player)
     ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Trade nicht gefunden"
+      return res.status(404).json({
+        error: "Trade nicht gefunden"
       });
     }
 
-    if (
-      trade.from ===
-      player
-    ) {
-      if (
-        !trade.fromOffer
-      ) {
-        return res.status(
-          400
-        ).json({
+    if (trade.from === player) {
+      if (!trade.fromOffer) {
+        return res.status(400).json({
           error:
             "Bitte zuerst einen Skin auswählen"
         });
       }
 
-      trade.fromConfirmed =
-        true;
-
+      trade.fromConfirmed = true;
     } else {
-      if (
-        !trade.toOffer
-      ) {
-        return res.status(
-          400
-        ).json({
+      if (!trade.toOffer) {
+        return res.status(400).json({
           error:
             "Bitte zuerst einen Skin auswählen"
         });
       }
 
-      trade.toConfirmed =
-        true;
+      trade.toConfirmed = true;
     }
 
-    /*
-     * Beide müssen bestätigen.
-     */
+    const fromWs =
+      players.get(trade.from);
+
+    const toWs =
+      players.get(trade.to);
+
+    // Beide bestätigen
     if (
       trade.fromConfirmed &&
       trade.toConfirmed
@@ -2114,141 +1434,131 @@ app.post(
         trade.id
       );
 
-      /*
-       * Der Client übernimmt beim "tradeComplete"
-       * das Entfernen des gesendeten Skins und das
-       * Hinzufügen des erhaltenen Skins.
-       */
-
+      // Ganz wichtig:
+      // Der Client bekommt EXAKT mitgeteilt,
+      // welcher Skin entfernt und welcher hinzugefügt
+      // werden muss.
       completedTrades.set(
         fromPlayer,
         {
-          id:
-            trade.id,
+          id: trade.id,
 
-          sentSkin:
-            fromSkin,
+          sentSkin: fromSkin,
+          receivedSkin: toSkin,
 
-          receivedSkin:
-            toSkin
+          removeSkin: fromSkin,
+          addSkin: toSkin
         }
       );
 
       completedTrades.set(
         toPlayer,
         {
-          id:
-            trade.id,
+          id: trade.id,
 
-          sentSkin:
-            toSkin,
+          sentSkin: toSkin,
+          receivedSkin: fromSkin,
 
-          receivedSkin:
-            fromSkin
+          removeSkin: toSkin,
+          addSkin: fromSkin
         }
       );
 
-      const fromWs =
-        players.get(
-          fromPlayer
-        );
-
-      const toWs =
-        players.get(
-          toPlayer
-        );
-
       if (fromWs) {
         send(fromWs, {
-          type:
-            "tradeComplete",
+          type: "tradeComplete",
 
-          tradeId:
-            trade.id,
+          tradeId: trade.id,
 
-          sentSkin:
-            fromSkin,
+          sentSkin: fromSkin,
+          receivedSkin: toSkin,
 
-          receivedSkin:
-            toSkin
+          removeSkin: fromSkin,
+          addSkin: toSkin
         });
       }
 
       if (toWs) {
         send(toWs, {
-          type:
-            "tradeComplete",
+          type: "tradeComplete",
 
-          tradeId:
-            trade.id,
+          tradeId: trade.id,
 
-          sentSkin:
-            toSkin,
+          sentSkin: toSkin,
+          receivedSkin: fromSkin,
 
-          receivedSkin:
-            fromSkin
+          removeSkin: toSkin,
+          addSkin: fromSkin
         });
       }
 
       return res.json({
         ok: true,
-        completed:
-          true
+        completed: true,
+
+        receivedSkin:
+          player === fromPlayer
+            ? toSkin
+            : fromSkin
+      });
+    }
+
+    // Ein Spieler hat bestätigt:
+    // beide sollen das aktuelle Trade-Fenster sehen
+    if (fromWs) {
+      send(fromWs, {
+        type: "tradeUpdated",
+        trade:
+          getTradeForPlayer(
+            trade.from
+          )
+      });
+    }
+
+    if (toWs) {
+      send(toWs, {
+        type: "tradeUpdated",
+        trade:
+          getTradeForPlayer(
+            trade.to
+          )
       });
     }
 
     return res.json({
       ok: true,
-
-      completed:
-        false,
-
+      completed: false,
       trade:
-        getTradeForPlayer(
-          player
-        )
+        getTradeForPlayer(player)
     });
   }
 );
 
-
 /* =========================================================
-   TRADE ABBRECHEN
+   TRADE CANCEL
    ========================================================= */
 
 app.post(
   "/api/trade/cancel",
   (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
+    const player = cleanName(
+      req.body?.player
+    );
 
-    const tradeId =
-      String(
-        req.body?.tradeId ||
-        ""
-      );
+    const tradeId = String(
+      req.body?.tradeId || ""
+    );
 
     const trade =
-      activeTrades.get(
-        tradeId
-      );
+      activeTrades.get(tradeId);
 
     if (
       !trade ||
-      (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
-      )
+      (trade.from !== player &&
+        trade.to !== player)
     ) {
-      return res.status(
-        404
-      ).json({
-        error:
-          "Trade nicht gefunden"
+      return res.status(404).json({
+        error: "Trade nicht gefunden"
       });
     }
 
@@ -2257,21 +1567,16 @@ app.post(
     );
 
     const other =
-      trade.from ===
-      player
+      trade.from === player
         ? trade.to
         : trade.from;
 
     const otherWs =
-      players.get(
-        other
-      );
+      players.get(other);
 
     if (otherWs) {
       send(otherWs, {
-        type:
-          "tradeCancelled",
-
+        type: "tradeCancelled",
         tradeId
       });
     }
@@ -2282,163 +1587,128 @@ app.post(
   }
 );
 
-
 /* =========================================================
-   TRADE AUFRÄUMEN
+   AUFRÄUMEN
    ========================================================= */
 
-setInterval(
-  () => {
-    const now =
-      Date.now();
+setInterval(() => {
+  const now = Date.now();
 
-    /*
-     * Alte Trade-Anfragen entfernen.
-     */
-    for (
-      let i =
-        tradeRequests.length -
-        1;
-      i >= 0;
-      i--
-    ) {
-      if (
+  // Nachrichten löschen
+  serverMessages =
+    serverMessages.filter(
+      (m) =>
+        Number(m.endsAt || 0) > now
+    );
+
+  // Alte Event-Anfragen löschen
+  eventRequests =
+    eventRequests.filter(
+      (r) =>
         now -
           Number(
-            tradeRequests[
-              i
-            ].createdAt ||
-              0
-          ) >
-        5 * 60 * 1000
-      ) {
-        tradeRequests.splice(
-          i,
-          1
-        );
-      }
-    }
-
-    /*
-     * Alte aktive Trades entfernen.
-     */
-    for (
-      const [
-        id,
-        trade
-      ] of activeTrades
-    ) {
-      if (
-        now -
-          Number(
-            trade.createdAt ||
-              0
-          ) >
+            r.createdAt || 0
+          ) <
         10 * 60 * 1000
-      ) {
-        activeTrades.delete(
-          id
-        );
-      }
-    }
-  },
-  5000
-);
+    );
+}, 1000);
 
+setInterval(() => {
+  if (
+    coinEventUntil > 0 &&
+    Date.now() >= coinEventUntil
+  ) {
+    executeEvent(
+      "coins",
+      "stop",
+      0
+    );
+  }
 
-/* =========================================================
-   ALLGEMEINES AUFRÄUMEN
-   ========================================================= */
+  if (
+    tenCoinEventUntil > 0 &&
+    Date.now() >=
+      tenCoinEventUntil
+  ) {
+    executeEvent(
+      "tenCoins",
+      "stop",
+      0
+    );
+  }
 
-setInterval(
-  () => {
-    const now =
-      Date.now();
+  if (
+    galaxyEventUntil > 0 &&
+    Date.now() >=
+      galaxyEventUntil
+  ) {
+    executeEvent(
+      "galaxy",
+      "stop",
+      0
+    );
+  }
+}, 1000);
 
-    serverMessages =
-      serverMessages.filter(
-        (message) =>
+setInterval(() => {
+  const now = Date.now();
+
+  // Trade-Anfragen nach 5 Minuten löschen
+  tradeRequests =
+    tradeRequests.filter(
+      (request) =>
+        now -
           Number(
-            message.endsAt ||
-              0
-          ) > now
-      );
+            request.createdAt || 0
+          ) <
+        5 * 60 * 1000
+    );
 
-    cleanupEventRequests();
-
+  // Trades nach 10 Minuten löschen
+  for (const [
+    id,
+    trade
+  ] of activeTrades) {
     if (
-      coinEventUntil >
-        0 &&
-      coinEventUntil <=
-        now
+      now -
+        Number(
+          trade.createdAt || 0
+        ) >
+      10 * 60 * 1000
     ) {
-      stopCoinEvent();
+      activeTrades.delete(id);
     }
-
-    if (
-      tenCoinEventUntil >
-        0 &&
-      tenCoinEventUntil <=
-        now
-    ) {
-      stopTenCoinEvent();
-    }
-
-    if (
-      galaxyEventUntil >
-        0 &&
-      galaxyEventUntil <=
-        now
-    ) {
-      stopGalaxyEvent();
-    }
-  },
-  1000
-);
-
+  }
+}, 5000);
 
 /* =========================================================
-   RENDER FALLBACK
+   ROUTING
    ========================================================= */
 
-app.use(
-  (req, res) => {
-    res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
-    );
-  }
-);
-
+app.use((req, res) => {
+  res.sendFile(
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
+  );
+});
 
 /* =========================================================
-   SERVER START
+   START
    ========================================================= */
 
-server.listen(
-  PORT,
-  () => {
-    console.log(
-      `Cube Rush server running on port ${PORT}`
-    );
+server.listen(PORT, () => {
+  console.log(
+    `Cube Rush server running on http://localhost:${PORT}`
+  );
 
-    console.log(
-      "Haupt-Admin: 603781"
-    );
+  console.log(
+    "Haupt-Admin: 603781"
+  );
 
-    console.log(
-      "Zweiter Admin: 6301"
-    );
-
-    console.log(
-      "2x / 10x / Galaxy aktiviert"
-    );
-
-    console.log(
-      "Trade-System aktiviert"
-    );
-  }
-);
+  console.log(
+    "Zweites Admin-Panel: 6301"
+  );
+});
