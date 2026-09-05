@@ -1119,229 +1119,6 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
   }
 }
 
-/* ---------- NEUES GELBES MÜNZEN-DESIGN ---------- */
-#menuCoins,
-#shopBalance,
-#coins{
-  position:relative;
-  display:inline-flex !important;
-  align-items:center;
-  justify-content:center;
-  gap:9px;
-  color:#fff !important;
-  background:linear-gradient(135deg,#ffe35a 0%,#ffcf20 45%,#f0a900 100%) !important;
-  border:4px solid #17143b !important;
-  border-radius:999px !important;
-  box-shadow:0 5px 0 #17143b,0 10px 20px rgba(23,20,59,.22),inset 0 3px 0 rgba(255,255,255,.55),inset 0 -4px 0 rgba(170,103,0,.22) !important;
-  text-shadow:0 3px 0 rgba(23,20,59,.45) !important;
-  overflow:hidden;
-}
-
-#menuCoins::before,
-#shopBalance::before,
-#coins::before{
-  content:"";
-  flex:0 0 auto;
-  width:27px;
-  height:27px;
-  border-radius:50%;
-  background:
-    linear-gradient(135deg,transparent 0 38%,rgba(255,247,154,.75) 39% 51%,transparent 52%),
-    radial-gradient(circle at 36% 30%,#fff58a 0 10%,#ffd52b 28%,#ffbd00 63%,#e69500 100%);
-  border:3px solid #fff0a0;
-  box-shadow:
-    0 0 0 2px #c98400,
-    inset 2px 2px 0 rgba(255,255,255,.55),
-    inset -3px -3px 0 rgba(166,94,0,.28);
-}
-
-#menuCoins{
-  padding:7px 22px !important;
-  width:min(520px,90vw);
-  max-width:90vw;
-  font-size:clamp(17px,2.2vw,24px) !important;
-  line-height:1.15;
-  white-space:nowrap;
-}
-
-#shopBalance{
-  padding:8px 16px !important;
-}
-
-#coins{
-  padding:7px 14px !important;
-}
-
-@media(max-width:700px){
-  #menuCoins{
-    padding:6px 15px !important;
-    font-size:17px !important;
-  }
-  #menuCoins::before,
-  #shopBalance::before,
-  #coins::before{
-    width:22px;
-    height:22px;
-    border-width:2px;
-  }
-}
-
-
-/* ---------- GAME HUD: MÜNZEN NICHT MEHR IN DER ECKE ---------- */
-body:not(#menu) #coins,
-#hud #coins{
-  position:fixed !important;
-  left:50% !important;
-  right:auto !important;
-  top:14px !important;
-  transform:translateX(-50%) !important;
-  z-index:6 !important;
-  margin:0 !important;
-  min-width:220px;
-  padding:7px 16px !important;
-  font-size:clamp(17px,2vw,24px) !important;
-  white-space:nowrap;
-  pointer-events:none;
-}
-
-/* ---------- SPIELER-FRAGE: IMMER SICHTBAR UND ANKLICKBAR ---------- */
-#playerPoll{
-  pointer-events:auto !important;
-  cursor:default;
-  z-index:1500 !important;
-  color:#fff !important;
-}
-#playerPollQuestion{
-  color:#fff !important;
-}
-#playerPollButtons button{
-  pointer-events:auto !important;
-  position:relative;
-  z-index:1501;
-}
-@media (max-width:650px){
-  body:not(.phone-mode) #coins,
-  body.phone-mode #hud #coins{
-    top:8px !important;
-  }
-}
-@media (orientation:landscape) and (max-width:1000px){
-  body.phone-mode #hud #coins{
-    top:4px !important;
-    left:50% !important;
-    transform:translateX(-50%) !important;
-    font-size:11px !important;
-    min-width:160px;
-    padding:4px 10px !important;
-  }
-}
-
-/* ---------- RANGLISTE ---------- */
-#leaderboardOpen{
-  width:min(420px,86vw);
-  margin:8px auto 0;
-  padding:12px 18px;
-  border:0;
-  border-radius:14px;
-  background:#ffd83d;
-  color:#171b3d;
-  font-size:18px;
-  font-weight:900;
-  cursor:pointer;
-  box-shadow:0 5px 0 #b18b00,0 10px 25px rgba(0,0,0,.18);
-}
-#leaderboardOpen:hover{filter:brightness(1.04)}
-#leaderboardPanel{
-  position:fixed;
-  inset:0;
-  z-index:1700;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  background:rgba(6,10,30,.72);
-  backdrop-filter:blur(6px);
-}
-#leaderboardPanel.open{display:flex}
-#leaderboardBox{
-  width:min(720px,94vw);
-  max-height:min(80vh,760px);
-  overflow:auto;
-  border:3px solid #ffd83d;
-  border-radius:24px;
-  background:#101536;
-  color:#fff;
-  box-shadow:0 18px 50px rgba(0,0,0,.4);
-  padding:20px;
-}
-#leaderboardBox h2{
-  margin:0 0 8px;
-  text-align:center;
-  font-size:32px;
-  color:#ffd83d;
-}
-#leaderboardInfo{
-  text-align:center;
-  color:#cbd3ff;
-  font-weight:700;
-  margin-bottom:14px;
-}
-#leaderboardList{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.leaderRow{
-  display:grid;
-  grid-template-columns:58px 1fr auto;
-  align-items:center;
-  gap:10px;
-  padding:12px 14px;
-  border-radius:14px;
-  background:#171d47;
-  border:1px solid #303a79;
-}
-.leaderRow.top1{
-  border-color:#ffd83d;
-  box-shadow:0 0 14px rgba(255,216,61,.24);
-  background:#232043;
-}
-.leaderRank{
-  font-size:24px;
-  font-weight:1000;
-  text-align:center;
-}
-.leaderName{
-  font-weight:900;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.leaderCoins{
-  color:#ffd83d;
-  font-weight:1000;
-  white-space:nowrap;
-}
-#leaderboardClose{
-  display:block;
-  width:min(300px,90%);
-  margin:16px auto 0;
-  padding:12px 18px;
-  border:0;
-  border-radius:14px;
-  background:#14d9ef;
-  color:#082035;
-  font-weight:1000;
-  font-size:18px;
-  cursor:pointer;
-}
-@media (max-width:650px){
-  #leaderboardBox{padding:14px;border-radius:18px}
-  #leaderboardBox h2{font-size:24px}
-  .leaderRow{grid-template-columns:44px 1fr auto;padding:10px}
-  .leaderRank{font-size:20px}
-  .leaderCoins{font-size:14px}
-}
 </style>
 
 <style>
@@ -1501,7 +1278,6 @@ body:not(#menu) #coins,
 <div id="levels"></div>
 <div id="menuShopActions">
 <button id="tradeOpen" type="button">🤝 TRADE</button>
-<button id="leaderboardOpen" type="button">🏆 RANGLISTE</button>
 <button id="shopOpen" type="button" aria-label="Shop"><span aria-hidden="true"></span></button>
 </div>
 <div id="tip">Leertaste / Klick = Springen · E = Pop-Kraft (Katze) · Im Flugzeug Leertaste halten = hoch</div>
@@ -1519,16 +1295,6 @@ body:not(#menu) #coins,
 <div class="skinGrid" id="trailGrid"></div>
 <button class="shopClose" id="shopClose" type="button">ZURÜCK</button>
 </div>
-</div>
-
-
-<div id="leaderboardPanel" aria-hidden="true">
-  <div id="leaderboardBox">
-    <h2>🏆 RANGLISTE</h2>
-    <div id="leaderboardInfo">Die meisten Münzen stehen ganz oben.</div>
-    <div id="leaderboardList"></div>
-    <button id="leaderboardClose" type="button">ZURÜCK</button>
-  </div>
 </div>
 
 <div id="tradePanel" aria-hidden="true">
@@ -1678,6 +1444,20 @@ body:not(#menu) #coins,
 <button class="adminAction" id="adminMessageSend">Nachricht senden</button>
 <button class="adminAction" id="adminMessageDelete">🗑️ Nachricht löschen</button>
 </div>
+<div class="adminSectionTitle">🗳️ SPIELER-FRAGE</div>
+<input id="adminPollQuestion" maxlength="140" placeholder="z. B. Wollt ihr 10× Münzen?" type="text"/>
+<div class="adminPollGrid">
+<input id="adminPollYes" maxlength="40" placeholder="Antwort Ja" type="text" value="Ja"/>
+<input id="adminPollNo" maxlength="40" placeholder="Antwort Nein" type="text" value="Nein"/>
+</div>
+<div class="adminPollGrid">
+<input id="adminPollMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
+<input id="adminPollSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
+</div>
+<button class="adminAction" id="adminPollStart">🗳️ Frage an Spieler senden</button>
+<button class="adminAction" id="adminPollStop">🛑 Frage schließen</button>
+<div id="adminPollStatus"></div>
+<div id="adminPollResults" style="margin-top:8px;font-size:13px;opacity:.85"></div>
 <button id="adminClose">Schließen</button>
 </div>
 </div>
@@ -1861,33 +1641,7 @@ function save(){
   saveSkins();
   saveTrails();
   savePlaneSkins();
-  syncLeaderboardCoins();
 }
-
-function syncLeaderboardCoins(){
-  try{
-    const name=
-      (localStorage.getItem("crPlayerName")||"").trim();
-
-    if(!name || location.protocol==="file:")return;
-
-    fetch("/api/leaderboard/update",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({
-        player:name,
-        coins:Math.max(
-          0,
-          Number(coins)||0
-        )
-      })
-    }).catch(()=>{});
-  }catch(_){}
-}
-
-
 
 /* ---------- player ---------- */
 const player={
@@ -4893,15 +4647,17 @@ function updatePollPosition(){
   const box=document.getElementById("serverMessages");
   const poll=document.getElementById("playerPoll");
   if(!poll)return;
-  const gap=8;
-  if(box){
-    const rect=box.getBoundingClientRect();
-    poll.style.top=Math.max(54,Math.round(rect.bottom+gap))+"px";
-  }else{
-    poll.style.top="58px";
+  const isLaptop=document.body && document.body.classList.contains("laptop-mode");
+  if(isLaptop){
+    // Auf dem Laptop steht die Frage direkt über dem Fortschrittsbalken.
+    poll.style.top="62px";
+    return;
   }
-  poll.style.left="50%";
-  poll.style.transform="translateX(-50%)";
+  if(!box)return;
+  const rect=box.getBoundingClientRect();
+  const gap=8;
+  const top=Math.max(14, Math.round(rect.bottom + gap));
+  poll.style.top=top+"px";
 }
 
 function renderServerMessages(){
@@ -6342,136 +6098,157 @@ setInterval(updateSettingsScore,500);
   const yes=document.getElementById("playerPollYes");
   const no=document.getElementById("playerPollNo");
   const time=document.getElementById("playerPollTime");
-  if(!poll||!q||!yes||!no||!time)return;
+  const aQ=document.getElementById("adminPollQuestion");
+  const aYes=document.getElementById("adminPollYes");
+  const aNo=document.getElementById("adminPollNo");
+  const aMin=document.getElementById("adminPollMinutes");
+  const aSec=document.getElementById("adminPollSeconds");
+  const aStart=document.getElementById("adminPollStart");
+  const aStop=document.getElementById("adminPollStop");
+  const aStatus=document.getElementById("adminPollStatus");
+  const aResults=document.getElementById("adminPollResults");
+  if(!poll||!q||!yes||!no||!time||!aStart||!aStop)return;
 
   let currentPoll=null;
   let pollTimer=null;
+  let lastPollId="";
 
   function renderPoll(p){
     currentPoll=p||null;
     if(!p){
       poll.classList.remove("open");
-      poll.style.display="none";
       if(pollTimer)clearInterval(pollTimer);
       return;
     }
-
     q.textContent=p.question||"Frage";
     yes.textContent=p.yesLabel||"Ja";
     no.textContent=p.noLabel||"Nein";
-
     poll.classList.add("open");
-    poll.classList.remove("hidden");
-    poll.style.display="block";
-    poll.style.pointerEvents="auto";
-
-    if(typeof updatePollPosition==="function")updatePollPosition();
-
+    lastPollId=p.id||"";
     if(pollTimer)clearInterval(pollTimer);
-
     const tick=()=>{
-      const left=Math.max(
-        0,
-        Number(p.endsAt||0)-Date.now()
-      );
-
+      const left=Math.max(0,Number(p.endsAt||0)-Date.now());
       const sec=Math.ceil(left/1000);
-
-      time.textContent =
-        sec>0
-          ? "⏳ Noch "+sec+" Sekunden"
-          : "⏳ Zeit abgelaufen";
-
+      time.textContent=sec>0?"⏳ Noch "+sec+" Sekunden":"⏳ Zeit abgelaufen";
       if(left<=0)renderPoll(null);
     };
-
     tick();
     pollTimer=setInterval(tick,1000);
   }
 
   function handlePoll(p){
     if(!p)return renderPoll(null);
-    if(Number(p.endsAt||0)<=Date.now()){
-      return renderPoll(null);
-    }
+    if(Number(p.endsAt||0)<=Date.now())return renderPoll(null);
     renderPoll(p);
+  }
+
+  if(window.WebSocket){
+    // vorhandene Socket-Logik kann das Event verarbeiten, falls sie window.cubeRushSocket setzt.
+    const hook=setInterval(()=>{
+      const ws=window.cubeRushSocket || window.ws || null;
+      if(ws && !ws.__pollHooked){
+        ws.__pollHooked=true;
+        const old=ws.onmessage;
+        ws.onmessage=(ev)=>{
+          try{
+            const msg=JSON.parse(ev.data);
+            if(msg.type==="playerPoll")handlePoll(msg.poll);
+            if(msg.type==="playerPollClear")renderPoll(null);
+          }catch{}
+          if(typeof old==="function")old.call(ws,ev);
+        };
+        clearInterval(hook);
+      }
+    },500);
   }
 
   window.handlePlayerPoll=handlePoll;
 
   async function answer(choice){
     if(!currentPoll)return;
-
     try{
-      yes.disabled=true;
-      no.disabled=true;
-
+      yes.disabled=true; no.disabled=true;
       let voterId=localStorage.getItem("crPollVoterId");
-
       if(!voterId){
         try{
-          voterId =
-            crypto &&
-            crypto.randomUUID
-              ? crypto.randomUUID()
-              : Date.now().toString(36)+
-                Math.random().toString(36).slice(2);
+          voterId=(crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
         }catch(e){
-          voterId =
-            Date.now().toString(36)+
-            Math.random().toString(36).slice(2);
+          voterId=Date.now().toString(36)+Math.random().toString(36).slice(2);
         }
-
-        localStorage.setItem(
-          "crPollVoterId",
-          voterId
-        );
+        localStorage.setItem("crPollVoterId",voterId);
       }
-
-      const r=await fetch(
-        "/api/poll/answer",
-        {
-          method:"POST",
-          headers:{
-            "Content-Type":"application/json"
-          },
-          body:JSON.stringify({
-            pollId:currentPoll.id,
-            answer:choice,
-            voterId
-          })
-        }
-      );
-
-      if(!r.ok){
-        const d=await r.json().catch(()=>({}));
-        throw new Error(
-          d.error || "Antwort nicht gespeichert"
-        );
-      }
-
+      const r=await fetch("/api/poll/answer",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({pollId:currentPoll.id,answer:choice,voterId})
+      });
+      if(!r.ok)throw new Error("Antwort nicht gespeichert");
       time.textContent="✅ Antwort gespeichert";
-
-      setTimeout(
-        ()=>renderPoll(null),
-        700
-      );
+      setTimeout(()=>renderPoll(null),700);
     }catch(e){
-      yes.disabled=false;
-      no.disabled=false;
+      yes.disabled=false; no.disabled=false;
       time.textContent="❌ "+e.message;
     }
   }
+  yes.addEventListener("click",()=>answer("yes"));
+  no.addEventListener("click",()=>answer("no"));
 
-  yes.addEventListener(
-    "click",
-    ()=>answer("yes")
-  );
+  async function adminPost(url,body){
+    const r=await fetch(url,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-admin-key":"603781"},
+      body:JSON.stringify(body||{})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"Fehler");
+    return d;
+  }
 
-  no.addEventListener(
-    "click",
-    ()=>answer("no")
-  );
+  aStart.addEventListener("click",async()=>{
+    const question=(aQ.value||"").trim();
+    const yesLabel=(aYes.value||"Ja").trim()||"Ja";
+    const noLabel=(aNo.value||"Nein").trim()||"Nein";
+    const min=Math.max(0,Number(aMin.value)||0);
+    const sec=Math.max(0,Math.min(59,Number(aSec.value)||0));
+    const durationMs=(min*60+sec)*1000;
+    if(!question||durationMs<=0){
+      if(aStatus)aStatus.textContent="❌ Frage und Zeit eingeben";
+      return;
+    }
+    try{
+      const d=await adminPost("/api/admin/poll",{question,yesLabel,noLabel,durationMs});
+      if(aStatus)aStatus.textContent="✅ Frage ist jetzt für alle sichtbar";
+      if(d.poll)handlePoll(d.poll);
+    }catch(e){
+      if(aStatus)aStatus.textContent="❌ "+e.message;
+    }
+  });
+
+  aStop.addEventListener("click",async()=>{
+    try{
+      await adminPost("/api/admin/poll/stop",{});
+      if(aStatus)aStatus.textContent="🛑 Frage geschlossen";
+    }catch(e){
+      if(aStatus)aStatus.textContent="❌ "+e.message;
+    }
+  });
+
+  async function loadResults(){
+    try{
+      const r=await fetch("/api/admin/poll/status",{headers:{"x-admin-key":"603781"}});
+      if(!r.ok)return;
+      const d=await r.json();
+      if(d.poll && Number(d.poll.endsAt||0)>Date.now()){
+        const y=Number(d.poll.answers?.yes||0);
+        const n=Number(d.poll.answers?.no||0);
+        if(aResults)aResults.textContent="Antworten: ✅ "+y+" · ❌ "+n;
+      }else{
+        if(aResults)aResults.textContent="Keine aktive Frage.";
+      }
+    }catch{}
+  }
+  setInterval(loadResults,2000);
+  loadResults();
 })();
 </script>
 
@@ -6950,144 +6727,6 @@ setInterval(updateSettingsScore,500);
 
   // Auch nach einem Shop-Update bleibt das Trade-Inventar aktuell.
   window.addEventListener('cubeRushTradeUpdated',renderMySkins);
-})();
-
-/* ---------- RANGLISTE ---------- */
-(function(){
-  const openBtn=document.getElementById("leaderboardOpen");
-  const closeBtn=document.getElementById("leaderboardClose");
-  const panel=document.getElementById("leaderboardPanel");
-  const list=document.getElementById("leaderboardList");
-  const info=document.getElementById("leaderboardInfo");
-
-  function formatCoins(value){
-    const n=Number(value)||0;
-
-    if(Math.abs(n)<1e15){
-      return n.toLocaleString("de-DE",{
-        minimumFractionDigits:2,
-        maximumFractionDigits:2
-      });
-    }
-
-    return n.toExponential(2).replace(".",",");
-  }
-
-  function render(rows){
-    if(!list)return;
-
-    if(!Array.isArray(rows)||!rows.length){
-      list.innerHTML=
-        '<div style="text-align:center;padding:20px;color:#cbd3ff;font-weight:800">Noch keine Spieler in der Rangliste.</div>';
-      return;
-    }
-
-    list.innerHTML="";
-
-    rows.forEach((row,index)=>{
-      const item=document.createElement("div");
-      item.className=
-        "leaderRow"+(index===0?" top1":"");
-
-      const rank=document.createElement("div");
-      rank.className="leaderRank";
-      rank.textContent=
-        index===0 ? "🥇" :
-        index===1 ? "🥈" :
-        index===2 ? "🥉" :
-        (index+1)+ ".";
-
-      const name=document.createElement("div");
-      name.className="leaderName";
-      name.textContent=row.player||"Spieler";
-
-      const coinsEl=document.createElement("div");
-      coinsEl.className="leaderCoins";
-      coinsEl.textContent=
-        formatCoins(row.coins)+" Münzen";
-
-      item.appendChild(rank);
-      item.appendChild(name);
-      item.appendChild(coinsEl);
-      list.appendChild(item);
-    });
-  }
-
-  async function load(){
-    try{
-      const r=await fetch("/api/leaderboard");
-      if(!r.ok)throw new Error();
-
-      const d=await r.json();
-
-      if(d && Array.isArray(d.players)){
-        render(d.players);
-
-        if(info){
-          info.textContent=
-            "Die meisten Münzen stehen ganz oben.";
-        }
-      }
-    }catch(e){
-      if(list){
-        list.innerHTML=
-          '<div style="text-align:center;padding:20px;color:#ff8290;font-weight:800">Rangliste konnte nicht geladen werden.</div>';
-      }
-    }
-  }
-
-  function open(){
-    if(!panel)return;
-
-    panel.classList.add("open");
-    panel.setAttribute(
-      "aria-hidden",
-      "false"
-    );
-
-    load();
-  }
-
-  function close(){
-    if(!panel)return;
-
-    panel.classList.remove("open");
-    panel.setAttribute(
-      "aria-hidden",
-      "true"
-    );
-  }
-
-  openBtn?.addEventListener(
-    "click",
-    open
-  );
-
-  closeBtn?.addEventListener(
-    "click",
-    close
-  );
-
-  panel?.addEventListener(
-    "click",
-    e=>{
-      if(e.target===panel)close();
-    }
-  );
-
-  setInterval(()=>{
-    syncLeaderboardCoins();
-  },5000);
-
-  setTimeout(()=>{
-    syncLeaderboardCoins();
-  },1500);
-
-  setInterval(()=>{
-    if(panel?.classList.contains("open")){
-      load();
-    }
-  },5000);
 })();
 </script>
 
