@@ -8,99 +8,14 @@ const ADMIN_KEY = process.env.ADMIN_KEY || "603781";
 const SECOND_ADMIN_KEY = process.env.SECOND_ADMIN_KEY || "6301";
 
 const app = express();
-
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: "50kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-/* =========================================================
-   SPIELER
-   ========================================================= */
-
 const players = new Map();
-
-/*
-player = {
-  ws,
-  name,
-  coins
-}
-*/
-
-function cleanName(name) {
-  return String(name || "")
-    .trim()
-    .slice(0, 40);
-}
-
-function send(ws, payload) {
-  if (
-    ws &&
-    ws.readyState === WebSocket.OPEN
-  ) {
-    ws.send(JSON.stringify(payload));
-  }
-}
-
-function broadcast(payload) {
-  const data = JSON.stringify(payload);
-
-  for (const ws of wss.clients) {
-    if (
-      ws.readyState === WebSocket.OPEN
-    ) {
-      ws.send(data);
-    }
-  }
-}
-
-function adminOK(req) {
-  return (
-    req.headers["x-admin-key"] ===
-    ADMIN_KEY
-  );
-}
-
-function secondAdminOK(req) {
-  return (
-    req.headers["x-admin-key"] ===
-    SECOND_ADMIN_KEY
-  );
-}
-
-function adminMessageEventOK(req) {
-  const key =
-    req.headers["x-admin-key"];
-
-  return (
-    key === ADMIN_KEY ||
-    key === SECOND_ADMIN_KEY
-  );
-}
-
-function amountFrom(body) {
-  return Math.max(
-    0,
-    Math.floor(
-      Number(body?.coins) || 0
-    )
-  );
-}
-
-function makeRequestId() {
-  return (
-    Date.now().toString(36) +
-    Math.random()
-      .toString(36)
-      .slice(2, 9)
-  );
-}
-
-/* =========================================================
-   EVENTS
-   ========================================================= */
+const leaderboard = new Map();
 
 let coinEventUntil = 0;
 let tenCoinEventUntil = 0;
@@ -109,65 +24,73 @@ let galaxyEventUntil = 0;
 let serverMessages = [];
 let eventRequests = [];
 
-/* =========================================================
-   TRADE
-   ========================================================= */
-
 let tradeRequests = [];
-
 const activeTrades = new Map();
 const completedTrades = new Map();
+
+let activePoll = null;
+
+function cleanName(name) {
+  return String(name || "").trim().slice(0, 40);
+}
+
+function normalizeCoinValue(value) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) return 0;
+
+  return Math.max(0, n);
+}
+
+function send(ws, payload) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+
+function broadcast(payload) {
+  const data = JSON.stringify(payload);
+
+  for (const ws of wss.clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
+  }
+}
+
+function adminOK(req) {
+  return req.headers["x-admin-key"] === ADMIN_KEY;
+}
+
+function secondAdminOK(req) {
+  return req.headers["x-admin-key"] === SECOND_ADMIN_KEY;
+}
+
+function adminMessageEventOK(req) {
+  const key = req.headers["x-admin-key"];
+  return key === ADMIN_KEY || key === SECOND_ADMIN_KEY;
+}
+
+function amountFrom(body) {
+  return Math.max(0, Math.floor(Number(body?.coins) || 0));
+}
+
+function makeRequestId() {
+  return (
+    Date.now().toString(36) +
+    Math.random().toString(36).slice(2, 9)
+  );
+}
 
 /* =========================================================
    RANGLISTE
    ========================================================= */
 
-/*
-Die Münzen werden pro Spieler gespeichert.
-
-Wichtig:
-Die index.html sollte nach jeder Änderung der Münzen
-eine Nachricht an den Server senden:
-
-{
-  type: "coinsUpdate",
-  coins: aktuelleMünzen
-}
-*/
-
-const leaderboard = new Map();
-
-function setPlayerCoins(
-  name,
-  coins
-) {
-  name = cleanName(name);
-
-  if (!name) return;
-
-  const value = Math.max(
-    0,
-    Number(coins) || 0
-  );
-
-  leaderboard.set(
-    name,
-    value
-  );
-
-  const player =
-    players.get(name);
-
-  if (player) {
-    player.coins = value;
-  }
-}
-
-function getLeaderboard() {
+function leaderboardRows(limit = 50) {
   return [...leaderboard.entries()]
     .map(([name, coins]) => ({
       name,
-      coins
+      coins: normalizeCoinValue(coins)
     }))
     .sort((a, b) => {
       if (b.coins !== a.coins) {
@@ -176,36 +99,66 @@ function getLeaderboard() {
 
       return a.name.localeCompare(
         b.name,
-        "de"
+        "de",
+        { sensitivity: "base" }
       );
     })
-    .map(
-      (player, index) => ({
-        place: index + 1,
-        name: player.name,
-        coins: player.coins
-      })
-    );
+    .slice(0, limit)
+    .map((entry, index) => ({
+      rank: index + 1,
+      name: entry.name,
+      coins: entry.coins
+    }));
+}
+
+function updateLeaderboard(name, coins) {
+  name = cleanName(name);
+
+  if (!name) return;
+
+  leaderboard.set(
+    name,
+    normalizeCoinValue(coins)
+  );
+
+  broadcast({
+    type: "leaderboardUpdate"
+  });
 }
 
 /* =========================================================
-   REQUEST-ID
+   POLL
    ========================================================= */
 
-function publicRequests() {
-  return eventRequests.map(
-    (r) => ({
-      id: r.id,
-      event: r.event,
-      action: r.action,
-      durationMs: r.durationMs,
-      createdAt: r.createdAt
-    })
-  );
+function publicPoll() {
+  if (!activePoll) return null;
+
+  if (
+    Number(activePoll.endsAt || 0) <=
+    Date.now()
+  ) {
+    return null;
+  }
+
+  return {
+    id: activePoll.id,
+    question: activePoll.question,
+    yesLabel: activePoll.yesLabel,
+    noLabel: activePoll.noLabel,
+    endsAt: activePoll.endsAt,
+    answers: {
+      yes: Number(
+        activePoll.answers?.yes || 0
+      ),
+      no: Number(
+        activePoll.answers?.no || 0
+      )
+    }
+  };
 }
 
 /* =========================================================
-   EVENTS AUSFÜHREN
+   EVENTS
    ========================================================= */
 
 function executeEvent(
@@ -220,13 +173,11 @@ function executeEvent(
 
       broadcast({
         type: "coinEvent",
-        until:
-          coinEventUntil
+        until: coinEventUntil
       });
 
       return {
-        until:
-          coinEventUntil
+        until: coinEventUntil
       };
     }
 
@@ -251,13 +202,11 @@ function executeEvent(
 
       broadcast({
         type: "tenCoinEvent",
-        until:
-          tenCoinEventUntil
+        until: tenCoinEventUntil
       });
 
       return {
-        until:
-          tenCoinEventUntil
+        until: tenCoinEventUntil
       };
     }
 
@@ -282,13 +231,11 @@ function executeEvent(
 
       broadcast({
         type: "galaxyEvent",
-        until:
-          galaxyEventUntil
+        until: galaxyEventUntil
       });
 
       return {
-        until:
-          galaxyEventUntil
+        until: galaxyEventUntil
       };
     }
 
@@ -306,277 +253,156 @@ function executeEvent(
     }
   }
 
-  throw new Error(
-    "Ungültiges Event"
-  );
+  throw new Error("Ungültiges Event");
 }
 
 /* =========================================================
    WEBSOCKET
    ========================================================= */
 
-wss.on(
-  "connection",
-  (ws) => {
-    ws.playerName = "";
-    ws.lastHeartbeat =
-      Date.now();
+wss.on("connection", (ws) => {
+  ws.playerName = "";
+  ws.lastHeartbeat = Date.now();
 
-    ws.on(
-      "message",
-      (raw) => {
-        let msg;
+  ws.on("message", (raw) => {
+    let msg;
 
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    ws.lastHeartbeat = Date.now();
+
+    if (msg.type === "identify") {
+      let name = cleanName(msg.name);
+
+      if (!name) {
+        name =
+          "Spieler-" +
+          Math.random()
+            .toString(36)
+            .slice(2, 8)
+            .toUpperCase();
+      }
+
+      const oldSocket =
+        players.get(name);
+
+      if (
+        oldSocket &&
+        oldSocket !== ws
+      ) {
         try {
-          msg = JSON.parse(
-            raw.toString()
-          );
-        } catch {
-          return;
-        }
+          oldSocket.terminate();
+        } catch {}
 
-        ws.lastHeartbeat =
-          Date.now();
-
-        /* -------------------------
-           SPIELER ANMELDEN
-           ------------------------- */
-
-        if (
-          msg.type ===
-          "identify"
-        ) {
-          let name =
-            cleanName(
-              msg.name
-            );
-
-          if (!name) {
-            name =
-              "Spieler-" +
-              Math.random()
-                .toString(36)
-                .slice(2, 8)
-                .toUpperCase();
-          }
-
-          const oldPlayer =
-            players.get(
-              name
-            );
-
-          if (
-            oldPlayer &&
-            oldPlayer.ws !== ws
-          ) {
-            try {
-              oldPlayer.ws.terminate();
-            } catch {}
-
-            players.delete(
-              name
-            );
-          }
-
-          if (
-            ws.playerName &&
-            players.has(
-              ws.playerName
-            )
-          ) {
-            players.delete(
-              ws.playerName
-            );
-          }
-
-          ws.playerName =
-            name;
-
-          const oldCoins =
-            leaderboard.get(
-              name
-            ) || 0;
-
-          players.set(
-            name,
-            {
-              ws,
-              name,
-              coins:
-                oldCoins
-            }
-          );
-
-          send(ws, {
-            type:
-              "connected",
-
-            name,
-
-            coins:
-              oldCoins,
-
-            coinEventUntil:
-              coinEventUntil >
-              Date.now()
-                ? coinEventUntil
-                : 0,
-
-            tenCoinEventUntil:
-              tenCoinEventUntil >
-              Date.now()
-                ? tenCoinEventUntil
-                : 0,
-
-            galaxyEventUntil:
-              galaxyEventUntil >
-              Date.now()
-                ? galaxyEventUntil
-                : 0,
-
-            serverMessages,
-
-            leaderboard:
-              getLeaderboard()
-          });
-
-          return;
-        }
-
-        /* -------------------------
-           MÜNZEN AKTUALISIEREN
-           ------------------------- */
-
-        if (
-          msg.type ===
-          "coinsUpdate"
-        ) {
-          if (!ws.playerName) {
-            return;
-          }
-
-          const coins =
-            Math.max(
-              0,
-              Number(
-                msg.coins
-              ) || 0
-            );
-
-          setPlayerCoins(
-            ws.playerName,
-            coins
-          );
-
-          broadcast({
-            type:
-              "leaderboardUpdate",
-
-            leaderboard:
-              getLeaderboard()
-          });
-
-          return;
-        }
-
-        /* -------------------------
-           HEARTBEAT
-           ------------------------- */
-
-        if (
-          msg.type ===
-          "heartbeat"
-        ) {
-          send(ws, {
-            type:
-              "heartbeatAck"
-          });
-
-          return;
-        }
+        players.delete(name);
       }
-    );
 
-    ws.on(
-      "close",
-      () => {
-        if (
-          ws.playerName &&
-          players.has(
-            ws.playerName
-          )
-        ) {
-          const player =
-            players.get(
-              ws.playerName
-            );
-
-          if (
-            player.ws === ws
-          ) {
-            players.delete(
-              ws.playerName
-            );
-          }
-        }
+      if (
+        ws.playerName &&
+        players.get(ws.playerName) === ws
+      ) {
+        players.delete(ws.playerName);
       }
-    );
 
-    ws.on(
-      "error",
-      () => {
-        if (
-          ws.playerName &&
-          players.has(
-            ws.playerName
-          )
-        ) {
-          const player =
-            players.get(
-              ws.playerName
-            );
+      ws.playerName = name;
+      players.set(name, ws);
 
-          if (
-            player.ws === ws
-          ) {
-            players.delete(
-              ws.playerName
-            );
-          }
-        }
+      if (!leaderboard.has(name)) {
+        leaderboard.set(name, "0");
       }
-    );
-  }
-);
 
-/* =========================================================
-   ONLINE CLEANUP
-   ========================================================= */
+      send(ws, {
+        type: "connected",
+        name,
 
-setInterval(() => {
-  const now =
-    Date.now();
+        coinEventUntil:
+          coinEventUntil > Date.now()
+            ? coinEventUntil
+            : 0,
 
-  for (
-    const [name, player]
-      of players
-  ) {
-    if (
-      player.ws.readyState !==
-        WebSocket.OPEN ||
-      now -
-        (
-          player.ws.lastHeartbeat ||
-          0
-        ) >
-        30000
-    ) {
-      players.delete(
-        name
+        tenCoinEventUntil:
+          tenCoinEventUntil > Date.now()
+            ? tenCoinEventUntil
+            : 0,
+
+        galaxyEventUntil:
+          galaxyEventUntil > Date.now()
+            ? galaxyEventUntil
+            : 0,
+
+        serverMessages,
+
+        poll: publicPoll()
+      });
+
+      return;
+    }
+
+    /*
+      Die HTML sendet die aktuellen Münzen.
+      Dadurch wird die Rangliste auf dem Server
+      aktuell gehalten.
+    */
+    if (msg.type === "coinsUpdate") {
+      const name =
+        ws.playerName ||
+        cleanName(msg.name);
+
+      if (!name) return;
+
+      const coins =
+        normalizeCoinValue(msg.coins);
+
+      updateLeaderboard(
+        name,
+        coins
       );
 
+      return;
+    }
+
+    if (msg.type === "heartbeat") {
+      send(ws, {
+        type: "heartbeatAck"
+      });
+    }
+  });
+
+  ws.on("close", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+
+  ws.on("error", () => {
+    if (
+      ws.playerName &&
+      players.get(ws.playerName) === ws
+    ) {
+      players.delete(ws.playerName);
+    }
+  });
+});
+
+setInterval(() => {
+  const now = Date.now();
+
+  for (const [name, ws] of players) {
+    if (
+      ws.readyState !== WebSocket.OPEN ||
+      now - (ws.lastHeartbeat || 0) > 30000
+    ) {
+      players.delete(name);
+
       try {
-        player.ws.terminate();
+        ws.terminate();
       } catch {}
     }
   }
@@ -591,14 +417,13 @@ app.get(
   (req, res) => {
     return res.json({
       ok: true,
-      leaderboard:
-        getLeaderboard()
+      leaderboard: leaderboardRows(50)
     });
   }
 );
 
 /* =========================================================
-   ADMIN 2X COIN EVENT
+   HAUPT-ADMIN
    ========================================================= */
 
 app.post(
@@ -606,26 +431,19 @@ app.post(
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const action =
-      String(
-        req.body?.action || ""
-      );
+      String(req.body?.action || "");
 
-    if (
-      action === "start"
-    ) {
+    if (action === "start") {
       const durationMs =
         Math.max(
           1000,
           Math.min(
-            10080 *
-              60 *
-              1000,
+            10080 * 60 * 1000,
             Math.floor(
               Number(
                 req.body?.durationMs
@@ -644,9 +462,7 @@ app.post(
       });
     }
 
-    if (
-      action === "stop"
-    ) {
+    if (action === "stop") {
       return res.json({
         ok: true,
         ...executeEvent(
@@ -658,41 +474,29 @@ app.post(
     }
 
     return res.status(400).json({
-      error:
-        "Invalid action"
+      error: "Invalid action"
     });
   }
 );
-
-/* =========================================================
-   10X EVENT
-   ========================================================= */
 
 app.post(
   "/api/admin/ten-coins-event",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const action =
-      String(
-        req.body?.action || ""
-      );
+      String(req.body?.action || "");
 
-    if (
-      action === "start"
-    ) {
+    if (action === "start") {
       const durationMs =
         Math.max(
           1000,
           Math.min(
-            10080 *
-              60 *
-              1000,
+            10080 * 60 * 1000,
             Math.floor(
               Number(
                 req.body?.durationMs
@@ -711,9 +515,7 @@ app.post(
       });
     }
 
-    if (
-      action === "stop"
-    ) {
+    if (action === "stop") {
       return res.json({
         ok: true,
         ...executeEvent(
@@ -725,38 +527,27 @@ app.post(
     }
 
     return res.status(400).json({
-      error:
-        "Invalid action"
+      error: "Invalid action"
     });
   }
 );
-
-/* =========================================================
-   COINS GEBEN
-   ========================================================= */
 
 app.post(
   "/api/admin/give",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const player =
-      cleanName(
-        req.body?.player
-      );
+      cleanName(req.body?.player);
 
     const coins =
       amountFrom(req.body);
 
-    if (
-      !player ||
-      coins <= 0
-    ) {
+    if (!player || coins <= 0) {
       return res.status(400).json({
         error:
           "Player and a coin amount are required"
@@ -764,29 +555,22 @@ app.post(
     }
 
     const target =
-      players.get(
-        player
-      );
+      players.get(player);
 
     if (
       !target ||
-      target.ws.readyState !==
-        WebSocket.OPEN
+      target.readyState !== WebSocket.OPEN
     ) {
       return res.status(404).json({
-        error:
-          "Player is not online"
+        error: "Player is not online"
       });
     }
 
-    send(
-      target.ws,
-      {
-        type: "gift",
-        target: player,
-        coins
-      }
-    );
+    send(target, {
+      type: "gift",
+      target: player,
+      coins
+    });
 
     return res.json({
       ok: true,
@@ -796,17 +580,12 @@ app.post(
   }
 );
 
-/* =========================================================
-   ALLEN COINS GEBEN
-   ========================================================= */
-
 app.post(
   "/api/admin/give-all",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
@@ -822,23 +601,23 @@ app.post(
 
     let count = 0;
 
-    const data =
+    const message =
       JSON.stringify({
-        type:
-          "giftAll",
+        type: "giftAll",
         coins
       });
 
     for (
-      const [name, player]
-        of players
+      const [name, ws] of players
     ) {
       if (
-        player.ws.readyState ===
+        ws.readyState ===
         WebSocket.OPEN
       ) {
-        player.ws.send(data);
+        ws.send(message);
         count++;
+      } else {
+        players.delete(name);
       }
     }
 
@@ -850,32 +629,22 @@ app.post(
   }
 );
 
-/* =========================================================
-   COINS WEGNEHMEN
-   ========================================================= */
-
 app.post(
   "/api/admin/take",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const player =
-      cleanName(
-        req.body?.player
-      );
+      cleanName(req.body?.player);
 
     const coins =
       amountFrom(req.body);
 
-    if (
-      !player ||
-      coins <= 0
-    ) {
+    if (!player || coins <= 0) {
       return res.status(400).json({
         error:
           "Player and a coin amount are required"
@@ -883,30 +652,22 @@ app.post(
     }
 
     const target =
-      players.get(
-        player
-      );
+      players.get(player);
 
     if (
       !target ||
-      target.ws.readyState !==
-        WebSocket.OPEN
+      target.readyState !== WebSocket.OPEN
     ) {
       return res.status(404).json({
-        error:
-          "Player is not online"
+        error: "Player is not online"
       });
     }
 
-    send(
-      target.ws,
-      {
-        type:
-          "takeCoins",
-        target: player,
-        coins
-      }
-    );
+    send(target, {
+      type: "takeCoins",
+      target: player,
+      coins
+    });
 
     return res.json({
       ok: true,
@@ -916,35 +677,24 @@ app.post(
   }
 );
 
-/* =========================================================
-   GALAXY EVENT
-   ========================================================= */
-
 app.post(
   "/api/admin/galaxy-event",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const action =
-      String(
-        req.body?.action || ""
-      );
+      String(req.body?.action || "");
 
-    if (
-      action === "start"
-    ) {
+    if (action === "start") {
       const durationMs =
         Math.max(
           60000,
           Math.min(
-            10080 *
-              60 *
-              1000,
+            10080 * 60 * 1000,
             Math.floor(
               Number(
                 req.body?.durationMs
@@ -963,9 +713,7 @@ app.post(
       });
     }
 
-    if (
-      action === "stop"
-    ) {
+    if (action === "stop") {
       return res.json({
         ok: true,
         ...executeEvent(
@@ -977,8 +725,7 @@ app.post(
     }
 
     return res.status(400).json({
-      error:
-        "Invalid action"
+      error: "Invalid action"
     });
   }
 );
@@ -990,21 +737,14 @@ app.post(
 app.post(
   "/api/admin/message",
   (req, res) => {
-    if (
-      !adminMessageEventOK(
-        req
-      )
-    ) {
+    if (!adminMessageEventOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const text =
-      String(
-        req.body?.text || ""
-      )
+      String(req.body?.text || "")
         .trim()
         .slice(0, 120);
 
@@ -1032,15 +772,9 @@ app.post(
       );
 
     const duration =
-      (
-        minutes * 60 +
-        seconds
-      ) * 1000;
+      (minutes * 60 + seconds) * 1000;
 
-    if (
-      !text ||
-      duration <= 0
-    ) {
+    if (!text || duration <= 0) {
       return res.status(400).json({
         error:
           "Text and duration required"
@@ -1049,25 +783,21 @@ app.post(
 
     const message = {
       id:
-        makeRequestId(),
+        Date.now().toString(36) +
+        Math.random()
+          .toString(36)
+          .slice(2, 7),
 
-      type:
-        "serverMessage",
-
+      type: "serverMessage",
       text,
 
       endsAt:
-        Date.now() +
-        duration
+        Date.now() + duration
     };
 
-    serverMessages.push(
-      message
-    );
+    serverMessages.push(message);
 
-    broadcast(
-      message
-    );
+    broadcast(message);
 
     return res.json({
       ok: true,
@@ -1079,22 +809,20 @@ app.post(
 app.post(
   "/api/admin/message/delete",
   (req, res) => {
-    if (
-      !adminMessageEventOK(
-        req
-      )
-    ) {
+    if (!adminMessageEventOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     serverMessages = [];
 
     broadcast({
-      type:
-        "serverMessagesClear"
+      type: "serverMessagesClear"
+    });
+
+    broadcast({
+      type: "serverMessageDelete"
     });
 
     return res.json({
@@ -1110,24 +838,17 @@ app.post(
 app.post(
   "/api/second-admin/event-request",
   (req, res) => {
-    if (
-      !secondAdminOK(req)
-    ) {
+    if (!secondAdminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const event =
-      String(
-        req.body?.event || ""
-      );
+      String(req.body?.event || "");
 
     const action =
-      String(
-        req.body?.action || ""
-      );
+      String(req.body?.action || "");
 
     if (
       ![
@@ -1137,28 +858,21 @@ app.post(
       ].includes(event)
     ) {
       return res.status(400).json({
-        error:
-          "Ungültiges Event"
+        error: "Ungültiges Event"
       });
     }
 
     if (
-      ![
-        "start",
-        "stop"
-      ].includes(action)
+      !["start", "stop"].includes(action)
     ) {
       return res.status(400).json({
-        error:
-          "Ungültige Aktion"
+        error: "Ungültige Aktion"
       });
     }
 
     let durationMs = 0;
 
-    if (
-      action === "start"
-    ) {
+    if (action === "start") {
       const value =
         Math.floor(
           Number(
@@ -1166,31 +880,30 @@ app.post(
           ) || 0
         );
 
-      durationMs =
-        event === "galaxy"
-          ? Math.max(
-              60000,
-              Math.min(
-                10080 *
-                  60 *
-                  1000,
-                value
-              )
+      if (event === "galaxy") {
+        durationMs =
+          Math.max(
+            60000,
+            Math.min(
+              10080 * 60 * 1000,
+              value
             )
-          : Math.max(
-              1000,
-              Math.min(
-                10080 *
-                  60 *
-                  1000,
-                value
-              )
-            );
+          );
+      } else {
+        durationMs =
+          Math.max(
+            1000,
+            Math.min(
+              10080 * 60 * 1000,
+              value
+            )
+          );
+      }
     }
 
     const duplicate =
       eventRequests.find(
-        (r) =>
+        r =>
           r.event === event &&
           r.action === action
       );
@@ -1204,80 +917,67 @@ app.post(
     }
 
     const request = {
-      id:
-        makeRequestId(),
-
+      id: makeRequestId(),
       event,
       action,
       durationMs,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
-    eventRequests.push(
-      request
-    );
+    eventRequests.push(request);
 
     return res.json({
       ok: true,
       pending: true,
-      id:
-        request.id
+      id: request.id
     });
   }
 );
-
-/* =========================================================
-   EVENT REQUESTS
-   ========================================================= */
 
 app.get(
   "/api/admin/event-requests",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     return res.json({
       ok: true,
-      requests:
-        publicRequests()
+      requests: eventRequests.map(
+        r => ({
+          id: r.id,
+          event: r.event,
+          action: r.action,
+          durationMs: r.durationMs,
+          createdAt: r.createdAt
+        })
+      )
     });
   }
 );
-
-/* =========================================================
-   EVENT REQUEST APPROVE / DENY
-   ========================================================= */
 
 app.post(
   "/api/admin/event-request/respond",
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const requestId =
       String(
-        req.body?.requestId ||
-          ""
+        req.body?.requestId || ""
       );
 
     const approve =
-      req.body?.approve ===
-      true;
+      req.body?.approve === true;
 
     const index =
       eventRequests.findIndex(
-        (r) =>
-          r.id === requestId
+        r => r.id === requestId
       );
 
     if (index < 0) {
@@ -1318,7 +1018,7 @@ app.post(
 );
 
 /* =========================================================
-   ONLINE SPIELER
+   ONLINE
    ========================================================= */
 
 app.get(
@@ -1326,21 +1026,19 @@ app.get(
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
     const onlinePlayers =
-      [...players.values()]
+      [...players.entries()]
         .filter(
-          (player) =>
-            player.ws.readyState ===
+          ([, ws]) =>
+            ws.readyState ===
             WebSocket.OPEN
         )
         .map(
-          (player) =>
-            player.name
+          ([name]) => name
         );
 
     return res.json({
@@ -1359,8 +1057,7 @@ app.get(
   (req, res) => {
     if (!adminOK(req)) {
       return res.status(401).json({
-        error:
-          "Unauthorized"
+        error: "Unauthorized"
       });
     }
 
@@ -1369,25 +1066,228 @@ app.get(
         [...players.keys()],
 
       coinEventUntil:
-        coinEventUntil >
-        Date.now()
+        coinEventUntil > Date.now()
           ? coinEventUntil
           : 0,
 
       tenCoinEventUntil:
-        tenCoinEventUntil >
-        Date.now()
+        tenCoinEventUntil > Date.now()
           ? tenCoinEventUntil
           : 0,
 
       galaxyEventUntil:
-        galaxyEventUntil >
-        Date.now()
+        galaxyEventUntil > Date.now()
           ? galaxyEventUntil
           : 0,
 
-      leaderboard:
-        getLeaderboard()
+      poll: publicPoll()
+    });
+  }
+);
+
+/* =========================================================
+   FRAGE
+   ========================================================= */
+
+app.post(
+  "/api/admin/poll",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const question =
+      String(
+        req.body?.question || ""
+      )
+        .trim()
+        .slice(0, 200);
+
+    const yesLabel =
+      String(
+        req.body?.yesLabel || "Ja"
+      )
+        .trim()
+        .slice(0, 60);
+
+    const noLabel =
+      String(
+        req.body?.noLabel || "Nein"
+      )
+        .trim()
+        .slice(0, 60);
+
+    const minutes =
+      Math.max(
+        0,
+        Math.floor(
+          Number(
+            req.body?.minutes
+          ) || 0
+        )
+      );
+
+    const seconds =
+      Math.max(
+        0,
+        Math.min(
+          59,
+          Math.floor(
+            Number(
+              req.body?.seconds
+            ) || 0
+          )
+        )
+      );
+
+    const durationMs =
+      (minutes * 60 + seconds) *
+      1000;
+
+    if (!question || durationMs <= 0) {
+      return res.status(400).json({
+        error:
+          "Frage und Dauer erforderlich"
+      });
+    }
+
+    activePoll = {
+      id: makeRequestId(),
+      question,
+      yesLabel: yesLabel || "Ja",
+      noLabel: noLabel || "Nein",
+      endsAt:
+        Date.now() + durationMs,
+
+      answers: {
+        yes: 0,
+        no: 0
+      },
+
+      voters: new Set()
+    };
+
+    broadcast({
+      type: "playerPoll",
+      poll: publicPoll()
+    });
+
+    return res.json({
+      ok: true,
+      poll: publicPoll()
+    });
+  }
+);
+
+app.post(
+  "/api/admin/poll/stop",
+  (req, res) => {
+    if (!adminOK(req)) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    activePoll = null;
+
+    broadcast({
+      type: "playerPollClear"
+    });
+
+    return res.json({
+      ok: true
+    });
+  }
+);
+
+app.post(
+  "/api/poll/answer",
+  (req, res) => {
+    if (
+      !activePoll ||
+      !publicPoll()
+    ) {
+      return res.status(404).json({
+        error:
+          "Keine aktive Frage"
+      });
+    }
+
+    const pollId =
+      String(
+        req.body?.pollId || ""
+      );
+
+    const answer =
+      String(
+        req.body?.answer || ""
+      );
+
+    const voterId =
+      String(
+        req.body?.voterId || ""
+      )
+        .trim()
+        .slice(0, 100);
+
+    if (
+      pollId !==
+      activePoll.id
+    ) {
+      return res.status(409).json({
+        error:
+          "Frage ist nicht mehr aktiv"
+      });
+    }
+
+    if (
+      answer !== "yes" &&
+      answer !== "no"
+    ) {
+      return res.status(400).json({
+        error:
+          "Ungültige Antwort"
+      });
+    }
+
+    if (!voterId) {
+      return res.status(400).json({
+        error:
+          "Voter-ID fehlt"
+      });
+    }
+
+    if (
+      activePoll.voters.has(
+        voterId
+      )
+    ) {
+      return res.status(409).json({
+        error:
+          "Du hast schon abgestimmt"
+      });
+    }
+
+    activePoll.voters.add(
+      voterId
+    );
+
+    activePoll.answers[
+      answer
+    ]++;
+
+    broadcast({
+      type: "pollUpdated",
+      poll: publicPoll()
+    });
+
+    return res.json({
+      ok: true,
+      answers: {
+        ...activePoll.answers
+      }
     });
   }
 );
@@ -1396,58 +1296,45 @@ app.get(
    TRADE
    ========================================================= */
 
-function getTradeForPlayer(
-  player
-) {
+function getTradeForPlayer(player) {
   for (
     const trade of
       activeTrades.values()
   ) {
     if (
-      trade.from ===
-        player ||
-      trade.to ===
-        player
+      trade.from === player ||
+      trade.to === player
     ) {
       const mine =
-        trade.from ===
-        player
+        trade.from === player
           ? trade.fromOffer
           : trade.toOffer;
 
       const theirs =
-        trade.from ===
-        player
+        trade.from === player
           ? trade.toOffer
           : trade.fromOffer;
 
       const mineConfirmed =
-        trade.from ===
-        player
+        trade.from === player
           ? trade.fromConfirmed
           : trade.toConfirmed;
 
       const theirsConfirmed =
-        trade.from ===
-        player
+        trade.from === player
           ? trade.toConfirmed
           : trade.fromConfirmed;
 
       return {
-        id:
-          trade.id,
+        id: trade.id,
 
         other:
-          trade.from ===
-          player
+          trade.from === player
             ? trade.to
             : trade.from,
 
-        myOffer:
-          mine,
-
-        otherOffer:
-          theirs,
+        myOffer: mine,
+        otherOffer: theirs,
 
         myConfirmed:
           mineConfirmed,
@@ -1460,10 +1347,6 @@ function getTradeForPlayer(
 
   return null;
 }
-
-/* =========================================================
-   TRADE STATUS
-   ========================================================= */
 
 app.get(
   "/api/trade/status",
@@ -1481,17 +1364,15 @@ app.get(
     }
 
     const onlinePlayers =
-      [...players.keys()]
-        .filter(
-          (name) =>
-            name !== player
-        );
+      [...players.keys()].filter(
+        name =>
+          name !== player
+      );
 
     const incomingRequests =
       tradeRequests.filter(
-        (request) =>
-          request.to ===
-          player
+        request =>
+          request.to === player
       );
 
     const trade =
@@ -1520,10 +1401,6 @@ app.get(
   }
 );
 
-/* =========================================================
-   TRADE REQUEST
-   ========================================================= */
-
 app.post(
   "/api/trade/request",
   (req, res) => {
@@ -1548,18 +1425,14 @@ app.post(
       });
     }
 
-    if (
-      !players.has(from)
-    ) {
+    if (!players.has(from)) {
       return res.status(400).json({
         error:
           "Du bist nicht online"
       });
     }
 
-    if (
-      !players.has(to)
-    ) {
+    if (!players.has(to)) {
       return res.status(404).json({
         error:
           "Spieler ist nicht online"
@@ -1567,9 +1440,7 @@ app.post(
     }
 
     if (
-      getTradeForPlayer(
-        from
-      )
+      getTradeForPlayer(from)
     ) {
       return res.status(409).json({
         error:
@@ -1579,7 +1450,7 @@ app.post(
 
     if (
       tradeRequests.some(
-        (r) =>
+        r =>
           r.from === from &&
           r.to === to
       )
@@ -1591,14 +1462,10 @@ app.post(
     }
 
     const request = {
-      id:
-        makeRequestId(),
-
+      id: makeRequestId(),
       from,
       to,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
     tradeRequests.push(
@@ -1609,14 +1476,11 @@ app.post(
       players.get(to);
 
     if (target) {
-      send(
-        target.ws,
-        {
-          type:
-            "tradeRequest",
-          request
-        }
-      );
+      send(target, {
+        type:
+          "tradeRequest",
+        request
+      });
     }
 
     return res.json({
@@ -1625,10 +1489,6 @@ app.post(
     });
   }
 );
-
-/* =========================================================
-   TRADE RESPOND
-   ========================================================= */
 
 app.post(
   "/api/trade/respond",
@@ -1640,17 +1500,15 @@ app.post(
 
     const requestId =
       String(
-        req.body?.requestId ||
-          ""
+        req.body?.requestId || ""
       );
 
     const accept =
-      req.body?.accept ===
-      true;
+      req.body?.accept === true;
 
     const index =
       tradeRequests.findIndex(
-        (request) =>
+        request =>
           request.id ===
             requestId &&
           request.to ===
@@ -1673,25 +1531,21 @@ app.post(
     );
 
     if (!accept) {
-      const fromPlayer =
+      const fromWs =
         players.get(
           request.from
         );
 
-      if (fromPlayer) {
-        send(
-          fromPlayer.ws,
-          {
-            type:
-              "tradeRequestResult",
+      if (fromWs) {
+        send(fromWs, {
+          type:
+            "tradeRequestResult",
 
-            requestId:
-              request.id,
+          requestId:
+            request.id,
 
-            accepted:
-              false
-          }
-        );
+          accepted: false
+        });
       }
 
       return res.json({
@@ -1729,29 +1583,18 @@ app.post(
     }
 
     const trade = {
-      id:
-        makeRequestId(),
+      id: makeRequestId(),
 
-      from:
-        request.from,
+      from: request.from,
+      to: request.to,
 
-      to:
-        request.to,
+      fromOffer: null,
+      toOffer: null,
 
-      fromOffer:
-        null,
+      fromConfirmed: false,
+      toConfirmed: false,
 
-      toOffer:
-        null,
-
-      fromConfirmed:
-        false,
-
-      toConfirmed:
-        false,
-
-      createdAt:
-        Date.now()
+      createdAt: Date.now()
     };
 
     activeTrades.set(
@@ -1759,22 +1602,18 @@ app.post(
       trade
     );
 
-    const fromPlayer =
+    const fromWs =
       players.get(
         request.from
       );
 
-    if (fromPlayer) {
-      send(
-        fromPlayer.ws,
-        {
-          type:
-            "tradeAccepted",
-
-          tradeId:
-            trade.id
-        }
-      );
+    if (fromWs) {
+      send(fromWs, {
+        type:
+          "tradeAccepted",
+        tradeId:
+          trade.id
+      });
     }
 
     return res.json({
@@ -1789,10 +1628,6 @@ app.post(
   }
 );
 
-/* =========================================================
-   TRADE OFFER
-   ========================================================= */
-
 app.post(
   "/api/trade/offer",
   (req, res) => {
@@ -1803,14 +1638,12 @@ app.post(
 
     const tradeId =
       String(
-        req.body?.tradeId ||
-          ""
+        req.body?.tradeId || ""
       );
 
     const skinId =
       String(
-        req.body?.skinId ||
-          ""
+        req.body?.skinId || ""
       ).trim();
 
     if (!skinId) {
@@ -1828,10 +1661,8 @@ app.post(
     if (
       !trade ||
       (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
+        trade.from !== player &&
+        trade.to !== player
       )
     ) {
       return res.status(404).json({
@@ -1840,13 +1671,8 @@ app.post(
       });
     }
 
-    if (
-      trade.from ===
-      player
-    ) {
-      if (
-        trade.fromConfirmed
-      ) {
+    if (trade.from === player) {
+      if (trade.fromConfirmed) {
         return res.status(409).json({
           error:
             "Bereits bestätigt"
@@ -1856,9 +1682,7 @@ app.post(
       trade.fromOffer =
         skinId;
     } else {
-      if (
-        trade.toConfirmed
-      ) {
+      if (trade.toConfirmed) {
         return res.status(409).json({
           error:
             "Bereits bestätigt"
@@ -1869,49 +1693,40 @@ app.post(
         skinId;
     }
 
-    const fromPlayer =
+    const fromWs =
       players.get(
         trade.from
       );
 
-    const toPlayer =
+    const toWs =
       players.get(
         trade.to
       );
 
-    if (fromPlayer) {
-      send(
-        fromPlayer.ws,
-        {
-          type:
-            "tradeUpdated",
-
-          trade:
-            getTradeForPlayer(
-              trade.from
-            )
-        }
-      );
+    if (fromWs) {
+      send(fromWs, {
+        type:
+          "tradeUpdated",
+        trade:
+          getTradeForPlayer(
+            trade.from
+          )
+      });
     }
 
-    if (toPlayer) {
-      send(
-        toPlayer.ws,
-        {
-          type:
-            "tradeUpdated",
-
-          trade:
-            getTradeForPlayer(
-              trade.to
-            )
-        }
-      );
+    if (toWs) {
+      send(toWs, {
+        type:
+          "tradeUpdated",
+        trade:
+          getTradeForPlayer(
+            trade.to
+          )
+      });
     }
 
     return res.json({
       ok: true,
-
       trade:
         getTradeForPlayer(
           player
@@ -1919,10 +1734,6 @@ app.post(
     });
   }
 );
-
-/* =========================================================
-   TRADE CONFIRM
-   ========================================================= */
 
 app.post(
   "/api/trade/confirm",
@@ -1934,8 +1745,7 @@ app.post(
 
     const tradeId =
       String(
-        req.body?.tradeId ||
-          ""
+        req.body?.tradeId || ""
       );
 
     const trade =
@@ -1946,10 +1756,8 @@ app.post(
     if (
       !trade ||
       (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
+        trade.from !== player &&
+        trade.to !== player
       )
     ) {
       return res.status(404).json({
@@ -1958,38 +1766,25 @@ app.post(
       });
     }
 
-    if (
-      trade.from ===
-      player
-    ) {
-      if (
-        !trade.fromOffer
-      ) {
+    if (trade.from === player) {
+      if (!trade.fromOffer) {
         return res.status(400).json({
           error:
             "Bitte zuerst einen Skin auswählen"
         });
       }
 
-      trade.fromConfirmed =
-        true;
+      trade.fromConfirmed = true;
     } else {
-      if (
-        !trade.toOffer
-      ) {
+      if (!trade.toOffer) {
         return res.status(400).json({
           error:
             "Bitte zuerst einen Skin auswählen"
         });
       }
 
-      trade.toConfirmed =
-        true;
+      trade.toConfirmed = true;
     }
-
-    /* -------------------------
-       TRADE FERTIG
-       ------------------------- */
 
     if (
       trade.fromConfirmed &&
@@ -2014,8 +1809,7 @@ app.post(
       completedTrades.set(
         fromPlayer,
         {
-          id:
-            trade.id,
+          id: trade.id,
 
           sentSkin:
             fromSkin,
@@ -2034,8 +1828,7 @@ app.post(
       completedTrades.set(
         toPlayer,
         {
-          id:
-            trade.id,
+          id: trade.id,
 
           sentSkin:
             toSkin,
@@ -2051,94 +1844,83 @@ app.post(
         }
       );
 
-      const fromWS =
+      const fromWs =
         players.get(
           fromPlayer
         );
 
-      const toWS =
+      const toWs =
         players.get(
           toPlayer
         );
 
-      if (fromWS) {
-        send(
-          fromWS.ws,
-          {
-            type:
-              "tradeComplete",
+      if (fromWs) {
+        send(fromWs, {
+          type:
+            "tradeComplete",
 
-            tradeId:
-              trade.id,
+          tradeId:
+            trade.id,
 
-            sentSkin:
-              fromSkin,
+          sentSkin:
+            fromSkin,
 
-            receivedSkin:
-              toSkin,
+          receivedSkin:
+            toSkin,
 
-            removeSkin:
-              fromSkin,
+          removeSkin:
+            fromSkin,
 
-            addSkin:
-              toSkin
-          }
-        );
+          addSkin:
+            toSkin
+        });
       }
 
-      if (toWS) {
-        send(
-          toWS.ws,
-          {
-            type:
-              "tradeComplete",
+      if (toWs) {
+        send(toWs, {
+          type:
+            "tradeComplete",
 
-            tradeId:
-              trade.id,
+          tradeId:
+            trade.id,
 
-            sentSkin:
-              toSkin,
+          sentSkin:
+            toSkin,
 
-            receivedSkin:
-              fromSkin,
+          receivedSkin:
+            fromSkin,
 
-            removeSkin:
-              toSkin,
+          removeSkin:
+            toSkin,
 
-            addSkin:
-              fromSkin
-          }
-        );
+          addSkin:
+            fromSkin
+        });
       }
 
       return res.json({
         ok: true,
 
         completed: {
-          id:
-            trade.id,
+          id: trade.id,
 
           sentSkin:
-            player ===
-            fromPlayer
+            player === fromPlayer
               ? fromSkin
               : toSkin,
 
           receivedSkin:
-            player ===
-            fromPlayer
+            player === fromPlayer
               ? toSkin
               : fromSkin,
 
           removeSkin:
-            player ===
-            fromPlayer
+            player === fromPlayer
               ? fromSkin
               : toSkin,
 
           addSkin:
-            player ===
-            fromPlayer
+            player === fromPlayer
               ? toSkin
               : fromSkin
         }
@@ -2157,10 +1939,6 @@ app.post(
   }
 );
 
-/* =========================================================
-   TRADE ABBRECHEN
-   ========================================================= */
-
 app.post(
   "/api/trade/cancel",
   (req, res) => {
@@ -2171,8 +1949,7 @@ app.post(
 
     const tradeId =
       String(
-        req.body?.tradeId ||
-          ""
+        req.body?.tradeId || ""
       );
 
     const trade =
@@ -2183,10 +1960,8 @@ app.post(
     if (
       !trade ||
       (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
+        trade.from !== player &&
+        trade.to !== player
       )
     ) {
       return res.status(404).json({
@@ -2200,26 +1975,19 @@ app.post(
     );
 
     const other =
-      trade.from ===
-      player
+      trade.from === player
         ? trade.to
         : trade.from;
 
-    const otherPlayer =
-      players.get(
-        other
-      );
+    const otherWs =
+      players.get(other);
 
-    if (otherPlayer) {
-      send(
-        otherPlayer.ws,
-        {
-          type:
-            "tradeCancelled",
-
-          tradeId
-        }
-      );
+    if (otherWs) {
+      send(otherWs, {
+        type:
+          "tradeCancelled",
+        tradeId
+      });
     }
 
     return res.json({
@@ -2229,14 +1997,45 @@ app.post(
 );
 
 /* =========================================================
-   AUTOMATISCHE EVENTS
+   AUFRÄUMEN
    ========================================================= */
+
+setInterval(() => {
+  const now = Date.now();
+
+  serverMessages =
+    serverMessages.filter(
+      m =>
+        Number(m.endsAt || 0) > now
+    );
+
+  eventRequests =
+    eventRequests.filter(
+      r =>
+        now -
+          Number(
+            r.createdAt || 0
+          ) <
+        10 * 60 * 1000
+    );
+
+  if (
+    activePoll &&
+    Number(activePoll.endsAt || 0) <= now
+  ) {
+    activePoll = null;
+
+    broadcast({
+      type:
+        "playerPollClear"
+    });
+  }
+}, 1000);
 
 setInterval(() => {
   if (
     coinEventUntil > 0 &&
-    Date.now() >=
-      coinEventUntil
+    Date.now() >= coinEventUntil
   ) {
     executeEvent(
       "coins",
@@ -2247,8 +2046,7 @@ setInterval(() => {
 
   if (
     tenCoinEventUntil > 0 &&
-    Date.now() >=
-      tenCoinEventUntil
+    Date.now() >= tenCoinEventUntil
   ) {
     executeEvent(
       "tenCoins",
@@ -2259,8 +2057,7 @@ setInterval(() => {
 
   if (
     galaxyEventUntil > 0 &&
-    Date.now() >=
-      galaxyEventUntil
+    Date.now() >= galaxyEventUntil
   ) {
     executeEvent(
       "galaxy",
@@ -2270,40 +2067,15 @@ setInterval(() => {
   }
 }, 1000);
 
-/* =========================================================
-   AUFRÄUMEN
-   ========================================================= */
-
 setInterval(() => {
-  const now =
-    Date.now();
-
-  serverMessages =
-    serverMessages.filter(
-      (m) =>
-        Number(
-          m.endsAt || 0
-        ) > now
-    );
-
-  eventRequests =
-    eventRequests.filter(
-      (r) =>
-        now -
-          Number(
-            r.createdAt ||
-              0
-          ) <
-        10 * 60 * 1000
-    );
+  const now = Date.now();
 
   tradeRequests =
     tradeRequests.filter(
-      (r) =>
+      request =>
         now -
           Number(
-            r.createdAt ||
-              0
+            request.createdAt || 0
           ) <
         5 * 60 * 1000
     );
@@ -2317,33 +2089,28 @@ setInterval(() => {
     if (
       now -
         Number(
-          trade.createdAt ||
-            0
+          trade.createdAt || 0
         ) >
       10 * 60 * 1000
     ) {
-      activeTrades.delete(
-        id
-      );
+      activeTrades.delete(id);
     }
   }
-}, 1000);
+}, 5000);
 
 /* =========================================================
    ROUTING
    ========================================================= */
 
-app.use(
-  (req, res) => {
-    res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
-    );
-  }
-);
+app.use((req, res) => {
+  res.sendFile(
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
+  );
+});
 
 /* =========================================================
    START
@@ -2362,10 +2129,6 @@ server.listen(
 
     console.log(
       "Zweites Admin-Panel: 6301"
-    );
-
-    console.log(
-      "Rangliste aktiv"
     );
   }
 );
