@@ -6430,29 +6430,54 @@ setInterval(updateSettingsScore,500);
           const sentSkin=d.completed.sentSkin;
           const owned=getOwnedSkins();
 
-          if(received && !owned.includes(received)){
-            owned.push(received);
-            saveOwnedSkins(owned);
-          }
-
+          // Wichtig: Nicht nur localStorage ändern, sondern auch die laufenden
+          // Spielvariablen. Sonst sieht der Shop den neuen/entfernten Skin erst
+          // nach einem Reload und Ausrüsten funktioniert nicht sofort.
+          let nextOwned=[...owned];
           if(sentSkin){
-            const next=getOwnedSkins().filter(id=>id!==sentSkin);
-            saveOwnedSkins(next);
-
-            if(isPlaneTradeSkin(sentSkin)){
-              const planeId=sentSkin.slice(7);
-              if(localStorage.getItem('crEquippedPlaneSkin')===planeId){
-                localStorage.removeItem('crEquippedPlaneSkin');
-                if(typeof equippedPlaneSkin!=='undefined') equippedPlaneSkin=null;
-              }
-            }else if(localStorage.getItem('crEquippedSkin')===sentSkin){
-              localStorage.setItem('crEquippedSkin','classic');
-              if(typeof equippedSkin!=='undefined') equippedSkin='classic';
-            }
+            nextOwned=nextOwned.filter(id=>id!==sentSkin);
           }
-          statusEl.textContent='✅ Trade erfolgreich!';
+          if(received && !nextOwned.includes(received)){
+            nextOwned.push(received);
+          }
+          saveOwnedSkins(nextOwned);
+
+          // Globale Skin-Liste des Shops sofort synchronisieren.
+          if(typeof ownedSkins!=='undefined' && Array.isArray(ownedSkins)){
+            ownedSkins.length=0;
+            nextOwned.forEach(id=>{ if(id && !ownedSkins.includes(id)) ownedSkins.push(id); });
+            if(!ownedSkins.includes('classic')) ownedSkins.push('classic');
+          }
+
+          // Globale Plane-Liste ebenfalls sofort synchronisieren.
+          if(typeof ownedPlaneSkins!=='undefined' && Array.isArray(ownedPlaneSkins)){
+            const nextPlanes=nextOwned
+              .filter(id=>isPlaneTradeSkin(id))
+              .map(id=>id.slice(7));
+            ownedPlaneSkins.length=0;
+            nextPlanes.forEach(id=>{ if(id && !ownedPlaneSkins.includes(id)) ownedPlaneSkins.push(id); });
+          }
+
+          // Wer den eigenen ausgerüsteten Skin weggibt, fällt sofort auf Classic
+          // zurück. Wer einen neuen Skin erhält, kann ihn danach direkt ausrüsten.
+          if(sentSkin && isPlaneTradeSkin(sentSkin)){
+            const planeId=sentSkin.slice(7);
+            if(typeof equippedPlaneSkin!=='undefined' && equippedPlaneSkin===planeId){
+              equippedPlaneSkin=null;
+              savePlaneSkins();
+            }
+          }else if(sentSkin && typeof equippedSkin!=='undefined' && equippedSkin===sentSkin){
+            equippedSkin='classic';
+            saveSkins();
+          }
+
+          // Persistenz nach dem Tausch sicherstellen.
+          if(typeof saveSkins==='function') saveSkins();
+          if(typeof savePlaneSkins==='function') savePlaneSkins();
           if(typeof updateMenu==='function')updateMenu();
+          if(typeof updateShop==='function')updateShop();
           renderMySkins();
+          statusEl.textContent='✅ Trade erfolgreich! Du kannst den erhaltenen Skin jetzt ausrüsten.';
         }
       }
     }catch(e){
