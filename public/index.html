@@ -1068,7 +1068,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 #playerPollYes{background:#44d47a;color:#07210f}
 #playerPollNo{background:#ff6175;color:#2a0710}
 #playerPollTime{margin-top:5px;font-size:10px;opacity:.8}
-
+.adminPollGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
 body.laptop-mode #playerPoll{
   width:min(620px,82vw);
@@ -1119,122 +1119,68 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
   }
 }
 
-/* ---------- NEUES GELBES MÜNZEN-DESIGN ---------- */
-#menuCoins,
-#shopBalance,
-#coins{
-  position:relative;
-  display:inline-flex !important;
+
+/* ---------- ONLINE RANGLISTE ---------- */
+#leaderboardOpen{
+  background:#ffd83d;
+  color:#171000;
+  box-shadow:0 0 18px #ffd83d;
+}
+#leaderboardModal{
+  position:fixed;
+  inset:0;
+  z-index:80;
+  display:none;
   align-items:center;
   justify-content:center;
-  gap:9px;
-  color:#fff !important;
-  background:linear-gradient(135deg,#ffe35a 0%,#ffcf20 45%,#f0a900 100%) !important;
-  border:4px solid #17143b !important;
-  border-radius:999px !important;
-  box-shadow:0 5px 0 #17143b,0 10px 20px rgba(23,20,59,.22),inset 0 3px 0 rgba(255,255,255,.55),inset 0 -4px 0 rgba(170,103,0,.22) !important;
-  text-shadow:0 3px 0 rgba(23,20,59,.45) !important;
-  overflow:hidden;
+  padding:20px;
+  background:rgba(2,4,15,.82);
+  backdrop-filter:blur(8px);
 }
+#leaderboardModal.open{display:flex}
+.leaderboardPanel{
+  width:min(680px,94vw);
+  max-height:min(760px,88vh);
+  overflow:auto;
+  padding:26px;
+  border:2px solid #00eaff;
+  border-radius:24px;
+  background:linear-gradient(180deg,#11183d,#080b20);
+  box-shadow:0 0 35px #00eaff66;
+  color:#fff;
+}
+.leaderboardPanel h2{
+  margin:0 0 8px;
+  color:#ffe600;
+  font-size:clamp(28px,6vw,48px);
+  text-shadow:0 0 16px #ff7800;
+}
+#leaderboardStatus{
+  min-height:24px;
+  color:#9eabdf;
+  font-size:14px;
+  margin-bottom:14px;
+}
+#leaderboardList{display:grid;gap:8px}
+.leaderboardRow{
+  display:grid;
+  grid-template-columns:52px 1fr auto;
+  gap:12px;
+  align-items:center;
+  padding:12px 14px;
+  border-radius:12px;
+  background:#0c1230;
+  border:1px solid #263477;
+}
+.leaderboardRow.top{
+  border-color:#ffd83d;
+  box-shadow:0 0 12px #ffd83d44;
+}
+.leaderboardRank{font-weight:900;color:#00eaff}
+.leaderboardName{font-weight:800;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.leaderboardScore{font-weight:900;color:#ffd83d}
+#leaderboardClose{margin-top:18px;background:#00eaff;color:#031015}
 
-#menuCoins::before,
-#shopBalance::before,
-#coins::before{
-  content:"";
-  flex:0 0 auto;
-  width:27px;
-  height:27px;
-  border-radius:50%;
-  background:
-    linear-gradient(135deg,transparent 0 38%,rgba(255,247,154,.75) 39% 51%,transparent 52%),
-    radial-gradient(circle at 36% 30%,#fff58a 0 10%,#ffd52b 28%,#ffbd00 63%,#e69500 100%);
-  border:3px solid #fff0a0;
-  box-shadow:
-    0 0 0 2px #c98400,
-    inset 2px 2px 0 rgba(255,255,255,.55),
-    inset -3px -3px 0 rgba(166,94,0,.28);
-}
-
-#menuCoins{
-  padding:7px 22px !important;
-  width:min(520px,90vw);
-  max-width:90vw;
-  font-size:clamp(17px,2.2vw,24px) !important;
-  line-height:1.15;
-  white-space:nowrap;
-}
-
-#shopBalance{
-  padding:8px 16px !important;
-}
-
-#coins{
-  padding:7px 14px !important;
-}
-
-@media(max-width:700px){
-  #menuCoins{
-    padding:6px 15px !important;
-    font-size:17px !important;
-  }
-  #menuCoins::before,
-  #shopBalance::before,
-  #coins::before{
-    width:22px;
-    height:22px;
-    border-width:2px;
-  }
-}
-
-
-/* ---------- GAME HUD: MÜNZEN NICHT MEHR IN DER ECKE ---------- */
-body:not(#menu) #coins,
-#hud #coins{
-  position:fixed !important;
-  left:50% !important;
-  right:auto !important;
-  top:14px !important;
-  transform:translateX(-50%) !important;
-  z-index:6 !important;
-  margin:0 !important;
-  min-width:220px;
-  padding:7px 16px !important;
-  font-size:clamp(17px,2vw,24px) !important;
-  white-space:nowrap;
-  pointer-events:none;
-}
-
-/* ---------- SPIELER-FRAGE: IMMER SICHTBAR UND ANKLICKBAR ---------- */
-#playerPoll{
-  pointer-events:auto !important;
-  cursor:default;
-  z-index:1500 !important;
-  color:#fff !important;
-}
-#playerPollQuestion{
-  color:#fff !important;
-}
-#playerPollButtons button{
-  pointer-events:auto !important;
-  position:relative;
-  z-index:1501;
-}
-@media (max-width:650px){
-  body:not(.phone-mode) #coins,
-  body.phone-mode #hud #coins{
-    top:8px !important;
-  }
-}
-@media (orientation:landscape) and (max-width:1000px){
-  body.phone-mode #hud #coins{
-    top:4px !important;
-    left:50% !important;
-    transform:translateX(-50%) !important;
-    font-size:11px !important;
-    min-width:160px;
-    padding:4px 10px !important;
-  }
-}
 </style>
 
 <style>
@@ -1391,6 +1337,7 @@ body:not(#menu) #coins,
 <div class="screen" id="menu">
 <h1>CUBE RUSH</h1>
 <div id="menuCoins">Münzen: 0</div>
+<button id="leaderboardOpen" type="button">🏆 RANGLISTE</button>
 <div id="levels"></div>
 <div id="menuShopActions">
 <button id="tradeOpen" type="button">🤝 TRADE</button>
@@ -1398,6 +1345,16 @@ body:not(#menu) #coins,
 </div>
 <div id="tip">Leertaste / Klick = Springen · E = Pop-Kraft (Katze) · Im Flugzeug Leertaste halten = hoch</div>
 </div>
+
+<div id="leaderboardModal" aria-hidden="true">
+  <div class="leaderboardPanel" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">
+    <h2 id="leaderboardTitle">🏆 RANGLISTE</h2>
+    <div id="leaderboardStatus">Verbinde mit dem Server …</div>
+    <div id="leaderboardList"></div>
+    <button id="leaderboardClose" type="button">SCHLIESSEN</button>
+  </div>
+</div>
+
 <div class="hidden" id="shop">
 <div class="shopPanel">
 <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
@@ -1517,23 +1474,14 @@ body:not(#menu) #coins,
 <button class="adminAction" id="adminGiftSendAll">🪙 An alle senden</button>
 </div>
 <div id="adminGiftStatus"></div>
-<div class="adminSectionTitle">🪙 2×-MÜNZEN-EVENT</div>
+<div class="adminSectionTitle">🪙 MÜNZEN-EVENT</div>
 <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
-<input id="adminCoinsMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
-<span style="font-weight:800;color:#ffd83d">Doppelte Münzen</span>
+<input id="adminCoinsMinutes" inputmode="numeric" max="10080" min="1" placeholder="Minuten" type="number"/>
+<span style="font-weight:800;color:#ff7cf5">500 Münzen pro normales Level</span>
 </div>
-<button class="adminAction" id="adminCoinsEventStart">🪙 2× Münzen für alle starten</button>
-<button class="adminAction" id="adminCoinsEventStop">🛑 2× Münzen stoppen</button>
+<button class="adminAction" id="adminCoinsEventStart">🪙 Münzen-Event für alle starten</button>
+<button class="adminAction" id="adminCoinsEventStop">🛑 Münzen-Event stoppen</button>
 <div id="adminCoinsEventStatus"></div>
-<div class="adminSectionTitle">🔥 10×-MÜNZEN-EVENT</div>
-<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center">
-<input id="adminTenCoinsMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
-<input id="adminTenCoinsSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
-<span style="font-weight:800;color:#ff7cf5">Zehnfache Münzen</span>
-</div>
-<button class="adminAction" id="adminTenCoinsEventStart">🔥 10× Münzen für alle starten</button>
-<button class="adminAction" id="adminTenCoinsEventStop">🛑 10× Münzen stoppen</button>
-<div id="adminTenCoinsEventStatus"></div>
 <div class="adminSectionTitle">🌌 GALAXY-EVENT</div>
 <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
 <input id="adminGalaxyMinutes" inputmode="numeric" max="10080" min="1" placeholder="Minuten" type="number"/>
@@ -1544,10 +1492,10 @@ body:not(#menu) #coins,
 <div id="adminGalaxyStatus"></div>
 <div class="adminSectionTitle">🎉 EVENT-SCHNELLSTART</div>
 <div id="adminQuickEvents" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-<button class="adminAction" data-quick-coins="5" type="button">🪙 2× Münzen · 5 Min</button>
-<button class="adminAction" data-quick-coins="15" type="button">🪙 2× Münzen · 15 Min</button>
-<button class="adminAction" data-quick-coins="30" type="button">🪙 2× Münzen · 30 Min</button>
-<button class="adminAction" data-quick-coins="60" type="button">🪙 2× Münzen · 60 Min</button>
+<button class="adminAction" data-quick-coins="5" type="button">🪙 Münzen-Event · 5 Min</button>
+<button class="adminAction" data-quick-coins="15" type="button">🪙 Münzen-Event · 15 Min</button>
+<button class="adminAction" data-quick-coins="30" type="button">🪙 Münzen-Event · 30 Min</button>
+<button class="adminAction" data-quick-coins="60" type="button">🪙 Münzen-Event · 60 Min</button>
 </div>
 <div id="adminQuickEventsStatus"></div>
 <div id="adminMessageArea">
@@ -1560,6 +1508,20 @@ body:not(#menu) #coins,
 <button class="adminAction" id="adminMessageSend">Nachricht senden</button>
 <button class="adminAction" id="adminMessageDelete">🗑️ Nachricht löschen</button>
 </div>
+<div class="adminSectionTitle">🗳️ SPIELER-FRAGE</div>
+<input id="adminPollQuestion" maxlength="140" placeholder="z. B. Wollt ihr 10× Münzen?" type="text"/>
+<div class="adminPollGrid">
+<input id="adminPollYes" maxlength="40" placeholder="Antwort Ja" type="text" value="Ja"/>
+<input id="adminPollNo" maxlength="40" placeholder="Antwort Nein" type="text" value="Nein"/>
+</div>
+<div class="adminPollGrid">
+<input id="adminPollMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
+<input id="adminPollSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
+</div>
+<button class="adminAction" id="adminPollStart">🗳️ Frage an Spieler senden</button>
+<button class="adminAction" id="adminPollStop">🛑 Frage schließen</button>
+<div id="adminPollStatus"></div>
+<div id="adminPollResults" style="margin-top:8px;font-size:13px;opacity:.85"></div>
 <button id="adminClose">Schließen</button>
 </div>
 </div>
@@ -1576,11 +1538,11 @@ body:not(#menu) #coins,
 <button class="adminAction" id="admin2MessageSend">📢 Nachricht senden</button>
 <button class="adminAction" id="admin2MessageDelete">🗑️ Nachricht löschen</button>
 <div class="adminSectionTitle">🎉 EVENTS</div>
-<div class="adminSectionTitle" style="font-size:18px;margin-top:4px">🪙 2×-MÜNZEN-EVENT</div>
+<div class="adminSectionTitle" style="font-size:18px;margin-top:4px">🪙 MÜNZEN-EVENT</div>
 <input id="admin2CoinsMinutes" inputmode="numeric" max="10080" min="1" placeholder="Minuten" type="number"/>
-<button class="adminAction" id="admin2CoinsStart">🪙 2× Münzen starten</button>
-<button class="adminAction" id="admin2CoinsStop">🛑 2× Münzen stoppen</button>
-<div class="adminSectionTitle" style="font-size:18px;margin-top:12px">🔥 10×-MÜNZEN-EVENT</div>
+<button class="adminAction" id="admin2CoinsStart">🪙 Münzen-Event starten</button>
+<button class="adminAction" id="admin2CoinsStop">🛑 Münzen-Event stoppen</button>
+<div class="adminSectionTitle" style="font-size:18px;margin-top:12px">🔥 10×-MÜNZEN-EVENT (direkt)</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
 <input id="admin2TenCoinsMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
 <input id="admin2TenCoinsSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
@@ -2039,7 +2001,7 @@ function updateTenCoinEventHud(){
   if(tenCoinEventActive && now<tenCoinEventUntil){
     hud.classList.remove("hidden");
     const sec=Math.max(0,Math.ceil((tenCoinEventUntil-now)/1000));
-    hud.textContent="🔥 10× MÜNZEN · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
+    hud.textContent="🪙 MÜNZEN-EVENT · 10× · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
   }else{
     tenCoinEventActive=false;
     hud.classList.add("hidden");
@@ -2053,7 +2015,7 @@ function galaxyReward(){
   // Galaxy-Level: 100 Basis-Münzen.
   // Die normale Münzlogik gilt auch in Galaxy:
   // Spur-Multiplikator + aktives 2×-Münzen-Event.
-  // Beispiel: 100 × 2× Spur × 2× Event = 400.
+  // Beim Münzen-Event: 100 × 2× Doppelspur × 10× Event = 2000.
   return coinReward(100);
 }
 
@@ -3448,6 +3410,7 @@ function burst(x,y,n=8){
 /* ---------- game state ---------- */
 function die(msg){
   running=false;
+  if(typeof window.cubeRushSubmitScore==="function") window.cubeRushSubmitScore(score);
   spaceHeld=false;
 
   // Taco-Event NICHT stoppen und NICHT zurücksetzen.
@@ -3473,6 +3436,7 @@ function win(){
   if(!running)return;
 
   running=false;
+  if(typeof window.cubeRushSubmitScore==="function") window.cubeRushSubmitScore(score);
   spaceHeld=false;
   if(typeof stopMusic==="function")stopMusic();
 
@@ -4749,15 +4713,17 @@ function updatePollPosition(){
   const box=document.getElementById("serverMessages");
   const poll=document.getElementById("playerPoll");
   if(!poll)return;
-  const gap=8;
-  if(box){
-    const rect=box.getBoundingClientRect();
-    poll.style.top=Math.max(54,Math.round(rect.bottom+gap))+"px";
-  }else{
-    poll.style.top="58px";
+  const isLaptop=document.body && document.body.classList.contains("laptop-mode");
+  if(isLaptop){
+    // Auf dem Laptop steht die Frage direkt über dem Fortschrittsbalken.
+    poll.style.top="62px";
+    return;
   }
-  poll.style.left="50%";
-  poll.style.transform="translateX(-50%)";
+  if(!box)return;
+  const rect=box.getBoundingClientRect();
+  const gap=8;
+  const top=Math.max(14, Math.round(rect.bottom + gap));
+  poll.style.top=top+"px";
 }
 
 function renderServerMessages(){
@@ -5106,7 +5072,7 @@ window.addEventListener("resize",updatePollPosition);
       const minutes=Math.max(1,Number(btn.dataset.quickCoins)||0);
 
       try{
-        const res=await fetch("/api/admin/coins-event",{
+        const res=await fetch("/api/admin/ten-coins-event",{
           method:"POST",
           headers:{
             "Content-Type":"application/json",
@@ -5231,17 +5197,17 @@ window.addEventListener("resize",updatePollPosition);
 
   async function send(action,durationMs=0){
     try{
-      const res=await fetch("/api/admin/coins-event",{
+      const res=await fetch("/api/admin/ten-coins-event",{
         method:"POST",
         headers:{"Content-Type":"application/json","x-admin-key":ADMIN_KEY},
         body:JSON.stringify({action,durationMs})
       });
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Fehler");
-      setCoinEvent(data.until||0);
+      setTenCoinEvent(data.until||0);
       if(status)status.textContent=action==="start"
-        ?"✅ 2× Münzen für alle aktiviert"
-        :"🛑 2× Münzen beendet";
+        ?"✅ Münzen-Event aktiviert · 10× Münzen für alle"
+        :"🛑 Münzen-Event beendet";
     }catch(e){
       if(status)status.textContent="❌ "+e.message;
     }
@@ -5340,7 +5306,7 @@ window.addEventListener("resize",updatePollPosition);
     try{
       const data=await api("/api/second-admin/event-stop",{event:"coins"});
       if(typeof setCoinEvent==="function")setCoinEvent(0);
-      if(status)status.textContent="🛑 2× Münzen gestoppt";
+      if(status)status.textContent="🛑 Münzen-Event gestoppt";
     }catch(e){if(status)status.textContent="❌ "+e.message;}
   });
 })();
@@ -6080,6 +6046,9 @@ setInterval(updateSettingsScore,500);
             if(Number(msg.poopEventUntil)>Date.now()) startPoopEvent(Number(msg.poopEventUntil));
             if(Number(msg.coinEventUntil)>Date.now()) setCoinEvent(Number(msg.coinEventUntil));
             if(Number(msg.galaxyEventUntil)>Date.now()) setGalaxyEvent(Number(msg.galaxyEventUntil));
+            if(Array.isArray(msg.leaderboard) && typeof window.cubeRushSetLeaderboard==="function"){
+              window.cubeRushSetLeaderboard(msg.leaderboard);
+            }
             if(Array.isArray(msg.serverMessages)){
               serverMessages=msg.serverMessages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
               saveServerMessages();
@@ -6160,6 +6129,12 @@ setInterval(updateSettingsScore,500);
             window.dispatchEvent(new CustomEvent("cubeRushServerMessageDelete",{detail:msg}));
           }
 
+          if(msg.type==="leaderboardUpdate" && Array.isArray(msg.leaderboard)){
+            if(typeof window.cubeRushSetLeaderboard==="function"){
+              window.cubeRushSetLeaderboard(msg.leaderboard);
+            }
+          }
+
           if(msg.type==="serverMessagesUpdate" && Array.isArray(msg.messages)){
             serverMessages=msg.messages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
             saveServerMessages();
@@ -6176,6 +6151,20 @@ setInterval(updateSettingsScore,500);
     }
   }
 
+  window.cubeRushSubmitScore=function(finalScore){
+    const cleanScore=Math.max(0,Math.floor(Number(finalScore)||0));
+    if(cleanScore<=0) return;
+
+    try{
+      if(ws && ws.readyState===1){
+        ws.send(JSON.stringify({type:"scoreUpdate",score:cleanScore}));
+      }else{
+        // Beim nächsten Verbinden wird nur der aktuelle Lauf nicht automatisch
+        // erneut gesendet; der Server bekommt daher nur echte Endpunkte.
+      }
+    }catch(e){}
+  };
+
   window.cubeRushServer={
     connect:connectServer,
     setPlayerName(name){
@@ -6191,6 +6180,87 @@ setInterval(updateSettingsScore,500);
 })();
 
 
+
+/* ---------- ONLINE RANGLISTE ---------- */
+(function(){
+  const modal=document.getElementById("leaderboardModal");
+  const openBtn=document.getElementById("leaderboardOpen");
+  const closeBtn=document.getElementById("leaderboardClose");
+  const list=document.getElementById("leaderboardList");
+  const status=document.getElementById("leaderboardStatus");
+  if(!modal||!openBtn||!closeBtn||!list||!status)return;
+
+  let rows=[];
+
+  function render(){
+    if(!rows.length){
+      list.innerHTML='<div class="leaderboardRow"><div></div><div class="leaderboardName">Noch keine Scores vorhanden.</div><div></div></div>';
+      return;
+    }
+
+    list.innerHTML=rows.slice(0,50).map((entry,index)=>{
+      const rank=Number(entry.rank)||index+1;
+      const score=Math.max(0,Math.floor(Number(entry.score)||0));
+      const name=String(entry.name||"Unbekannt");
+      const medal=rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":"#"+rank;
+      return '<div class="leaderboardRow '+(rank<=3?'top':'')+'">'+
+        '<div class="leaderboardRank">'+medal+'</div>'+
+        '<div class="leaderboardName"></div>'+
+        '<div class="leaderboardScore">'+score+'</div>'+
+        '</div>';
+    }).join("");
+
+    [...list.querySelectorAll(".leaderboardName")].forEach((el,i)=>{
+      el.textContent=String(rows[i]?.name||"Unbekannt");
+    });
+
+    status.textContent=window.cubeRushServer?.isConnected?.()
+      ?"Online · persönliche Bestwerte"
+      :"Server nicht verbunden";
+  }
+
+  window.cubeRushSetLeaderboard=function(nextRows){
+    rows=Array.isArray(nextRows)?nextRows:[];
+    render();
+  };
+
+  async function load(){
+    status.textContent="Lade Rangliste …";
+    try{
+      const res=await fetch("/api/leaderboard",{cache:"no-store"});
+      const data=await res.json();
+      if(data && data.ok && Array.isArray(data.leaderboard)){
+        window.cubeRushSetLeaderboard(data.leaderboard);
+      }else{
+        throw new Error("Ungültige Antwort");
+      }
+    }catch(e){
+      status.textContent="Rangliste konnte nicht geladen werden.";
+    }
+  }
+
+  function open(){
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden","false");
+    render();
+    load();
+  }
+  function close(){
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden","true");
+  }
+
+  openBtn.addEventListener("click",open);
+  closeBtn.addEventListener("click",close);
+  modal.addEventListener("click",e=>{if(e.target===modal)close();});
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape" && modal.classList.contains("open")) close();
+  });
+
+  render();
+})();
+
+
 /* ---------- SPIELER-FRAGEN / UMFRAGEN ---------- */
 (function(){
   const poll=document.getElementById("playerPoll");
@@ -6198,7 +6268,16 @@ setInterval(updateSettingsScore,500);
   const yes=document.getElementById("playerPollYes");
   const no=document.getElementById("playerPollNo");
   const time=document.getElementById("playerPollTime");
-  if(!poll||!q||!yes||!no||!time)return;
+  const aQ=document.getElementById("adminPollQuestion");
+  const aYes=document.getElementById("adminPollYes");
+  const aNo=document.getElementById("adminPollNo");
+  const aMin=document.getElementById("adminPollMinutes");
+  const aSec=document.getElementById("adminPollSeconds");
+  const aStart=document.getElementById("adminPollStart");
+  const aStop=document.getElementById("adminPollStop");
+  const aStatus=document.getElementById("adminPollStatus");
+  const aResults=document.getElementById("adminPollResults");
+  if(!poll||!q||!yes||!no||!time||!aStart||!aStop)return;
 
   let currentPoll=null;
   let pollTimer=null;
@@ -6215,10 +6294,6 @@ setInterval(updateSettingsScore,500);
     yes.textContent=p.yesLabel||"Ja";
     no.textContent=p.noLabel||"Nein";
     poll.classList.add("open");
-    poll.classList.remove("hidden");
-    poll.style.display="block";
-    poll.style.pointerEvents="auto";
-    updatePollPosition();
     lastPollId=p.id||"";
     if(pollTimer)clearInterval(pollTimer);
     const tick=()=>{
@@ -6279,8 +6354,6 @@ setInterval(updateSettingsScore,500);
       });
       if(!r.ok)throw new Error("Antwort nicht gespeichert");
       time.textContent="✅ Antwort gespeichert";
-      yes.disabled=true;
-      no.disabled=true;
       setTimeout(()=>renderPoll(null),700);
     }catch(e){
       yes.disabled=false; no.disabled=false;
@@ -6290,7 +6363,62 @@ setInterval(updateSettingsScore,500);
   yes.addEventListener("click",()=>answer("yes"));
   no.addEventListener("click",()=>answer("no"));
 
+  async function adminPost(url,body){
+    const r=await fetch(url,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-admin-key":"603781"},
+      body:JSON.stringify(body||{})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"Fehler");
+    return d;
+  }
 
+  aStart.addEventListener("click",async()=>{
+    const question=(aQ.value||"").trim();
+    const yesLabel=(aYes.value||"Ja").trim()||"Ja";
+    const noLabel=(aNo.value||"Nein").trim()||"Nein";
+    const min=Math.max(0,Number(aMin.value)||0);
+    const sec=Math.max(0,Math.min(59,Number(aSec.value)||0));
+    const durationMs=(min*60+sec)*1000;
+    if(!question||durationMs<=0){
+      if(aStatus)aStatus.textContent="❌ Frage und Zeit eingeben";
+      return;
+    }
+    try{
+      const d=await adminPost("/api/admin/poll",{question,yesLabel,noLabel,durationMs});
+      if(aStatus)aStatus.textContent="✅ Frage ist jetzt für alle sichtbar";
+      if(d.poll)handlePoll(d.poll);
+    }catch(e){
+      if(aStatus)aStatus.textContent="❌ "+e.message;
+    }
+  });
+
+  aStop.addEventListener("click",async()=>{
+    try{
+      await adminPost("/api/admin/poll/stop",{});
+      if(aStatus)aStatus.textContent="🛑 Frage geschlossen";
+    }catch(e){
+      if(aStatus)aStatus.textContent="❌ "+e.message;
+    }
+  });
+
+  async function loadResults(){
+    try{
+      const r=await fetch("/api/admin/poll/status",{headers:{"x-admin-key":"603781"}});
+      if(!r.ok)return;
+      const d=await r.json();
+      if(d.poll && Number(d.poll.endsAt||0)>Date.now()){
+        const y=Number(d.poll.answers?.yes||0);
+        const n=Number(d.poll.answers?.no||0);
+        if(aResults)aResults.textContent="Antworten: ✅ "+y+" · ❌ "+n;
+      }else{
+        if(aResults)aResults.textContent="Keine aktive Frage.";
+      }
+    }catch{}
+  }
+  setInterval(loadResults,2000);
+  loadResults();
 })();
 </script>
 
