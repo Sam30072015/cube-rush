@@ -1186,6 +1186,55 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
   }
 }
 
+
+/* ---------- GAME HUD: MÜNZEN NICHT MEHR IN DER ECKE ---------- */
+body:not(#menu) #coins,
+#hud #coins{
+  position:fixed !important;
+  left:50% !important;
+  right:auto !important;
+  top:14px !important;
+  transform:translateX(-50%) !important;
+  z-index:6 !important;
+  margin:0 !important;
+  min-width:220px;
+  padding:7px 16px !important;
+  font-size:clamp(17px,2vw,24px) !important;
+  white-space:nowrap;
+  pointer-events:none;
+}
+
+/* ---------- SPIELER-FRAGE: IMMER SICHTBAR UND ANKLICKBAR ---------- */
+#playerPoll{
+  pointer-events:auto !important;
+  cursor:default;
+  z-index:1500 !important;
+  color:#fff !important;
+}
+#playerPollQuestion{
+  color:#fff !important;
+}
+#playerPollButtons button{
+  pointer-events:auto !important;
+  position:relative;
+  z-index:1501;
+}
+@media (max-width:650px){
+  body:not(.phone-mode) #coins,
+  body.phone-mode #hud #coins{
+    top:8px !important;
+  }
+}
+@media (orientation:landscape) and (max-width:1000px){
+  body.phone-mode #hud #coins{
+    top:4px !important;
+    left:50% !important;
+    transform:translateX(-50%) !important;
+    font-size:11px !important;
+    min-width:160px;
+    padding:4px 10px !important;
+  }
+}
 </style>
 
 <style>
@@ -4714,17 +4763,15 @@ function updatePollPosition(){
   const box=document.getElementById("serverMessages");
   const poll=document.getElementById("playerPoll");
   if(!poll)return;
-  const isLaptop=document.body && document.body.classList.contains("laptop-mode");
-  if(isLaptop){
-    // Auf dem Laptop steht die Frage direkt über dem Fortschrittsbalken.
-    poll.style.top="62px";
-    return;
-  }
-  if(!box)return;
-  const rect=box.getBoundingClientRect();
   const gap=8;
-  const top=Math.max(14, Math.round(rect.bottom + gap));
-  poll.style.top=top+"px";
+  if(box){
+    const rect=box.getBoundingClientRect();
+    poll.style.top=Math.max(54,Math.round(rect.bottom+gap))+"px";
+  }else{
+    poll.style.top="58px";
+  }
+  poll.style.left="50%";
+  poll.style.transform="translateX(-50%)";
 }
 
 function renderServerMessages(){
@@ -6191,6 +6238,10 @@ setInterval(updateSettingsScore,500);
     yes.textContent=p.yesLabel||"Ja";
     no.textContent=p.noLabel||"Nein";
     poll.classList.add("open");
+    poll.classList.remove("hidden");
+    poll.style.display="block";
+    poll.style.pointerEvents="auto";
+    updatePollPosition();
     lastPollId=p.id||"";
     if(pollTimer)clearInterval(pollTimer);
     const tick=()=>{
@@ -6251,6 +6302,8 @@ setInterval(updateSettingsScore,500);
       });
       if(!r.ok)throw new Error("Antwort nicht gespeichert");
       time.textContent="✅ Antwort gespeichert";
+      yes.disabled=true;
+      no.disabled=true;
       setTimeout(()=>renderPoll(null),700);
     }catch(e){
       yes.disabled=false; no.disabled=false;
