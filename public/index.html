@@ -1068,7 +1068,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 #playerPollYes{background:#44d47a;color:#07210f}
 #playerPollNo{background:#ff6175;color:#2a0710}
 #playerPollTime{margin-top:5px;font-size:10px;opacity:.8}
-.adminPollGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
 
 body.laptop-mode #playerPoll{
   width:min(620px,82vw);
@@ -1560,20 +1560,6 @@ body:not(#menu) #coins,
 <button class="adminAction" id="adminMessageSend">Nachricht senden</button>
 <button class="adminAction" id="adminMessageDelete">🗑️ Nachricht löschen</button>
 </div>
-<div class="adminSectionTitle">🗳️ SPIELER-FRAGE</div>
-<input id="adminPollQuestion" maxlength="140" placeholder="z. B. Wollt ihr 10× Münzen?" type="text"/>
-<div class="adminPollGrid">
-<input id="adminPollYes" maxlength="40" placeholder="Antwort Ja" type="text" value="Ja"/>
-<input id="adminPollNo" maxlength="40" placeholder="Antwort Nein" type="text" value="Nein"/>
-</div>
-<div class="adminPollGrid">
-<input id="adminPollMinutes" inputmode="numeric" max="10080" min="0" placeholder="Minuten" type="number"/>
-<input id="adminPollSeconds" inputmode="numeric" max="59" min="0" placeholder="Sekunden" type="number"/>
-</div>
-<button class="adminAction" id="adminPollStart">🗳️ Frage an Spieler senden</button>
-<button class="adminAction" id="adminPollStop">🛑 Frage schließen</button>
-<div id="adminPollStatus"></div>
-<div id="adminPollResults" style="margin-top:8px;font-size:13px;opacity:.85"></div>
 <button id="adminClose">Schließen</button>
 </div>
 </div>
@@ -6212,16 +6198,7 @@ setInterval(updateSettingsScore,500);
   const yes=document.getElementById("playerPollYes");
   const no=document.getElementById("playerPollNo");
   const time=document.getElementById("playerPollTime");
-  const aQ=document.getElementById("adminPollQuestion");
-  const aYes=document.getElementById("adminPollYes");
-  const aNo=document.getElementById("adminPollNo");
-  const aMin=document.getElementById("adminPollMinutes");
-  const aSec=document.getElementById("adminPollSeconds");
-  const aStart=document.getElementById("adminPollStart");
-  const aStop=document.getElementById("adminPollStop");
-  const aStatus=document.getElementById("adminPollStatus");
-  const aResults=document.getElementById("adminPollResults");
-  if(!poll||!q||!yes||!no||!time||!aStart||!aStop)return;
+  if(!poll||!q||!yes||!no||!time)return;
 
   let currentPoll=null;
   let pollTimer=null;
@@ -6313,62 +6290,7 @@ setInterval(updateSettingsScore,500);
   yes.addEventListener("click",()=>answer("yes"));
   no.addEventListener("click",()=>answer("no"));
 
-  async function adminPost(url,body){
-    const r=await fetch(url,{
-      method:"POST",
-      headers:{"Content-Type":"application/json","x-admin-key":"603781"},
-      body:JSON.stringify(body||{})
-    });
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||"Fehler");
-    return d;
-  }
 
-  aStart.addEventListener("click",async()=>{
-    const question=(aQ.value||"").trim();
-    const yesLabel=(aYes.value||"Ja").trim()||"Ja";
-    const noLabel=(aNo.value||"Nein").trim()||"Nein";
-    const min=Math.max(0,Number(aMin.value)||0);
-    const sec=Math.max(0,Math.min(59,Number(aSec.value)||0));
-    const durationMs=(min*60+sec)*1000;
-    if(!question||durationMs<=0){
-      if(aStatus)aStatus.textContent="❌ Frage und Zeit eingeben";
-      return;
-    }
-    try{
-      const d=await adminPost("/api/admin/poll",{question,yesLabel,noLabel,durationMs});
-      if(aStatus)aStatus.textContent="✅ Frage ist jetzt für alle sichtbar";
-      if(d.poll)handlePoll(d.poll);
-    }catch(e){
-      if(aStatus)aStatus.textContent="❌ "+e.message;
-    }
-  });
-
-  aStop.addEventListener("click",async()=>{
-    try{
-      await adminPost("/api/admin/poll/stop",{});
-      if(aStatus)aStatus.textContent="🛑 Frage geschlossen";
-    }catch(e){
-      if(aStatus)aStatus.textContent="❌ "+e.message;
-    }
-  });
-
-  async function loadResults(){
-    try{
-      const r=await fetch("/api/admin/poll/status",{headers:{"x-admin-key":"603781"}});
-      if(!r.ok)return;
-      const d=await r.json();
-      if(d.poll && Number(d.poll.endsAt||0)>Date.now()){
-        const y=Number(d.poll.answers?.yes||0);
-        const n=Number(d.poll.answers?.no||0);
-        if(aResults)aResults.textContent="Antworten: ✅ "+y+" · ❌ "+n;
-      }else{
-        if(aResults)aResults.textContent="Keine aktive Frage.";
-      }
-    }catch{}
-  }
-  setInterval(loadResults,2000);
-  loadResults();
 })();
 </script>
 
