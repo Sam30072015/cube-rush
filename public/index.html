@@ -4771,7 +4771,7 @@ window.addEventListener("resize",updatePollPosition);
   const sendBtn=document.getElementById("adminGiftSend");
   const takeBtn=document.getElementById("adminTakeCoins");
   const sendAllBtn=document.getElementById("adminGiftSendAll");
-  const coinsInput=document.getElementById("adminGiftCoins");
+  const coinsInput=document.getElementById("adminGiftCoins") || document.getElementById("adminGiftCoinsInput");
   const status=document.getElementById("adminGiftStatus");
   const playersStatus=document.getElementById("adminPlayersStatus");
 
@@ -4781,29 +4781,54 @@ window.addEventListener("resize",updatePollPosition);
 
   async function loadPlayers(){
     try{
-      const res=await fetch("/api/status",{headers:{"x-admin-key":ADMIN_KEY}});
+      let res=await fetch("/api/status?t="+Date.now(),{
+        headers:{"x-admin-key":ADMIN_KEY},
+        cache:"no-store"
+      });
+
+      // Fallback für ältere Server-Versionen
+      if(!res.ok){
+        res=await fetch("/api/admin/online-players?t="+Date.now(),{
+          headers:{"x-admin-key":ADMIN_KEY},
+          cache:"no-store"
+        });
+      }
+
       const data=await res.json();
       if(!res.ok)throw new Error(data.error||"Fehler");
 
+      const list=Array.isArray(data.onlinePlayers)
+        ? data.onlinePlayers
+        : [];
+
       playersSelect.innerHTML='<option value="">Spieler auswählen</option>';
-      const count=(data.onlinePlayers||[]).length;
-      if(playersStatus)playersStatus.textContent=count ? "🟢 "+count+" Spieler online" : "ℹ️ Keine Spieler online";
-      (data.onlinePlayers||[]).forEach(name=>{
+
+      if(playersStatus){
+        playersStatus.textContent=list.length
+          ? "🟢 "+list.length+" Spieler online"
+          : "ℹ️ Keine Spieler online";
+      }
+
+      list.forEach(name=>{
         const option=document.createElement("option");
         option.value=name;
         option.textContent="🟢 "+name;
         playersSelect.appendChild(option);
       });
 
-      status.textContent=(data.onlinePlayers||[]).length
-        ? "🟢 "+data.onlinePlayers.length+" Spieler online"
-        : "ℹ️ Keine Spieler online";
+      if(status){
+        status.textContent=list.length
+          ? "🟢 "+list.length+" Spieler online"
+          : "ℹ️ Keine Spieler online";
+      }
     }catch(e){
-      status.textContent="❌ Server nicht erreichbar";
+      if(status)status.textContent="❌ Online-Spieler konnten nicht geladen werden";
+      if(playersStatus)playersStatus.textContent="❌ Server nicht erreichbar";
     }
   }
 
   refreshBtn.addEventListener("click",loadPlayers);
+  loadPlayers();
   let giftSending=false;
 
   async function takeCoinsFromPlayer(){
