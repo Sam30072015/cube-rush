@@ -132,26 +132,44 @@ function executeEvent(
   action,
   durationMs
 ) {
+  // Das zentrale Münzen-Event ist das 10×-Event.
+  // Normales Level: 50 → 500 Münzen.
+  // Galaxy mit 2×-Doppelspur: 100 × 2 × 10 = 2000 Münzen.
   if (event === "coins") {
     if (action === "start") {
-      coinEventUntil =
+      // Das normale Münzen-Event ist das 10×-Event.
+      // Ein eventuell noch laufendes altes 2×-Event wird beendet,
+      // damit sich die Multiplikatoren nicht versehentlich addieren.
+      coinEventUntil = 0;
+      tenCoinEventUntil =
         Date.now() + durationMs;
 
       broadcast({
         type: "coinEvent",
-        until: coinEventUntil
+        until: 0
+      });
+
+      broadcast({
+        type: "tenCoinEvent",
+        until: tenCoinEventUntil
       });
 
       return {
-        until: coinEventUntil
+        until: tenCoinEventUntil
       };
     }
 
     if (action === "stop") {
       coinEventUntil = 0;
+      tenCoinEventUntil = 0;
 
       broadcast({
         type: "coinEvent",
+        until: 0
+      });
+
+      broadcast({
+        type: "tenCoinEvent",
         until: 0
       });
 
@@ -954,7 +972,9 @@ app.post(
   "/api/second-admin/event-request",
   (req, res) => {
     if (
-      !secondAdminOK(req)
+      !secondAdminOK(
+        req
+      )
     ) {
       return res
         .status(401)
