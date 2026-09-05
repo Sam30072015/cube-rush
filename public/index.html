@@ -1061,7 +1061,8 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 
 
 #playerPoll{position:fixed;left:50%;top:62px;bottom:auto;transform:translateX(-50%);z-index:1300;display:none;width:min(620px,82vw);padding:6px 10px;border:2px solid #ffd83d;border-radius:12px;background:rgba(25,18,45,.96);box-shadow:0 5px 18px rgba(0,0,0,.32);text-align:center;box-sizing:border-box;transition:top .12s ease}
-#playerPoll.open{display:block}
+#playerPoll.open{display:block;pointer-events:auto}
+#playerPoll button{pointer-events:auto;position:relative;z-index:2;touch-action:manipulation;user-select:none}
 #playerPollQuestion{font-size:13px;font-weight:900;margin-bottom:7px;line-height:1.2}
 #playerPollButtons{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 #playerPollButtons button{padding:6px 9px;border:0;border-radius:9px;font-weight:900;font-size:12px;cursor:pointer}
@@ -6294,6 +6295,14 @@ setInterval(updateSettingsScore,500);
 
   function renderPoll(p){
     currentPoll=p||null;
+
+    // Wichtig: Bei jeder neuen Frage die Buttons wieder freigeben.
+    // Sonst bleiben sie nach einer bereits beantworteten Frage deaktiviert.
+    yes.disabled=false;
+    no.disabled=false;
+    yes.removeAttribute("aria-disabled");
+    no.removeAttribute("aria-disabled");
+
     if(!p){
       poll.classList.remove("open");
       if(pollTimer)clearInterval(pollTimer);
@@ -6345,8 +6354,12 @@ setInterval(updateSettingsScore,500);
 
   async function answer(choice){
     if(!currentPoll)return;
+    if(choice!=="yes" && choice!=="no")return;
     try{
-      yes.disabled=true; no.disabled=true;
+      yes.disabled=true;
+      no.disabled=true;
+      yes.setAttribute("aria-disabled","true");
+      no.setAttribute("aria-disabled","true");
       let voterId=localStorage.getItem("crPollVoterId");
       if(!voterId){
         try{
@@ -6365,7 +6378,10 @@ setInterval(updateSettingsScore,500);
       time.textContent="✅ Antwort gespeichert";
       setTimeout(()=>renderPoll(null),700);
     }catch(e){
-      yes.disabled=false; no.disabled=false;
+      yes.disabled=false;
+      no.disabled=false;
+      yes.removeAttribute("aria-disabled");
+      no.removeAttribute("aria-disabled");
       time.textContent="❌ "+e.message;
     }
   }
