@@ -6248,6 +6248,8 @@ setInterval(updateSettingsScore,500);
     ocean:'🌊 Ozean',
     shadow:'🌑 Schatten',
     sunset:'🌅 Sunset',
+    blood:'🩸 Blut',
+    gold:'🥇 Gold',
     cat:'🐱 Meme Katze',
     magma:'🌋 Magma-Block',
     poop:'💩 Kackhaufen',
@@ -6369,7 +6371,8 @@ setInterval(updateSettingsScore,500);
 
   function renderMySkins(){
     mySkinsBox.innerHTML='';
-    const owned=getOwnedSkins().filter(id=>id!=='classic');
+    const blockedTradeSkins=new Set(['red','blue','gold']);
+    const owned=getOwnedSkins().filter(id=>id!=='classic' && !blockedTradeSkins.has(String(id)));
     if(!owned.length){
       mySkinsBox.innerHTML='<div style="opacity:.7;grid-column:1/-1">Du hast keine tauschbaren Skins.</div>';
       return;
