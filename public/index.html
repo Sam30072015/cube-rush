@@ -6347,73 +6347,94 @@ setInterval(updateSettingsScore,500);
   }
 
   function syncAfterTrade(sentSkin,receivedSkin){
-    // IMMER mit den echten gespeicherten Inventaren arbeiten – nicht nur mit
-    // der gefilterten Trade-Liste. So gehen auch bereits vorhandene Skins nicht verloren.
+    // Echter Besitzwechsel: nur die normalen Shop-Inventare ändern.
+    // Die Trade-Liste ist NICHT der Besitzspeicher.
+    sentSkin=String(sentSkin||'').trim();
+    receivedSkin=String(receivedSkin||'').trim();
+    if(!receivedSkin && !sentSkin)return;
+
     let normal=[];
     let planes=[];
-    try{ normal=JSON.parse(localStorage.getItem('crOwnedSkins')||'["classic"]'); }catch(e){ normal=['classic']; }
-    try{ planes=JSON.parse(localStorage.getItem('crOwnedPlaneSkins')||'[]'); }catch(e){ planes=[]; }
-    if(!Array.isArray(normal)) normal=['classic'];
-    if(!Array.isArray(planes)) planes=[];
-    if(!normal.includes('classic')) normal.unshift('classic');
 
-    function removeItem(id){
+    try{
+      const raw=JSON.parse(localStorage.getItem('crOwnedSkins')||'[]');
+      normal=Array.isArray(raw)?raw.slice():[];
+    }catch(e){ normal=[]; }
+
+    try{
+      const raw=JSON.parse(localStorage.getItem('crOwnedPlaneSkins')||'[]');
+      planes=Array.isArray(raw)?raw.slice():[];
+    }catch(e){ planes=[]; }
+
+    if(!normal.includes('classic'))normal.unshift('classic');
+
+    const removeOwned=(id)=>{
       if(!id)return;
       if(isPlaneTradeSkin(id)){
-        const pid=id.slice(7);
-        planes=planes.filter(x=>x!==pid);
+        const pid=id.slice(6); // "plane:" = 6 Zeichen
+        planes=planes.filter(x=>String(x)!==pid);
       }else{
-        normal=normal.filter(x=>x!==id);
+        normal=normal.filter(x=>String(x)!==id);
       }
-    }
-    function addItem(id){
+    };
+
+    const addOwned=(id)=>{
       if(!id || blockedIds.has(id))return;
       if(isPlaneTradeSkin(id)){
-        const pid=id.slice(7);
-        if(pid && !planes.includes(pid)) planes.push(pid);
+        const pid=id.slice(6);
+        if(pid && !planes.includes(pid))planes.push(pid);
       }else if(!normal.includes(id)){
         normal.push(id);
       }
-    }
+    };
 
-    removeItem(sentSkin);
-    addItem(receivedSkin);
-    if(!normal.includes('classic')) normal.unshift('classic');
+    removeOwned(sentSkin);
+    addOwned(receivedSkin);
 
-    // Persistieren.
+    if(!normal.includes('classic'))normal.unshift('classic');
+
+    // 1) Dauerhaft speichern
     localStorage.setItem('crOwnedSkins',JSON.stringify(normal));
     localStorage.setItem('crOwnedPlaneSkins',JSON.stringify(planes));
 
-    // Laufzeit-Arrays sofort ersetzen, damit Ausrüsten direkt funktioniert.
-    if(Array.isArray(ownedSkins)){
-      ownedSkins.length=0;
-      normal.forEach(x=>ownedSkins.push(x));
+    // 2) Laufzeit-Inventare des echten Shops synchronisieren
+    if(typeof ownedSkins!=='undefined' && Array.isArray(ownedSkins)){
+      ownedSkins.splice(0,ownedSkins.length,...normal);
     }
-    if(Array.isArray(ownedPlaneSkins)){
-      ownedPlaneSkins.length=0;
-      planes.forEach(x=>ownedPlaneSkins.push(x));
+    if(typeof ownedPlaneSkins!=='undefined' && Array.isArray(ownedPlaneSkins)){
+      ownedPlaneSkins.splice(0,ownedPlaneSkins.length,...planes);
     }
 
-    // Weggetradeten ausgerüsteten Skin automatisch ablegen.
+    // 3) Falls der abgegebene Skin ausgerüstet war -> Classic.
     if(typeof equippedSkin!=='undefined' && !normal.includes(equippedSkin)){
       equippedSkin='classic';
       localStorage.setItem('crEquippedSkin','classic');
-    }
-    if(typeof equippedPlaneSkin!=='undefined' && equippedPlaneSkin && !planes.includes(equippedPlaneSkin)){
-      equippedPlaneSkin=null;
-      localStorage.removeItem('crEquippedPlaneSkin');
+    }else if(typeof equippedSkin!=='undefined'){
+      localStorage.setItem('crEquippedSkin',equippedSkin||'classic');
     }
 
-    // Wichtig: die normalen Shop-Funktionen erneut ausführen.
-    try{ saveSkins(); }catch(e){}
-    try{ savePlaneSkins(); }catch(e){}
-    try{ if(typeof updateShop==='function') updateShop(); }catch(e){}
-    try{ if(typeof updateMenu==='function') updateMenu(); }catch(e){}
-    try{ if(typeof updateHUD==='function') updateHUD(); }catch(e){}
-    try{ if(typeof save==='function') save(); }catch(e){}
+    if(typeof equippedPlaneSkin!=='undefined'){
+      if(equippedPlaneSkin && !planes.includes(equippedPlaneSkin)){
+        equippedPlaneSkin=null;
+        localStorage.removeItem('crEquippedPlaneSkin');
+      }else if(equippedPlaneSkin){
+        localStorage.setItem('crEquippedPlaneSkin',equippedPlaneSkin);
+      }
+    }
+
+    // 4) Normale Shop-Speicherfunktionen nur noch zum Absichern benutzen.
+    try{ if(typeof saveSkins==='function')saveSkins(); }catch(e){}
+    try{ if(typeof savePlaneSkins==='function')savePlaneSkins(); }catch(e){}
+
+    // 5) Shop sofort neu zeichnen. Der Skin ist jetzt wirklich ausrüstbar.
+    try{ if(typeof updateShop==='function')updateShop(); }catch(e){}
+    try{ if(typeof updateHUD==='function')updateHUD(); }catch(e){}
+    try{ if(typeof updateMenu==='function')updateMenu(); }catch(e){}
 
     try{
-      window.dispatchEvent(new CustomEvent('cubeRushTradeUpdated',{detail:{sentSkin,receivedSkin}}));
+      window.dispatchEvent(new CustomEvent('cubeRushTradeUpdated',{
+        detail:{sentSkin,receivedSkin}
+      }));
     }catch(e){}
   }
 
@@ -6581,16 +6602,19 @@ setInterval(updateSettingsScore,500);
       .catch(e=>statusEl.textContent='❌ '+e.message);
   }
 
-  async function processCompleted(completed){
-    if(!completed || !completed.id)return;
-    const key='crTradeDone_'+completed.id;
-    if(sessionStorage.getItem(key))return;
-    sessionStorage.setItem(key,'1');
-    syncAfterTrade(completed.sentSkin||'',completed.receivedSkin||'');
-    const received=completed.receivedSkin||'';
+  function processCompleted(completed){
+    if(!completed)return;
+
+    const sent=String(completed.sentSkin||completed.removeSkin||'');
+    const received=String(completed.receivedSkin||completed.addSkin||'');
+
+    // Idempotent: doppelte Meldungen sind unschädlich.
+    syncAfterTrade(sent,received);
+
     statusEl.textContent=received
       ? '✅ Trade erfolgreich! '+tradeName(received)+' ist jetzt im Shop und ausrüstbar.'
       : '✅ Trade erfolgreich!';
+
     currentTrade=null;
     machine.classList.add('hidden');
     actions.classList.add('hidden');
@@ -6600,12 +6624,29 @@ setInterval(updateSettingsScore,500);
   confirmBtn.addEventListener('click',()=>{
     if(!currentTrade)return;
     const tradeId=currentTrade.id;
-    api('/api/trade/confirm',{method:'POST',body:JSON.stringify({player:playerName(),tradeId})})
+    const mySentSkin=currentTrade.myOffer||'';
+
+    api('/api/trade/confirm',{
+      method:'POST',
+      body:JSON.stringify({player:playerName(),tradeId})
+    })
       .then(async d=>{
-        if(d.completed && d.completed.id){
-          await processCompleted(d.completed);
+        // Der Server liefert beim Abschluss jetzt das komplette Ergebnis.
+        if(d.completed===true){
+          const received=d.receivedSkin||'';
+          processCompleted({
+            id:tradeId,
+            sentSkin:mySentSkin,
+            receivedSkin:received
+          });
           return;
         }
+
+        if(d.completed && typeof d.completed==='object'){
+          processCompleted(d.completed);
+          return;
+        }
+
         if(d.trade)renderTrade(d.trade);
         else statusEl.textContent='✅ Bestätigt. Warte auf den anderen Spieler …';
         refresh();
@@ -6633,7 +6674,13 @@ setInterval(updateSettingsScore,500);
       ws.addEventListener('message',ev=>{
         try{
           const msg=JSON.parse(ev.data);
-          if(msg && msg.type==='tradeComplete') refresh();
+          if(msg && msg.type==='tradeComplete'){
+            processCompleted({
+              id:msg.tradeId||'',
+              sentSkin:msg.sentSkin||msg.removeSkin||'',
+              receivedSkin:msg.receivedSkin||msg.addSkin||''
+            });
+          }
         }catch(e){}
       });
     }
