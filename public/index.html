@@ -1068,7 +1068,7 @@ body.world4-luck #game{filter:saturate(1.22) contrast(1.07)}
 #playerPollYes{background:#44d47a;color:#07210f}
 #playerPollNo{background:#ff6175;color:#2a0710}
 #playerPollTime{margin-top:5px;font-size:10px;opacity:.8}
-
+.adminPollGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
 body.laptop-mode #playerPoll{
   width:min(620px,82vw);
@@ -1235,6 +1235,113 @@ body:not(#menu) #coins,
     padding:4px 10px !important;
   }
 }
+
+/* ---------- RANGLISTE ---------- */
+#leaderboardOpen{
+  width:min(420px,86vw);
+  margin:8px auto 0;
+  padding:12px 18px;
+  border:0;
+  border-radius:14px;
+  background:#ffd83d;
+  color:#171b3d;
+  font-size:18px;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 5px 0 #b18b00,0 10px 25px rgba(0,0,0,.18);
+}
+#leaderboardOpen:hover{filter:brightness(1.04)}
+#leaderboardPanel{
+  position:fixed;
+  inset:0;
+  z-index:1700;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(6,10,30,.72);
+  backdrop-filter:blur(6px);
+}
+#leaderboardPanel.open{display:flex}
+#leaderboardBox{
+  width:min(720px,94vw);
+  max-height:min(80vh,760px);
+  overflow:auto;
+  border:3px solid #ffd83d;
+  border-radius:24px;
+  background:#101536;
+  color:#fff;
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+  padding:20px;
+}
+#leaderboardBox h2{
+  margin:0 0 8px;
+  text-align:center;
+  font-size:32px;
+  color:#ffd83d;
+}
+#leaderboardInfo{
+  text-align:center;
+  color:#cbd3ff;
+  font-weight:700;
+  margin-bottom:14px;
+}
+#leaderboardList{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.leaderRow{
+  display:grid;
+  grid-template-columns:58px 1fr auto;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  border-radius:14px;
+  background:#171d47;
+  border:1px solid #303a79;
+}
+.leaderRow.top1{
+  border-color:#ffd83d;
+  box-shadow:0 0 14px rgba(255,216,61,.24);
+  background:#232043;
+}
+.leaderRank{
+  font-size:24px;
+  font-weight:1000;
+  text-align:center;
+}
+.leaderName{
+  font-weight:900;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.leaderCoins{
+  color:#ffd83d;
+  font-weight:1000;
+  white-space:nowrap;
+}
+#leaderboardClose{
+  display:block;
+  width:min(300px,90%);
+  margin:16px auto 0;
+  padding:12px 18px;
+  border:0;
+  border-radius:14px;
+  background:#14d9ef;
+  color:#082035;
+  font-weight:1000;
+  font-size:18px;
+  cursor:pointer;
+}
+@media (max-width:650px){
+  #leaderboardBox{padding:14px;border-radius:18px}
+  #leaderboardBox h2{font-size:24px}
+  .leaderRow{grid-template-columns:44px 1fr auto;padding:10px}
+  .leaderRank{font-size:20px}
+  .leaderCoins{font-size:14px}
+}
 </style>
 
 <style>
@@ -1366,73 +1473,6 @@ body:not(#menu) #coins,
   #tradeMachine{grid-template-columns:1fr}
   .tradeSide{min-height:170px}
 }
-
-/* ========================= RANGLISTE ========================= */
-#leaderboardOpen{
-  width:100%;
-  max-width:520px;
-  margin:10px auto 0;
-  padding:14px 18px;
-  border:3px solid #17143b;
-  border-radius:18px;
-  background:linear-gradient(135deg,#ffd83d,#ffb300);
-  color:#17143b;
-  font-weight:900;
-  font-size:19px;
-  cursor:pointer;
-  box-shadow:0 5px 0 #17143b,0 10px 20px rgba(23,20,59,.2);
-}
-#leaderboardOpen:active{transform:translateY(3px);box-shadow:0 2px 0 #17143b}
-#leaderboardPanel{
-  position:fixed;
-  inset:0;
-  z-index:1800;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,.72);
-  backdrop-filter:blur(8px);
-}
-#leaderboardPanel.open{display:flex}
-#leaderboardBox{
-  width:min(620px,94vw);
-  max-height:86vh;
-  overflow:auto;
-  box-sizing:border-box;
-  padding:22px;
-  border-radius:24px;
-  background:linear-gradient(145deg,#111735,#201449);
-  border:4px solid #ffd83d;
-  box-shadow:0 0 45px rgba(255,216,61,.25);
-  color:#fff;
-}
-#leaderboardBox h2{margin:0 0 6px;text-align:center;font-size:30px}
-#leaderboardSub{text-align:center;opacity:.8;margin-bottom:14px}
-#leaderboardList{display:flex;flex-direction:column;gap:8px}
-.leaderRow{
-  display:grid;
-  grid-template-columns:54px minmax(0,1fr) auto;
-  align-items:center;
-  gap:10px;
-  padding:10px 12px;
-  border-radius:14px;
-  background:rgba(255,255,255,.09);
-  border:2px solid rgba(255,255,255,.1);
-}
-.leaderPlace{font-size:22px;font-weight:900;text-align:center}
-.leaderName{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.leaderCoins{font-weight:900;color:#ffd83d;text-align:right;white-space:nowrap}
-.leaderRow.first{background:linear-gradient(135deg,rgba(255,216,61,.25),rgba(255,255,255,.08));border-color:#ffd83d;box-shadow:0 0 16px rgba(255,216,61,.16)}
-#leaderboardClose{width:100%;margin-top:14px;padding:12px;border:0;border-radius:14px;background:#ffd83d;color:#17143b;font-weight:900;font-size:16px;cursor:pointer}
-@media(max-width:700px){
-  #leaderboardOpen{max-width:92vw;font-size:17px;padding:12px 14px}
-  #leaderboardBox{padding:16px;width:94vw}
-  #leaderboardBox h2{font-size:25px}
-  .leaderRow{grid-template-columns:42px minmax(0,1fr) auto;padding:8px 9px}
-  .leaderPlace{font-size:19px}
-  .leaderCoins{font-size:13px}
-  .leaderName{font-size:14px}
-}
 </style>
 </head>
 <body>
@@ -1466,15 +1506,6 @@ body:not(#menu) #coins,
 </div>
 <div id="tip">Leertaste / Klick = Springen · E = Pop-Kraft (Katze) · Im Flugzeug Leertaste halten = hoch</div>
 </div>
-<div id="leaderboardPanel" aria-hidden="true">
-  <div id="leaderboardBox">
-    <h2>🏆 RANGLISTE</h2>
-    <div id="leaderboardSub">Die meisten Münzen stehen ganz oben.</div>
-    <div id="leaderboardList"></div>
-    <button id="leaderboardClose" type="button">ZURÜCK</button>
-  </div>
-</div>
-
 <div class="hidden" id="shop">
 <div class="shopPanel">
 <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
@@ -1488,6 +1519,16 @@ body:not(#menu) #coins,
 <div class="skinGrid" id="trailGrid"></div>
 <button class="shopClose" id="shopClose" type="button">ZURÜCK</button>
 </div>
+</div>
+
+
+<div id="leaderboardPanel" aria-hidden="true">
+  <div id="leaderboardBox">
+    <h2>🏆 RANGLISTE</h2>
+    <div id="leaderboardInfo">Die meisten Münzen stehen ganz oben.</div>
+    <div id="leaderboardList"></div>
+    <button id="leaderboardClose" type="button">ZURÜCK</button>
+  </div>
 </div>
 
 <div id="tradePanel" aria-hidden="true">
@@ -1820,7 +1861,33 @@ function save(){
   saveSkins();
   saveTrails();
   savePlaneSkins();
+  syncLeaderboardCoins();
 }
+
+function syncLeaderboardCoins(){
+  try{
+    const name=
+      (localStorage.getItem("crPlayerName")||"").trim();
+
+    if(!name || location.protocol==="file:")return;
+
+    fetch("/api/leaderboard/update",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        player:name,
+        coins:Math.max(
+          0,
+          Number(coins)||0
+        )
+      })
+    }).catch(()=>{});
+  }catch(_){}
+}
+
+
 
 /* ---------- player ---------- */
 const player={
@@ -6146,17 +6213,6 @@ setInterval(updateSettingsScore,500);
             if(ws && ws.readyState===1) ws.send(JSON.stringify({type:"heartbeat"}));
           }catch(e){}
         },10000);
-        if(ws._cubeRushCoinSync) clearInterval(ws._cubeRushCoinSync);
-        ws._cubeRushCoinSync=setInterval(()=>{
-          try{
-            if(ws && ws.readyState===1){
-              ws.send(JSON.stringify({type:"coinUpdate",coins:String(coins||0)}));
-            }
-          }catch(e){}
-        },2000);
-        try{
-          if(ws && ws.readyState===1) ws.send(JSON.stringify({type:"coinUpdate",coins:String(coins||0)}));
-        }catch(e){}
       });
       ws.addEventListener("message", ev=>{
         try{
@@ -6257,7 +6313,6 @@ setInterval(updateSettingsScore,500);
       });
       ws.addEventListener("close",()=>{
         if(ws && ws._cubeRushHeartbeat) clearInterval(ws._cubeRushHeartbeat);
-        if(ws && ws._cubeRushCoinSync) clearInterval(ws._cubeRushCoinSync);
         setTimeout(connectServer,2500);
       });
     }catch(e){
@@ -6291,156 +6346,132 @@ setInterval(updateSettingsScore,500);
 
   let currentPoll=null;
   let pollTimer=null;
-  let lastPollId="";
 
   function renderPoll(p){
     currentPoll=p||null;
     if(!p){
       poll.classList.remove("open");
+      poll.style.display="none";
       if(pollTimer)clearInterval(pollTimer);
       return;
     }
+
     q.textContent=p.question||"Frage";
     yes.textContent=p.yesLabel||"Ja";
     no.textContent=p.noLabel||"Nein";
+
     poll.classList.add("open");
     poll.classList.remove("hidden");
     poll.style.display="block";
     poll.style.pointerEvents="auto";
-    updatePollPosition();
-    lastPollId=p.id||"";
+
+    if(typeof updatePollPosition==="function")updatePollPosition();
+
     if(pollTimer)clearInterval(pollTimer);
+
     const tick=()=>{
-      const left=Math.max(0,Number(p.endsAt||0)-Date.now());
+      const left=Math.max(
+        0,
+        Number(p.endsAt||0)-Date.now()
+      );
+
       const sec=Math.ceil(left/1000);
-      time.textContent=sec>0?"⏳ Noch "+sec+" Sekunden":"⏳ Zeit abgelaufen";
+
+      time.textContent =
+        sec>0
+          ? "⏳ Noch "+sec+" Sekunden"
+          : "⏳ Zeit abgelaufen";
+
       if(left<=0)renderPoll(null);
     };
+
     tick();
     pollTimer=setInterval(tick,1000);
   }
 
   function handlePoll(p){
     if(!p)return renderPoll(null);
-    if(Number(p.endsAt||0)<=Date.now())return renderPoll(null);
+    if(Number(p.endsAt||0)<=Date.now()){
+      return renderPoll(null);
+    }
     renderPoll(p);
-  }
-
-  if(window.WebSocket){
-    // vorhandene Socket-Logik kann das Event verarbeiten, falls sie window.cubeRushSocket setzt.
-    const hook=setInterval(()=>{
-      const ws=window.cubeRushSocket || window.ws || null;
-      if(ws && !ws.__pollHooked){
-        ws.__pollHooked=true;
-        const old=ws.onmessage;
-        ws.onmessage=(ev)=>{
-          try{
-            const msg=JSON.parse(ev.data);
-            if(msg.type==="playerPoll")handlePoll(msg.poll);
-            if(msg.type==="playerPollClear")renderPoll(null);
-          }catch{}
-          if(typeof old==="function")old.call(ws,ev);
-        };
-        clearInterval(hook);
-      }
-    },500);
   }
 
   window.handlePlayerPoll=handlePoll;
 
   async function answer(choice){
     if(!currentPoll)return;
+
     try{
-      yes.disabled=true; no.disabled=true;
-      let voterId=localStorage.getItem("crPollVoterId");
-      if(!voterId){
-        try{
-          voterId=(crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
-        }catch(e){
-          voterId=Date.now().toString(36)+Math.random().toString(36).slice(2);
-        }
-        localStorage.setItem("crPollVoterId",voterId);
-      }
-      const r=await fetch("/api/poll/answer",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pollId:currentPoll.id,answer:choice,voterId})
-      });
-      if(!r.ok)throw new Error("Antwort nicht gespeichert");
-      time.textContent="✅ Antwort gespeichert";
       yes.disabled=true;
       no.disabled=true;
-      setTimeout(()=>renderPoll(null),700);
+
+      let voterId=localStorage.getItem("crPollVoterId");
+
+      if(!voterId){
+        try{
+          voterId =
+            crypto &&
+            crypto.randomUUID
+              ? crypto.randomUUID()
+              : Date.now().toString(36)+
+                Math.random().toString(36).slice(2);
+        }catch(e){
+          voterId =
+            Date.now().toString(36)+
+            Math.random().toString(36).slice(2);
+        }
+
+        localStorage.setItem(
+          "crPollVoterId",
+          voterId
+        );
+      }
+
+      const r=await fetch(
+        "/api/poll/answer",
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            pollId:currentPoll.id,
+            answer:choice,
+            voterId
+          })
+        }
+      );
+
+      if(!r.ok){
+        const d=await r.json().catch(()=>({}));
+        throw new Error(
+          d.error || "Antwort nicht gespeichert"
+        );
+      }
+
+      time.textContent="✅ Antwort gespeichert";
+
+      setTimeout(
+        ()=>renderPoll(null),
+        700
+      );
     }catch(e){
-      yes.disabled=false; no.disabled=false;
+      yes.disabled=false;
+      no.disabled=false;
       time.textContent="❌ "+e.message;
     }
   }
-  yes.addEventListener("click",()=>answer("yes"));
-  no.addEventListener("click",()=>answer("no"));
 
+  yes.addEventListener(
+    "click",
+    ()=>answer("yes")
+  );
 
-})();
-</script>
-
-<script>
-/* ========================= RANGLISTE ========================= */
-(function(){
-  const openBtn=document.getElementById('leaderboardOpen');
-  const panel=document.getElementById('leaderboardPanel');
-  const closeBtn=document.getElementById('leaderboardClose');
-  const listEl=document.getElementById('leaderboardList');
-  if(!openBtn||!panel||!closeBtn||!listEl)return;
-
-  function fmt(v){
-    const n=Number(v);
-    if(Number.isFinite(n)) return n.toLocaleString('de-DE');
-    return String(v||0);
-  }
-
-  async function refresh(){
-    listEl.innerHTML='<div style="text-align:center;opacity:.75;padding:18px">Rangliste wird geladen …</div>';
-    try{
-      const r=await fetch('/api/leaderboard');
-      const d=await r.json();
-      if(!r.ok)throw new Error(d.error||'Fehler');
-      const rows=Array.isArray(d.leaderboard)?d.leaderboard:[];
-      if(!rows.length){
-        listEl.innerHTML='<div style="text-align:center;opacity:.75;padding:18px">Noch keine Spieler in der Rangliste.</div>';
-        return;
-      }
-      listEl.innerHTML='';
-      rows.forEach((row,i)=>{
-        const el=document.createElement('div');
-        el.className='leaderRow'+(i===0?' first':'');
-        const medal=i===0?'🥇':(i===1?'🥈':(i===2?'🥉':(i+1)+'.'));
-        el.innerHTML='<div class="leaderPlace">'+medal+'</div><div class="leaderName"></div><div class="leaderCoins">🪙 '+fmt(row.coins)+'</div>';
-        el.querySelector('.leaderName').textContent=row.name||'Spieler';
-        listEl.appendChild(el);
-      });
-    }catch(e){
-      listEl.innerHTML='<div style="text-align:center;color:#ff7a8a;padding:18px">❌ '+String(e.message||e)+'</div>';
-    }
-  }
-
-  function open(){
-    panel.classList.add('open');
-    panel.setAttribute('aria-hidden','false');
-    refresh();
-  }
-  function close(){
-    panel.classList.remove('open');
-    panel.setAttribute('aria-hidden','true');
-  }
-
-  openBtn.addEventListener('click',open);
-  closeBtn.addEventListener('click',close);
-  panel.addEventListener('click',e=>{if(e.target===panel)close();});
-
-  // Rangliste im Hintergrund aktualisieren, damit die Reihenfolge aktuell bleibt.
-  setInterval(()=>{
-    if(panel.classList.contains('open')) refresh();
-  },3000);
+  no.addEventListener(
+    "click",
+    ()=>answer("no")
+  );
 })();
 </script>
 
@@ -6919,6 +6950,144 @@ setInterval(updateSettingsScore,500);
 
   // Auch nach einem Shop-Update bleibt das Trade-Inventar aktuell.
   window.addEventListener('cubeRushTradeUpdated',renderMySkins);
+})();
+
+/* ---------- RANGLISTE ---------- */
+(function(){
+  const openBtn=document.getElementById("leaderboardOpen");
+  const closeBtn=document.getElementById("leaderboardClose");
+  const panel=document.getElementById("leaderboardPanel");
+  const list=document.getElementById("leaderboardList");
+  const info=document.getElementById("leaderboardInfo");
+
+  function formatCoins(value){
+    const n=Number(value)||0;
+
+    if(Math.abs(n)<1e15){
+      return n.toLocaleString("de-DE",{
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+      });
+    }
+
+    return n.toExponential(2).replace(".",",");
+  }
+
+  function render(rows){
+    if(!list)return;
+
+    if(!Array.isArray(rows)||!rows.length){
+      list.innerHTML=
+        '<div style="text-align:center;padding:20px;color:#cbd3ff;font-weight:800">Noch keine Spieler in der Rangliste.</div>';
+      return;
+    }
+
+    list.innerHTML="";
+
+    rows.forEach((row,index)=>{
+      const item=document.createElement("div");
+      item.className=
+        "leaderRow"+(index===0?" top1":"");
+
+      const rank=document.createElement("div");
+      rank.className="leaderRank";
+      rank.textContent=
+        index===0 ? "🥇" :
+        index===1 ? "🥈" :
+        index===2 ? "🥉" :
+        (index+1)+ ".";
+
+      const name=document.createElement("div");
+      name.className="leaderName";
+      name.textContent=row.player||"Spieler";
+
+      const coinsEl=document.createElement("div");
+      coinsEl.className="leaderCoins";
+      coinsEl.textContent=
+        formatCoins(row.coins)+" Münzen";
+
+      item.appendChild(rank);
+      item.appendChild(name);
+      item.appendChild(coinsEl);
+      list.appendChild(item);
+    });
+  }
+
+  async function load(){
+    try{
+      const r=await fetch("/api/leaderboard");
+      if(!r.ok)throw new Error();
+
+      const d=await r.json();
+
+      if(d && Array.isArray(d.players)){
+        render(d.players);
+
+        if(info){
+          info.textContent=
+            "Die meisten Münzen stehen ganz oben.";
+        }
+      }
+    }catch(e){
+      if(list){
+        list.innerHTML=
+          '<div style="text-align:center;padding:20px;color:#ff8290;font-weight:800">Rangliste konnte nicht geladen werden.</div>';
+      }
+    }
+  }
+
+  function open(){
+    if(!panel)return;
+
+    panel.classList.add("open");
+    panel.setAttribute(
+      "aria-hidden",
+      "false"
+    );
+
+    load();
+  }
+
+  function close(){
+    if(!panel)return;
+
+    panel.classList.remove("open");
+    panel.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+  }
+
+  openBtn?.addEventListener(
+    "click",
+    open
+  );
+
+  closeBtn?.addEventListener(
+    "click",
+    close
+  );
+
+  panel?.addEventListener(
+    "click",
+    e=>{
+      if(e.target===panel)close();
+    }
+  );
+
+  setInterval(()=>{
+    syncLeaderboardCoins();
+  },5000);
+
+  setTimeout(()=>{
+    syncLeaderboardCoins();
+  },1500);
+
+  setInterval(()=>{
+    if(panel?.classList.contains("open")){
+      load();
+    }
+  },5000);
 })();
 </script>
 
