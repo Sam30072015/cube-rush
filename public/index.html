@@ -1119,6 +1119,68 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
   }
 }
 
+
+/* ---------- ONLINE RANGLISTE ---------- */
+#leaderboardOpen{
+  background:#ffd83d;
+  color:#171000;
+  box-shadow:0 0 18px #ffd83d;
+}
+#leaderboardModal{
+  position:fixed;
+  inset:0;
+  z-index:80;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(2,4,15,.82);
+  backdrop-filter:blur(8px);
+}
+#leaderboardModal.open{display:flex}
+.leaderboardPanel{
+  width:min(680px,94vw);
+  max-height:min(760px,88vh);
+  overflow:auto;
+  padding:26px;
+  border:2px solid #00eaff;
+  border-radius:24px;
+  background:linear-gradient(180deg,#11183d,#080b20);
+  box-shadow:0 0 35px #00eaff66;
+  color:#fff;
+}
+.leaderboardPanel h2{
+  margin:0 0 8px;
+  color:#ffe600;
+  font-size:clamp(28px,6vw,48px);
+  text-shadow:0 0 16px #ff7800;
+}
+#leaderboardStatus{
+  min-height:24px;
+  color:#9eabdf;
+  font-size:14px;
+  margin-bottom:14px;
+}
+#leaderboardList{display:grid;gap:8px}
+.leaderboardRow{
+  display:grid;
+  grid-template-columns:52px 1fr auto;
+  gap:12px;
+  align-items:center;
+  padding:12px 14px;
+  border-radius:12px;
+  background:#0c1230;
+  border:1px solid #263477;
+}
+.leaderboardRow.top{
+  border-color:#ffd83d;
+  box-shadow:0 0 12px #ffd83d44;
+}
+.leaderboardRank{font-weight:900;color:#00eaff}
+.leaderboardName{font-weight:800;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.leaderboardScore{font-weight:900;color:#ffd83d}
+#leaderboardClose{margin-top:18px;background:#00eaff;color:#031015}
+
 </style>
 
 <style>
@@ -1275,6 +1337,7 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 <div class="screen" id="menu">
 <h1>CUBE RUSH</h1>
 <div id="menuCoins">Münzen: 0</div>
+<button id="leaderboardOpen" type="button">🏆 RANGLISTE</button>
 <div id="levels"></div>
 <div id="menuShopActions">
 <button id="tradeOpen" type="button">🤝 TRADE</button>
@@ -1282,6 +1345,16 @@ body.laptop-mode #playerPollButtons button{font-size:12px;padding:6px 9px}
 </div>
 <div id="tip">Leertaste / Klick = Springen · E = Pop-Kraft (Katze) · Im Flugzeug Leertaste halten = hoch</div>
 </div>
+
+<div id="leaderboardModal" aria-hidden="true">
+  <div class="leaderboardPanel" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">
+    <h2 id="leaderboardTitle">🏆 RANGLISTE</h2>
+    <div id="leaderboardStatus">Verbinde mit dem Server …</div>
+    <div id="leaderboardList"></div>
+    <button id="leaderboardClose" type="button">SCHLIESSEN</button>
+  </div>
+</div>
+
 <div class="hidden" id="shop">
 <div class="shopPanel">
 <h2 class="shopTitle">🛍️ SKIN-SHOP</h2>
@@ -3346,6 +3419,7 @@ function burst(x,y,n=8){
 /* ---------- game state ---------- */
 function die(msg){
   running=false;
+  if(typeof window.cubeRushSubmitScore==="function") window.cubeRushSubmitScore(score);
   spaceHeld=false;
 
   // Taco-Event NICHT stoppen und NICHT zurücksetzen.
@@ -3371,6 +3445,7 @@ function win(){
   if(!running)return;
 
   running=false;
+  if(typeof window.cubeRushSubmitScore==="function") window.cubeRushSubmitScore(score);
   spaceHeld=false;
   if(typeof stopMusic==="function")stopMusic();
 
@@ -5980,6 +6055,9 @@ setInterval(updateSettingsScore,500);
             if(Number(msg.poopEventUntil)>Date.now()) startPoopEvent(Number(msg.poopEventUntil));
             if(Number(msg.coinEventUntil)>Date.now()) setCoinEvent(Number(msg.coinEventUntil));
             if(Number(msg.galaxyEventUntil)>Date.now()) setGalaxyEvent(Number(msg.galaxyEventUntil));
+            if(Array.isArray(msg.leaderboard) && typeof window.cubeRushSetLeaderboard==="function"){
+              window.cubeRushSetLeaderboard(msg.leaderboard);
+            }
             if(Array.isArray(msg.serverMessages)){
               serverMessages=msg.serverMessages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
               saveServerMessages();
@@ -6060,6 +6138,12 @@ setInterval(updateSettingsScore,500);
             window.dispatchEvent(new CustomEvent("cubeRushServerMessageDelete",{detail:msg}));
           }
 
+          if(msg.type==="leaderboardUpdate" && Array.isArray(msg.leaderboard)){
+            if(typeof window.cubeRushSetLeaderboard==="function"){
+              window.cubeRushSetLeaderboard(msg.leaderboard);
+            }
+          }
+
           if(msg.type==="serverMessagesUpdate" && Array.isArray(msg.messages)){
             serverMessages=msg.messages.filter(m=>m&&m.text&&Number(m.endsAt)>Date.now());
             saveServerMessages();
@@ -6076,6 +6160,20 @@ setInterval(updateSettingsScore,500);
     }
   }
 
+  window.cubeRushSubmitScore=function(finalScore){
+    const cleanScore=Math.max(0,Math.floor(Number(finalScore)||0));
+    if(cleanScore<=0) return;
+
+    try{
+      if(ws && ws.readyState===1){
+        ws.send(JSON.stringify({type:"scoreUpdate",score:cleanScore}));
+      }else{
+        // Beim nächsten Verbinden wird nur der aktuelle Lauf nicht automatisch
+        // erneut gesendet; der Server bekommt daher nur echte Endpunkte.
+      }
+    }catch(e){}
+  };
+
   window.cubeRushServer={
     connect:connectServer,
     setPlayerName(name){
@@ -6088,6 +6186,87 @@ setInterval(updateSettingsScore,500);
   };
 
   connectServer();
+})();
+
+
+
+/* ---------- ONLINE RANGLISTE ---------- */
+(function(){
+  const modal=document.getElementById("leaderboardModal");
+  const openBtn=document.getElementById("leaderboardOpen");
+  const closeBtn=document.getElementById("leaderboardClose");
+  const list=document.getElementById("leaderboardList");
+  const status=document.getElementById("leaderboardStatus");
+  if(!modal||!openBtn||!closeBtn||!list||!status)return;
+
+  let rows=[];
+
+  function render(){
+    if(!rows.length){
+      list.innerHTML='<div class="leaderboardRow"><div></div><div class="leaderboardName">Noch keine Scores vorhanden.</div><div></div></div>';
+      return;
+    }
+
+    list.innerHTML=rows.slice(0,50).map((entry,index)=>{
+      const rank=Number(entry.rank)||index+1;
+      const score=Math.max(0,Math.floor(Number(entry.score)||0));
+      const name=String(entry.name||"Unbekannt");
+      const medal=rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":"#"+rank;
+      return '<div class="leaderboardRow '+(rank<=3?'top':'')+'">'+
+        '<div class="leaderboardRank">'+medal+'</div>'+
+        '<div class="leaderboardName"></div>'+
+        '<div class="leaderboardScore">'+score+'</div>'+
+        '</div>';
+    }).join("");
+
+    [...list.querySelectorAll(".leaderboardName")].forEach((el,i)=>{
+      el.textContent=String(rows[i]?.name||"Unbekannt");
+    });
+
+    status.textContent=window.cubeRushServer?.isConnected?.()
+      ?"Online · persönliche Bestwerte"
+      :"Server nicht verbunden";
+  }
+
+  window.cubeRushSetLeaderboard=function(nextRows){
+    rows=Array.isArray(nextRows)?nextRows:[];
+    render();
+  };
+
+  async function load(){
+    status.textContent="Lade Rangliste …";
+    try{
+      const res=await fetch("/api/leaderboard",{cache:"no-store"});
+      const data=await res.json();
+      if(data && data.ok && Array.isArray(data.leaderboard)){
+        window.cubeRushSetLeaderboard(data.leaderboard);
+      }else{
+        throw new Error("Ungültige Antwort");
+      }
+    }catch(e){
+      status.textContent="Rangliste konnte nicht geladen werden.";
+    }
+  }
+
+  function open(){
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden","false");
+    render();
+    load();
+  }
+  function close(){
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden","true");
+  }
+
+  openBtn.addEventListener("click",open);
+  closeBtn.addEventListener("click",close);
+  modal.addEventListener("click",e=>{if(e.target===modal)close();});
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape" && modal.classList.contains("open")) close();
+  });
+
+  render();
 })();
 
 
