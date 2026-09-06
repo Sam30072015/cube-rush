@@ -1961,7 +1961,7 @@ function updateCoinEventHud(){
   if(coinEventActive && now<coinEventUntil){
     hud.classList.remove("hidden");
     const sec=Math.max(0,Math.ceil((coinEventUntil-now)/1000));
-    hud.textContent="🪙 2× MÜNZEN · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
+    hud.textContent="🪙 MÜNZEN-EVENT · 10× · "+Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
   }else{
     coinEventActive=false;
     hud.classList.add("hidden");
@@ -1980,8 +1980,8 @@ function coinReward(base){
     multiplier=1;
   }
 
-  // Ein normales Level gibt 50 Münzen.
-  // Mit der besten Spur (2x) sind es exakt 100.
+  // Normales Level: 500 Münzen.
+  // Mit der besten Spur (2x) sind es exakt 1000.
   const doubleEvent=(coinEventActive && Date.now()<coinEventUntil) ? 2 : 1;
   const tenEvent=(tenCoinEventActive && Date.now()<tenCoinEventUntil) ? 10 : 1;
   return Math.max(0,Math.floor(amount*multiplier*doubleEvent*tenEvent));
@@ -3439,7 +3439,7 @@ function win(){
   spaceHeld=false;
   if(typeof stopMusic==="function")stopMusic();
 
-  const isGalaxy=levelIndex>=40 && levelIndex<50;
+  const isGalaxy=Number(levels[levelIndex]?.world)===4;
   const firstTime=!completed.includes(levelIndex);
   const rewardCoins=isGalaxy ? galaxyReward() : coinReward(500);
 
