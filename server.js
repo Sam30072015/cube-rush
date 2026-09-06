@@ -41,723 +41,469 @@ let activePoll = null;
 // HILFSFUNKTIONEN
 // =========================================================
 
-function cleanName(name) {
-  return String(name || "")
-    .trim()
-    .slice(0, 40);
+function now() {
+  return Date.now();
 }
 
-function send(ws, payload) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(payload));
-  }
+function json(res, status, data) {
+  return res.status(status).json(data);
 }
 
-function broadcast(payload) {
-  const data = JSON.stringify(payload);
+function broadcast(data) {
+  const message = JSON.stringify(data);
 
   for (const ws of wss.clients) {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
+      try {
+        ws.send(message);
+      } catch (err) {
+        console.error("WebSocket broadcast error:", err);
+      }
     }
   }
 }
 
-function adminOK(req) {
-  return req.headers["x-admin-key"] === ADMIN_KEY;
-}
+function send(ws, data) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-function secondAdminOK(req) {
-  return req.headers["x-admin-key"] === SECOND_ADMIN_KEY;
-}
-
-function adminMessageEventOK(req) {
-  const key = req.headers["x-admin-key"];
-  return key === ADMIN_KEY || key === SECOND_ADMIN_KEY;
-}
-
-function amountFrom(body) {
-  return Math.max(
-    0,
-    Math.floor(Number(body?.coins) || 0)
-  );
-}
-
-function makeRequestId() {
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).slice(2, 9)
-  );
-}
-
-function publicRequests() {
-  return eventRequests.map((r) => ({
-    id: r.id,
-    event: r.event,
-    action: r.action,
-    durationMs: r.durationMs,
-    createdAt: r.createdAt
-  }));
-}
-
-function publicPoll() {
-  if (!activePoll) return null;
-
-  if (
-    Number(activePoll.endsAt || 0) <=
-    Date.now()
-  ) {
-    return null;
+  try {
+    ws.send(JSON.stringify(data));
+  } catch (err) {
+    console.error("WebSocket send error:", err);
   }
+}
+
+function isAdmin(req) {
+  const key =
+    req.headers["x-admin-key"] ||
+    req.query.key ||
+    req.body?.key;
+
+  return String(key || "") === String(ADMIN_KEY);
+}
+
+function isSecondAdmin(req) {
+  const key =
+    req.headers["x-admin-key"] ||
+    req.query.key ||
+    req.body?.key;
+
+  return String(key || "") === String(SECOND_ADMIN_KEY);
+}
+
+function requireAdmin(req, res, next) {
+  if (!isAdmin(req)) {
+    return json(res, 403, {
+      ok: false,
+      error: "Nicht autorisiert"
+    });
+  }
+
+  next();
+}
+
+function requireSecondAdmin(req, res, next) {
+  if (!isSecondAdmin(req)) {
+    return json(res, 403, {
+      ok: false,
+      error: "Nicht autorisiert"
+    });
+  }
+
+  next();
+}
+
+function cleanText(value, max = 500) {
+  return String(value ?? "")
+    .replace(/\0/g, "")
+    .trim()
+    .slice(0, max);
+}
+
+function randomId(prefix = "id") {
+  return (
+    prefix +
+    "_" +
+    Date.now().toString(36) +
+    "_" +
+    Math.random().toString(36).slice(2, 10)
+  );
+}
+
+// =========================================================
+// EVENTS
+// =========================================================
+
+function eventState() {
+  const t = Date.now();
 
   return {
-    id: activePoll.id,
-    question: activePoll.question,
-    yesLabel: activePoll.yesLabel,
-    noLabel: activePoll.noLabel,
-    endsAt: activePoll.endsAt,
-    answers: {
-      yes: Number(
-        activePoll.answers?.yes || 0
-      ),
-      no: Number(
-        activePoll.answers?.no || 0
-      )
-    }
+    coinEventUntil:
+      coinEventUntil > t ? coinEventUntil : 0,
+
+    tenCoinEventUntil:
+      tenCoinEventUntil > t ? tenCoinEventUntil : 0,
+
+    galaxyEventUntil:
+      galaxyEventUntil > t ? galaxyEventUntil : 0
   };
 }
 
-function executeEvent(
-  event,
-  action,
-  durationMs
-) {
-  // Das zentrale Münzen-Event ist das 10×-Event.
-  // Normales Level: 50 → 500 Münzen.
-  // Galaxy mit 2×-Doppelspur: 100 × 2 × 10 = 2000 Münzen.
+function broadcastEventState() {
+  const state = eventState();
+
+  broadcast({
+    type: "coinEvent",
+    until: state.coinEventUntil
+  });
+
+  broadcast({
+    type: "tenCoinEvent",
+    until: state.tenCoinEventUntil
+  });
+
+  broadcast({
+    type: "galaxyEvent",
+    until: state.galaxyEventUntil
+  });
+}
+
+function executeEvent(event, durationMs = 60000) {
+  const duration = Math.max(
+    0,
+    Number(durationMs) || 0
+  );
+
+  const until = Date.now() + duration;
+
+  // =======================================================
+  // MÜNZEN-EVENT
+  //
+  // Das Haupt-Münzen-Event ist das 10×-Event.
+  //
+  // Die eigentliche Level-Belohnung kommt aus der
+  // index.html:
+  //
+  // Normale Welt:
+  //   500 × Spur
+  //
+  // Galaxy:
+  //   1000 × Spur
+  //
+  // Dadurch:
+  //
+  // Normal + normale Spur = 500
+  // Normal + Doppelspur   = 1000
+  // Galaxy + normale Spur = 1000
+  // Galaxy + Doppelspur   = 2000
+  //
+  // Das 10×-Event wird separat über tenCoinEventUntil
+  // übertragen.
+  // =======================================================
+
   if (event === "coins") {
-    if (action === "start") {
-      // Das normale Münzen-Event ist das 10×-Event.
-      // Ein eventuell noch laufendes altes 2×-Event wird beendet,
-      // damit sich die Multiplikatoren nicht versehentlich addieren.
-      coinEventUntil = 0;
-      tenCoinEventUntil =
-        Date.now() + durationMs;
+    // Altes 2×-Event nicht parallel aktiv lassen.
+    coinEventUntil = 0;
 
-      broadcast({
-        type: "coinEvent",
-        until: 0
-      });
+    tenCoinEventUntil = until;
 
-      broadcast({
-        type: "tenCoinEvent",
-        until: tenCoinEventUntil
-      });
+    broadcast({
+      type: "coinEvent",
+      until: 0
+    });
 
-      return {
-        until: tenCoinEventUntil
-      };
-    }
+    broadcast({
+      type: "tenCoinEvent",
+      until: tenCoinEventUntil
+    });
 
-    if (action === "stop") {
-      coinEventUntil = 0;
-      tenCoinEventUntil = 0;
+    return {
+      ok: true,
+      event: "coins",
+      until: tenCoinEventUntil
+    };
+  }
 
-      broadcast({
-        type: "coinEvent",
-        until: 0
-      });
+  // =======================================================
+  // LEGACY 10× EVENT
+  // =======================================================
 
-      broadcast({
-        type: "tenCoinEvent",
-        until: 0
-      });
+  if (event === "tenCoins") {
+    tenCoinEventUntil = until;
 
-      return {
-        until: 0
-      };
-    }
+    broadcast({
+      type: "tenCoinEvent",
+      until: tenCoinEventUntil
+    });
+
+    return {
+      ok: true,
+      event: "tenCoins",
+      until: tenCoinEventUntil
+    };
+  }
+
+  // =======================================================
+  // GALAXY EVENT
+  // =======================================================
+
+  if (event === "galaxy") {
+    galaxyEventUntil = until;
+
+    broadcast({
+      type: "galaxyEvent",
+      until: galaxyEventUntil
+    });
+
+    return {
+      ok: true,
+      event: "galaxy",
+      until: galaxyEventUntil
+    };
+  }
+
+  return {
+    ok: false,
+    error: "Unbekanntes Event"
+  };
+}
+
+function stopEvent(event) {
+  if (event === "coins") {
+    coinEventUntil = 0;
+    tenCoinEventUntil = 0;
+
+    broadcast({
+      type: "coinEvent",
+      until: 0
+    });
+
+    broadcast({
+      type: "tenCoinEvent",
+      until: 0
+    });
+
+    return {
+      ok: true,
+      event: "coins",
+      until: 0
+    };
   }
 
   if (event === "tenCoins") {
-    if (action === "start") {
-      tenCoinEventUntil =
-        Date.now() + durationMs;
+    tenCoinEventUntil = 0;
 
-      broadcast({
-        type: "tenCoinEvent",
-        until: tenCoinEventUntil
-      });
+    broadcast({
+      type: "tenCoinEvent",
+      until: 0
+    });
 
-      return {
-        until: tenCoinEventUntil
-      };
-    }
-
-    if (action === "stop") {
-      tenCoinEventUntil = 0;
-
-      broadcast({
-        type: "tenCoinEvent",
-        until: 0
-      });
-
-      return {
-        until: 0
-      };
-    }
+    return {
+      ok: true,
+      event: "tenCoins",
+      until: 0
+    };
   }
 
   if (event === "galaxy") {
-    if (action === "start") {
-      galaxyEventUntil =
-        Date.now() + durationMs;
+    galaxyEventUntil = 0;
 
-      broadcast({
-        type: "galaxyEvent",
-        until: galaxyEventUntil
-      });
+    broadcast({
+      type: "galaxyEvent",
+      until: 0
+    });
 
-      return {
-        until: galaxyEventUntil
-      };
-    }
-
-    if (action === "stop") {
-      galaxyEventUntil = 0;
-
-      broadcast({
-        type: "galaxyEvent",
-        until: 0
-      });
-
-      return {
-        until: 0
-      };
-    }
+    return {
+      ok: true,
+      event: "galaxy",
+      until: 0
+    };
   }
 
-  throw new Error("Ungültiges Event");
+  return {
+    ok: false,
+    error: "Unbekanntes Event"
+  };
 }
 
 // =========================================================
-// WEBSOCKET
+// STATUS
 // =========================================================
 
-wss.on("connection", (ws) => {
-  ws.playerName = "";
-  ws.lastHeartbeat = Date.now();
-
-  ws.on("message", (raw) => {
-    let msg;
-
-    try {
-      msg = JSON.parse(
-        raw.toString()
-      );
-    } catch {
-      return;
-    }
-
-    ws.lastHeartbeat = Date.now();
-
-    if (msg.type === "identify") {
-      let name = cleanName(
-        msg.name
-      );
-
-      if (!name) {
-        name =
-          "Spieler-" +
-          Math.random()
-            .toString(36)
-            .slice(2, 8)
-            .toUpperCase();
-      }
-
-      const oldSocket =
-        players.get(name);
-
-      if (
-        oldSocket &&
-        oldSocket !== ws
-      ) {
-        try {
-          oldSocket.terminate();
-        } catch {}
-
-        players.delete(name);
-      }
-
-      if (
-        ws.playerName &&
-        players.get(
-          ws.playerName
-        ) === ws
-      ) {
-        players.delete(
-          ws.playerName
-        );
-      }
-
-      ws.playerName = name;
-      players.set(name, ws);
-
-      send(ws, {
-        type: "connected",
-        name,
-
-        coinEventUntil:
-          coinEventUntil >
-          Date.now()
-            ? coinEventUntil
-            : 0,
-
-        tenCoinEventUntil:
-          tenCoinEventUntil >
-          Date.now()
-            ? tenCoinEventUntil
-            : 0,
-
-        galaxyEventUntil:
-          galaxyEventUntil >
-          Date.now()
-            ? galaxyEventUntil
-            : 0,
-
-        serverMessages,
-
-        poll: publicPoll()
-      });
-
-      return;
-    }
-
-    if (
-      msg.type ===
-      "heartbeat"
-    ) {
-      send(ws, {
-        type:
-          "heartbeatAck"
-      });
-    }
-  });
-
-  ws.on("close", () => {
-    if (
-      ws.playerName &&
-      players.get(
-        ws.playerName
-      ) === ws
-    ) {
-      players.delete(
-        ws.playerName
-      );
-    }
-  });
-
-  ws.on("error", () => {
-    if (
-      ws.playerName &&
-      players.get(
-        ws.playerName
-      ) === ws
-    ) {
-      players.delete(
-        ws.playerName
-      );
-    }
+app.get("/api/status", (req, res) => {
+  return json(res, 200, {
+    ok: true,
+    players: players.size,
+    ...eventState(),
+    serverMessages,
+    eventRequests,
+    activePoll,
+    tradeRequests
   });
 });
 
 // =========================================================
-// ONLINE CLEANUP
+// PLAYER STATUS
 // =========================================================
 
-setInterval(() => {
-  const now = Date.now();
+app.get("/api/players", requireAdmin, (req, res) => {
+  const result = [];
 
-  for (
-    const [name, ws] of players
-  ) {
-    if (
-      ws.readyState !==
-        WebSocket.OPEN ||
-      now -
-        (ws.lastHeartbeat || 0) >
-        30000
-    ) {
-      players.delete(name);
-
-      try {
-        ws.terminate();
-      } catch {}
-    }
+  for (const [id, player] of players.entries()) {
+    result.push({
+      id,
+      name: player.name,
+      connectedAt: player.connectedAt,
+      level: player.level,
+      world: player.world,
+      coins: player.coins
+    });
   }
-}, 15000);
+
+  return json(res, 200, {
+    ok: true,
+    players: result
+  });
+});
 
 // =========================================================
-// HAUPT-ADMIN 603781
-// 2X COIN EVENT
+// SERVER MESSAGES
+// =========================================================
+
+app.post(
+  "/api/admin/message",
+  requireAdmin,
+  (req, res) => {
+    const text = cleanText(req.body?.message, 500);
+
+    if (!text) {
+      return json(res, 400, {
+        ok: false,
+        error: "Nachricht fehlt"
+      });
+    }
+
+    const message = {
+      id: randomId("msg"),
+      text,
+      createdAt: Date.now()
+    };
+
+    serverMessages.push(message);
+
+    if (serverMessages.length > 100) {
+      serverMessages =
+        serverMessages.slice(-100);
+    }
+
+    broadcast({
+      type: "serverMessage",
+      message
+    });
+
+    return json(res, 200, {
+      ok: true,
+      message
+    });
+  }
+);
+
+app.get(
+  "/api/admin/messages",
+  requireAdmin,
+  (req, res) => {
+    return json(res, 200, {
+      ok: true,
+      messages: serverMessages
+    });
+  }
+);
+
+app.delete(
+  "/api/admin/messages",
+  requireAdmin,
+  (req, res) => {
+    serverMessages = [];
+
+    broadcast({
+      type: "serverMessagesClear"
+    });
+
+    return json(res, 200, {
+      ok: true
+    });
+  }
+);
+
+// =========================================================
+// MÜNZEN-EVENT
 // =========================================================
 
 app.post(
   "/api/admin/coins-event",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
+    const minutes =
+      Number(req.body?.minutes);
 
-    const action =
-      String(
-        req.body?.action || ""
-      );
+    const durationMs =
+      Number.isFinite(minutes) && minutes > 0
+        ? minutes * 60 * 1000
+        : Number(req.body?.durationMs) || 60000;
 
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          1000,
-          Math.min(
-            10080 * 60 * 1000,
-            Math.floor(
-              Number(
-                req.body?.durationMs
-              ) || 0
-            )
-          )
-        );
+    return json(
+      res,
+      200,
+      executeEvent("coins", durationMs)
+    );
+  }
+);
 
-      const result =
-        executeEvent(
-          "coins",
-          "start",
-          durationMs
-        );
-
-      return res.json({
-        ok: true,
-        ...result
-      });
-    }
-
-    if (
-      action === "stop"
-    ) {
-      const result =
-        executeEvent(
-          "coins",
-          "stop",
-          0
-        );
-
-      return res.json({
-        ok: true,
-        ...result
-      });
-    }
-
-    return res
-      .status(400)
-      .json({
-        error:
-          "Invalid action"
-      });
+app.post(
+  "/api/admin/coins-event/stop",
+  requireAdmin,
+  (req, res) => {
+    return json(
+      res,
+      200,
+      stopEvent("coins")
+    );
   }
 );
 
 // =========================================================
-// 10X EVENT
+// LEGACY 10× MÜNZEN-EVENT
 // =========================================================
 
 app.post(
   "/api/admin/ten-coins-event",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
+    const minutes =
+      Number(req.body?.minutes);
 
-    const action =
-      String(
-        req.body?.action || ""
-      );
+    const durationMs =
+      Number.isFinite(minutes) && minutes > 0
+        ? minutes * 60 * 1000
+        : Number(req.body?.durationMs) || 60000;
 
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          1000,
-          Math.min(
-            10080 * 60 * 1000,
-            Math.floor(
-              Number(
-                req.body?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      const result =
-        executeEvent(
-          "tenCoins",
-          "start",
-          durationMs
-        );
-
-      return res.json({
-        ok: true,
-        ...result
-      });
-    }
-
-    if (
-      action === "stop"
-    ) {
-      const result =
-        executeEvent(
-          "tenCoins",
-          "stop",
-          0
-        );
-
-      return res.json({
-        ok: true,
-        ...result
-      });
-    }
-
-    return res
-      .status(400)
-      .json({
-        error:
-          "Invalid action"
-      });
+    return json(
+      res,
+      200,
+      executeEvent("tenCoins", durationMs)
+    );
   }
 );
 
-// =========================================================
-// COINS GEBEN
-// =========================================================
-
 app.post(
-  "/api/admin/give",
+  "/api/admin/ten-coins-event/stop",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const coins =
-      amountFrom(req.body);
-
-    if (
-      !player ||
-      coins <= 0
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Player and a coin amount are required"
-        });
-    }
-
-    const target =
-      players.get(player);
-
-    if (
-      !target ||
-      target.readyState !==
-        WebSocket.OPEN
-    ) {
-      if (
-        players.get(
-          player
-        ) === target
-      ) {
-        players.delete(
-          player
-        );
-      }
-
-      return res
-        .status(404)
-        .json({
-          error:
-            "Player is not online"
-        });
-    }
-
-    send(target, {
-      type: "gift",
-      target: player,
-      coins
-    });
-
-    return res.json({
-      ok: true,
-      player,
-      coins
-    });
-  }
-);
-
-// =========================================================
-// ALLEN SPIELERN COINS GEBEN
-// =========================================================
-
-app.post(
-  "/api/admin/give-all",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const coins =
-      amountFrom(req.body);
-
-    if (coins <= 0) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "A coin amount greater than 0 is required"
-        });
-    }
-
-    let count = 0;
-
-    const message =
-      JSON.stringify({
-        type:
-          "giftAll",
-        coins
-      });
-
-    for (
-      const [name, ws] of
-        players
-    ) {
-      if (
-        ws.readyState ===
-        WebSocket.OPEN
-      ) {
-        ws.send(message);
-        count++;
-      } else {
-        players.delete(name);
-      }
-    }
-
-    return res.json({
-      ok: true,
-      coins,
-      count
-    });
-  }
-);
-
-// =========================================================
-// COINS WEGNEHMEN
-// =========================================================
-
-app.post(
-  "/api/admin/take",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const coins =
-      amountFrom(req.body);
-
-    if (
-      !player ||
-      coins <= 0
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Player and a coin amount are required"
-        });
-    }
-
-    const target =
-      players.get(player);
-
-    if (
-      !target ||
-      target.readyState !==
-        WebSocket.OPEN
-    ) {
-      if (
-        players.get(
-          player
-        ) === target
-      ) {
-        players.delete(
-          player
-        );
-      }
-
-      return res
-        .status(404)
-        .json({
-          error:
-            "Player is not online"
-        });
-    }
-
-    send(target, {
-      type:
-        "takeCoins",
-      target: player,
-      coins
-    });
-
-    return res.json({
-      ok: true,
-      player,
-      coins
-    });
+    return json(
+      res,
+      200,
+      stopEvent("tenCoins")
+    );
   }
 );
 
@@ -767,1801 +513,723 @@ app.post(
 
 app.post(
   "/api/admin/galaxy-event",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const action =
-      String(
-        req.body?.action || ""
-      );
-
-    if (
-      action === "start"
-    ) {
-      const durationMs =
-        Math.max(
-          60000,
-          Math.min(
-            10080 * 60 * 1000,
-            Math.floor(
-              Number(
-                req.body?.durationMs
-              ) || 0
-            )
-          )
-        );
-
-      return res.json({
-        ok: true,
-        ...executeEvent(
-          "galaxy",
-          "start",
-          durationMs
-        )
-      });
-    }
-
-    if (
-      action === "stop"
-    ) {
-      return res.json({
-        ok: true,
-        ...executeEvent(
-          "galaxy",
-          "stop",
-          0
-        )
-      });
-    }
-
-    return res
-      .status(400)
-      .json({
-        error:
-          "Invalid action"
-      });
-  }
-);
-
-// =========================================================
-// SERVER-NACHRICHTEN
-// =========================================================
-
-app.post(
-  "/api/admin/message",
-  (req, res) => {
-    if (
-      !adminMessageEventOK(
-        req
-      )
-    ) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const text =
-      String(
-        req.body?.text || ""
-      )
-        .trim()
-        .slice(0, 120);
-
     const minutes =
-      Math.max(
-        0,
-        Math.floor(
-          Number(
-            req.body?.minutes
-          ) || 0
-        )
-      );
+      Number(req.body?.minutes);
 
-    const seconds =
-      Math.max(
-        0,
-        Math.min(
-          59,
-          Math.floor(
-            Number(
-              req.body?.seconds
-            ) || 0
-          )
-        )
-      );
+    const durationMs =
+      Number.isFinite(minutes) && minutes > 0
+        ? minutes * 60 * 1000
+        : Number(req.body?.durationMs) || 60000;
 
-    const duration =
-      (minutes * 60 +
-        seconds) *
-      1000;
-
-    if (
-      !text ||
-      duration <= 0
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Text and duration required"
-        });
-    }
-
-    const message = {
-      id:
-        Date.now().toString(
-          36
-        ) +
-        Math.random()
-          .toString(36)
-          .slice(2, 7),
-
-      type:
-        "serverMessage",
-
-      text,
-
-      endsAt:
-        Date.now() +
-        duration
-    };
-
-    serverMessages.push(
-      message
+    return json(
+      res,
+      200,
+      executeEvent("galaxy", durationMs)
     );
-
-    broadcast(message);
-
-    return res.json({
-      ok: true,
-      message
-    });
   }
 );
 
 app.post(
-  "/api/admin/message/delete",
+  "/api/admin/galaxy-event/stop",
+  requireAdmin,
   (req, res) => {
-    if (
-      !adminMessageEventOK(
-        req
-      )
-    ) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    serverMessages = [];
-
-    broadcast({
-      type:
-        "serverMessagesClear"
-    });
-
-    broadcast({
-      type:
-        "serverMessageDelete"
-    });
-
-    return res.json({
-      ok: true
-    });
+    return json(
+      res,
+      200,
+      stopEvent("galaxy")
+    );
   }
 );
 
 // =========================================================
-// ZWEITES ADMIN-PANEL
-// 6301
+// SECOND ADMIN – EVENT REQUESTS
 // =========================================================
 
 app.post(
   "/api/second-admin/event-request",
+  requireSecondAdmin,
   (req, res) => {
-    if (
-      !secondAdminOK(
-        req
-      )
-    ) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
+    const event = cleanText(
+      req.body?.event,
+      50
+    );
 
-    const event =
-      String(
-        req.body?.event || ""
-      );
+    const allowed = [
+      "coins",
+      "tenCoins",
+      "galaxy"
+    ];
 
-    const action =
-      String(
-        req.body?.action || ""
-      );
-
-    if (
-      ![
-        "coins",
-        "tenCoins",
-        "galaxy"
-      ].includes(event)
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Ungültiges Event"
-        });
-    }
-
-    if (
-      ![
-        "start",
-        "stop"
-      ].includes(action)
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Ungültige Aktion"
-        });
-    }
-
-    let durationMs = 0;
-
-    if (
-      action === "start"
-    ) {
-      const value =
-        Math.floor(
-          Number(
-            req.body?.durationMs
-          ) || 0
-        );
-
-      if (
-        event === "galaxy"
-      ) {
-        durationMs =
-          Math.max(
-            60000,
-            Math.min(
-              10080 *
-                60 *
-                1000,
-              value
-            )
-          );
-      } else {
-        durationMs =
-          Math.max(
-            1000,
-            Math.min(
-              10080 *
-                60 *
-                1000,
-              value
-            )
-          );
-      }
-    }
-
-    const duplicate =
-      eventRequests.find(
-        (r) =>
-          r.event === event &&
-          r.action === action
-      );
-
-    if (duplicate) {
-      return res.json({
-        ok: true,
-        pending: true,
-        id: duplicate.id
+    if (!allowed.includes(event)) {
+      return json(res, 400, {
+        ok: false,
+        error: "Ungültiges Event"
       });
     }
 
     const request = {
-      id: makeRequestId(),
+      id: randomId("event"),
       event,
-      action,
-      durationMs,
       createdAt: Date.now()
     };
 
-    eventRequests.push(
-      request
-    );
+    eventRequests.push(request);
 
-    return res.json({
+    if (eventRequests.length > 100) {
+      eventRequests =
+        eventRequests.slice(-100);
+    }
+
+    broadcast({
+      type: "eventRequest",
+      request
+    });
+
+    return json(res, 200, {
       ok: true,
-      pending: true,
-      id: request.id
+      request
     });
   }
 );
-
-// =========================================================
-// EVENT REQUESTS
-// =========================================================
 
 app.get(
-  "/api/admin/event-requests",
+  "/api/second-admin/event-requests",
+  requireSecondAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    return res.json({
+    return json(res, 200, {
       ok: true,
-      requests:
-        publicRequests()
+      requests: eventRequests
     });
   }
 );
 
-// =========================================================
-// EVENT REQUEST APPROVE / DENY
-// =========================================================
-
 app.post(
-  "/api/admin/event-request/respond",
+  "/api/admin/event-request/:id/approve",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const requestId =
-      String(
-        req.body?.requestId ||
-          ""
-      );
-
-    const approve =
-      req.body?.approve ===
-      true;
-
     const index =
       eventRequests.findIndex(
-        (r) =>
-          r.id === requestId
+        x => x.id === req.params.id
       );
 
     if (index < 0) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Anfrage nicht gefunden"
-        });
+      return json(res, 404, {
+        ok: false,
+        error: "Anfrage nicht gefunden"
+      });
     }
 
     const request =
       eventRequests[index];
 
-    eventRequests.splice(
-      index,
-      1
-    );
+    eventRequests.splice(index, 1);
 
-    if (!approve) {
-      return res.json({
-        ok: true,
-        approved: false
+    const result =
+      executeEvent(request.event, 10 * 60 * 1000);
+
+    broadcast({
+      type: "eventRequestApproved",
+      request,
+      result
+    });
+
+    return json(res, 200, {
+      ok: true,
+      request,
+      result
+    });
+  }
+);
+
+app.post(
+  "/api/admin/event-request/:id/deny",
+  requireAdmin,
+  (req, res) => {
+    const index =
+      eventRequests.findIndex(
+        x => x.id === req.params.id
+      );
+
+    if (index < 0) {
+      return json(res, 404, {
+        ok: false,
+        error: "Anfrage nicht gefunden"
       });
     }
 
-    const result =
-      executeEvent(
-        request.event,
-        request.action,
-        request.durationMs
-      );
+    const request =
+      eventRequests[index];
 
-    return res.json({
+    eventRequests.splice(index, 1);
+
+    broadcast({
+      type: "eventRequestDenied",
+      request
+    });
+
+    return json(res, 200, {
       ok: true,
-      approved: true,
-      ...result
+      request
     });
   }
 );
 
 // =========================================================
-// ONLINE SPIELER
+// POLL / UMFRAGE
 // =========================================================
 
 app.get(
-  "/api/admin/online-players",
+  "/api/poll",
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    const onlinePlayers =
-      [...players.entries()]
-        .filter(
-          ([, ws]) =>
-            ws.readyState ===
-            WebSocket.OPEN
-        )
-        .map(
-          ([name]) =>
-            name
-        );
-
-    return res.json({
+    return json(res, 200, {
       ok: true,
-      onlinePlayers
+      poll: activePoll
     });
   }
 );
-
-// =========================================================
-// STATUS
-// =========================================================
-
-app.get(
-  "/api/status",
-  (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    return res.json({
-      onlinePlayers:
-        [...players.keys()],
-
-      coinEventUntil:
-        coinEventUntil >
-        Date.now()
-          ? coinEventUntil
-          : 0,
-
-      tenCoinEventUntil:
-        tenCoinEventUntil >
-        Date.now()
-          ? tenCoinEventUntil
-          : 0,
-
-      galaxyEventUntil:
-        galaxyEventUntil >
-        Date.now()
-          ? galaxyEventUntil
-          : 0,
-
-      poll:
-        publicPoll()
-    });
-  }
-);
-
-// =========================================================
-// FRAGE ERSTELLEN
-// =========================================================
 
 app.post(
   "/api/admin/poll",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
     const question =
-      String(
-        req.body?.question ||
-          ""
-      )
-        .trim()
-        .slice(0, 200);
+      cleanText(req.body?.question, 300);
 
-    const yesLabel =
-      String(
-        req.body?.yesLabel ||
-          "Ja"
-      )
-        .trim()
-        .slice(0, 60);
-
-    const noLabel =
-      String(
-        req.body?.noLabel ||
-          "Nein"
-      )
-        .trim()
-        .slice(0, 60);
-
-    const minutes =
-      Math.max(
-        0,
-        Math.floor(
-          Number(
-            req.body?.minutes
-          ) || 0
-        )
-      );
-
-    const seconds =
-      Math.max(
-        0,
-        Math.min(
-          59,
-          Math.floor(
-            Number(
-              req.body?.seconds
-            ) || 0
-          )
-        )
-      );
-
-    const durationMs =
-      (minutes * 60 +
-        seconds) *
-      1000;
-
-    if (
-      !question ||
-      durationMs <= 0
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Frage und Dauer erforderlich"
-        });
+    if (!question) {
+      return json(res, 400, {
+        ok: false,
+        error: "Frage fehlt"
+      });
     }
 
     activePoll = {
-      id: makeRequestId(),
-
+      id: randomId("poll"),
       question,
-
-      yesLabel:
-        yesLabel || "Ja",
-
-      noLabel:
-        noLabel || "Nein",
-
-      endsAt:
-        Date.now() +
-        durationMs,
-
-      answers: {
-        yes: 0,
-        no: 0
-      },
-
-      voters: new Set()
+      yes: 0,
+      no: 0,
+      createdAt: Date.now()
     };
 
-    const poll =
-      publicPoll();
-
     broadcast({
-      type:
-        "playerPoll",
-      poll
+      type: "poll",
+      poll: activePoll
     });
 
-    return res.json({
+    return json(res, 200, {
       ok: true,
-      poll
+      poll: activePoll
     });
   }
 );
 
-// =========================================================
-// FRAGE STOPPEN
-// =========================================================
-
 app.post(
   "/api/admin/poll/stop",
+  requireAdmin,
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
     activePoll = null;
 
     broadcast({
-      type:
-        "playerPollClear"
+      type: "poll",
+      poll: null
     });
 
-    return res.json({
+    return json(res, 200, {
       ok: true
     });
   }
 );
 
 // =========================================================
-// FRAGE STATUS
+// TRADE
 // =========================================================
 
 app.get(
-  "/api/admin/poll/status",
+  "/api/trades",
   (req, res) => {
-    if (!adminOK(req)) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Unauthorized"
-        });
-    }
-
-    return res.json({
+    return json(res, 200, {
       ok: true,
-      poll:
-        publicPoll()
+      requests: tradeRequests
     });
   }
 );
-
-// =========================================================
-// FRAGE BEANTWORTEN
-// =========================================================
-
-app.post(
-  "/api/poll/answer",
-  (req, res) => {
-    const poll =
-      publicPoll();
-
-    if (
-      !poll ||
-      !activePoll
-    ) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Keine aktive Frage"
-        });
-    }
-
-    const pollId =
-      String(
-        req.body?.pollId ||
-          ""
-      );
-
-    const answer =
-      String(
-        req.body?.answer ||
-          ""
-      );
-
-    const voterId =
-      String(
-        req.body?.voterId ||
-          ""
-      )
-        .trim()
-        .slice(0, 100);
-
-    if (
-      pollId !==
-      activePoll.id
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Frage ist nicht mehr aktiv"
-        });
-    }
-
-    if (
-      answer !== "yes" &&
-      answer !== "no"
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Ungültige Antwort"
-        });
-    }
-
-    if (!voterId) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Voter-ID fehlt"
-        });
-    }
-
-    if (
-      !activePoll.voters
-    ) {
-      activePoll.voters =
-        new Set();
-    }
-
-    if (
-      activePoll.voters.has(
-        voterId
-      )
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Du hast schon abgestimmt"
-        });
-    }
-
-    activePoll.voters.add(
-      voterId
-    );
-
-    activePoll.answers[
-      answer
-    ]++;
-
-    broadcast({
-      type:
-        "pollUpdated",
-      poll:
-        publicPoll()
-    });
-
-    return res.json({
-      ok: true,
-      answers: {
-        ...activePoll.answers
-      }
-    });
-  }
-);
-
-// =========================================================
-// TRADE HILFSFUNKTION
-// =========================================================
-
-function getTradeForPlayer(
-  player
-) {
-  for (
-    const trade of
-      activeTrades.values()
-  ) {
-    if (
-      trade.from ===
-        player ||
-      trade.to === player
-    ) {
-      const mine =
-        trade.from ===
-        player
-          ? trade.fromOffer
-          : trade.toOffer;
-
-      const theirs =
-        trade.from ===
-        player
-          ? trade.toOffer
-          : trade.fromOffer;
-
-      const mineConfirmed =
-        trade.from ===
-        player
-          ? trade.fromConfirmed
-          : trade.toConfirmed;
-
-      const theirsConfirmed =
-        trade.from ===
-        player
-          ? trade.toConfirmed
-          : trade.fromConfirmed;
-
-      return {
-        id: trade.id,
-
-        other:
-          trade.from ===
-          player
-            ? trade.to
-            : trade.from,
-
-        myOffer: mine,
-        otherOffer:
-          theirs,
-
-        myConfirmed:
-          mineConfirmed,
-
-        otherConfirmed:
-          theirsConfirmed
-      };
-    }
-  }
-
-  return null;
-}
-
-// =========================================================
-// TRADE STATUS
-// =========================================================
 
 app.get(
-  "/api/trade/status",
+  "/api/admin/trades",
+  requireAdmin,
   (req, res) => {
-    const player =
-      cleanName(
-        req.query.player
-      );
-
-    if (!player) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Spielername fehlt"
-        });
-    }
-
-    const onlinePlayers =
-      [...players.keys()]
-        .filter(
-          (name) =>
-            name !== player
-        );
-
-    const incomingRequests =
-      tradeRequests.filter(
-        (request) =>
-          request.to ===
-          player
-      );
-
-    const trade =
-      getTradeForPlayer(
-        player
-      );
-
-    const completed =
-      completedTrades.get(
-        player
-      ) || null;
-
-    if (completed) {
-      completedTrades.delete(
-        player
-      );
-    }
-
-    return res.json({
+    return json(res, 200, {
       ok: true,
-      onlinePlayers,
-      incomingRequests,
-      trade,
-      completed
+      requests: tradeRequests,
+      activeTrades:
+        Array.from(activeTrades.entries()),
+      completedTrades:
+        Array.from(completedTrades.entries())
     });
   }
 );
-
-// =========================================================
-// TRADE ANFRAGE
-// =========================================================
 
 app.post(
   "/api/trade/request",
   (req, res) => {
-    const from =
-      cleanName(
-        req.body?.from
-      );
+    const from = cleanText(
+      req.body?.from,
+      100
+    );
 
-    const to =
-      cleanName(
-        req.body?.to
-      );
+    const to = cleanText(
+      req.body?.to,
+      100
+    );
 
-    if (
-      !from ||
-      !to ||
-      from === to
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Ungültiger Spieler"
-        });
-    }
-
-    if (
-      !players.has(from)
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Du bist nicht online"
-        });
-    }
-
-    if (
-      !players.has(to)
-    ) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Spieler ist nicht online"
-        });
-    }
-
-    if (
-      getTradeForPlayer(
-        from
-      )
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Du bist bereits in einem Trade"
-        });
-    }
-
-    if (
-      tradeRequests.some(
-        (r) =>
-          r.from === from &&
-          r.to === to
-      )
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Anfrage wurde bereits gesendet"
-        });
-    }
+    const offer =
+      req.body?.offer || {};
 
     const request = {
-      id: makeRequestId(),
+      id: randomId("trade"),
       from,
       to,
-      createdAt: Date.now()
+      offer,
+      createdAt: Date.now(),
+      status: "pending"
     };
 
-    tradeRequests.push(
-      request
-    );
-
-    const target =
-      players.get(to);
-
-    if (target) {
-      send(target, {
-        type:
-          "tradeRequest",
-        request
-      });
-    }
-
-    return res.json({
-      ok: true,
-      request
-    });
-  }
-);
-
-// =========================================================
-// TRADE ANNEHMEN / ABLEHNEN
-// =========================================================
-
-app.post(
-  "/api/trade/respond",
-  (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const requestId =
-      String(
-        req.body?.requestId ||
-          ""
-      );
-
-    const accept =
-      req.body?.accept ===
-      true;
-
-    const index =
-      tradeRequests.findIndex(
-        (request) =>
-          request.id ===
-            requestId &&
-          request.to ===
-            player
-      );
-
-    if (index < 0) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Trade-Anfrage nicht gefunden"
-        });
-    }
-
-    const request =
-      tradeRequests[index];
-
-    tradeRequests.splice(
-      index,
-      1
-    );
-
-    if (!accept) {
-      const fromWs =
-        players.get(
-          request.from
-        );
-
-      if (fromWs) {
-        send(fromWs, {
-          type:
-            "tradeRequestResult",
-
-          requestId:
-            request.id,
-
-          accepted:
-            false
-        });
-      }
-
-      return res.json({
-        ok: true,
-        accepted: false
-      });
-    }
-
-    if (
-      !players.has(
-        request.from
-      ) ||
-      !players.has(
-        request.to
-      )
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Spieler ist nicht mehr online"
-        });
-    }
-
-    if (
-      getTradeForPlayer(
-        request.from
-      ) ||
-      getTradeForPlayer(
-        request.to
-      )
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Ein Spieler ist bereits in einem Trade"
-        });
-    }
-
-    const trade = {
-      id: makeRequestId(),
-
-      from: request.from,
-      to: request.to,
-
-      fromOffer: null,
-      toOffer: null,
-
-      fromConfirmed:
-        false,
-
-      toConfirmed:
-        false,
-
-      createdAt:
-        Date.now()
-    };
-
-    activeTrades.set(
-      trade.id,
-      trade
-    );
-
-    const fromWs =
-      players.get(
-        request.from
-      );
-
-    if (fromWs) {
-      send(fromWs, {
-        type:
-          "tradeAccepted",
-
-        tradeId:
-          trade.id
-      });
-    }
-
-    return res.json({
-      ok: true,
-
-      accepted: true,
-
-      trade:
-        getTradeForPlayer(
-          player
-        )
-    });
-  }
-);
-
-// =========================================================
-// TRADE OFFER
-// =========================================================
-
-app.post(
-  "/api/trade/offer",
-  (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const tradeId =
-      String(
-        req.body?.tradeId ||
-          ""
-      );
-
-    const skinId =
-      String(
-        req.body?.skinId ||
-          ""
-      ).trim();
-
-    if (!skinId) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Ungültiger Skin"
-        });
-    }
-
-    const trade =
-      activeTrades.get(
-        tradeId
-      );
-
-    if (
-      !trade ||
-      (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
-      )
-    ) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Trade nicht gefunden"
-        });
-    }
-
-    if (
-      trade.from ===
-      player
-    ) {
-      if (
-        trade.fromConfirmed
-      ) {
-        return res
-          .status(409)
-          .json({
-            error:
-              "Bereits bestätigt"
-          });
-      }
-
-      trade.fromOffer =
-        skinId;
-    } else {
-      if (
-        trade.toConfirmed
-      ) {
-        return res
-          .status(409)
-          .json({
-            error:
-              "Bereits bestätigt"
-          });
-      }
-
-      trade.toOffer =
-        skinId;
-    }
-
-    const fromWs =
-      players.get(
-        trade.from
-      );
-
-    const toWs =
-      players.get(
-        trade.to
-      );
-
-    if (fromWs) {
-      send(fromWs, {
-        type:
-          "tradeUpdated",
-
-        trade:
-          getTradeForPlayer(
-            trade.from
-          )
-      });
-    }
-
-    if (toWs) {
-      send(toWs, {
-        type:
-          "tradeUpdated",
-
-        trade:
-          getTradeForPlayer(
-            trade.to
-          )
-      });
-    }
-
-    return res.json({
-      ok: true,
-
-      trade:
-        getTradeForPlayer(
-          player
-        )
-    });
-  }
-);
-
-// =========================================================
-// TRADE BESTÄTIGEN
-// =========================================================
-
-app.post(
-  "/api/trade/confirm",
-  (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const tradeId =
-      String(
-        req.body?.tradeId ||
-          ""
-      );
-
-    const trade =
-      activeTrades.get(
-        tradeId
-      );
-
-    if (
-      !trade ||
-      (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
-      )
-    ) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Trade nicht gefunden"
-        });
-    }
-
-    if (
-      trade.from ===
-      player
-    ) {
-      if (
-        !trade.fromOffer
-      ) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Bitte zuerst einen Skin auswählen"
-          });
-      }
-
-      trade.fromConfirmed =
-        true;
-    } else {
-      if (
-        !trade.toOffer
-      ) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Bitte zuerst einen Skin auswählen"
-          });
-      }
-
-      trade.toConfirmed =
-        true;
-    }
-
-    // Beide haben bestätigt
-    if (
-      trade.fromConfirmed &&
-      trade.toConfirmed
-    ) {
-      const fromPlayer =
-        trade.from;
-
-      const toPlayer =
-        trade.to;
-
-      const fromSkin =
-        trade.fromOffer;
-
-      const toSkin =
-        trade.toOffer;
-
-      activeTrades.delete(
-        trade.id
-      );
-
-      // Spieler A:
-      // entfernt seinen Skin
-      // bekommt den Skin von B
-      completedTrades.set(
-        fromPlayer,
-        {
-          id: trade.id,
-
-          sentSkin:
-            fromSkin,
-
-          receivedSkin:
-            toSkin,
-
-          removeSkin:
-            fromSkin,
-
-          addSkin:
-            toSkin
-        }
-      );
-
-      // Spieler B:
-      // entfernt seinen Skin
-      // bekommt den Skin von A
-      completedTrades.set(
-        toPlayer,
-        {
-          id: trade.id,
-
-          sentSkin:
-            toSkin,
-
-          receivedSkin:
-            fromSkin,
-
-          removeSkin:
-            toSkin,
-
-          addSkin:
-            fromSkin
-        }
-      );
-
-      const fromWs =
-        players.get(
-          fromPlayer
-        );
-
-      const toWs =
-        players.get(
-          toPlayer
-        );
-
-      if (fromWs) {
-        send(fromWs, {
-          type:
-            "tradeComplete",
-
-          tradeId:
-            trade.id,
-
-          sentSkin:
-            fromSkin,
-
-          receivedSkin:
-            toSkin,
-
-          removeSkin:
-            fromSkin,
-
-          addSkin:
-            toSkin
-        });
-      }
-
-      if (toWs) {
-        send(toWs, {
-          type:
-            "tradeComplete",
-
-          tradeId:
-            trade.id,
-
-          sentSkin:
-            toSkin,
-
-          receivedSkin:
-            fromSkin,
-
-          removeSkin:
-            toSkin,
-
-          addSkin:
-            fromSkin
-        });
-      }
-
-      return res.json({
-        ok: true,
-
-        completed: {
-          id: trade.id,
-
-          sentSkin:
-            player ===
-            fromPlayer
-              ? fromSkin
-              : toSkin,
-
-          receivedSkin:
-            player ===
-            fromPlayer
-              ? toSkin
-              : fromSkin,
-
-          removeSkin:
-            player ===
-            fromPlayer
-              ? fromSkin
-              : toSkin,
-
-          addSkin:
-            player ===
-            fromPlayer
-              ? toSkin
-              : fromSkin
-        }
-      });
-    }
-
-    const fromWs =
-      players.get(
-        trade.from
-      );
-
-    const toWs =
-      players.get(
-        trade.to
-      );
-
-    if (fromWs) {
-      send(fromWs, {
-        type:
-          "tradeUpdated",
-
-        trade:
-          getTradeForPlayer(
-            trade.from
-          )
-      });
-    }
-
-    if (toWs) {
-      send(toWs, {
-        type:
-          "tradeUpdated",
-
-        trade:
-          getTradeForPlayer(
-            trade.to
-          )
-      });
-    }
-
-    return res.json({
-      ok: true,
-
-      completed: false,
-
-      trade:
-        getTradeForPlayer(
-          player
-        )
-    });
-  }
-);
-
-// =========================================================
-// TRADE ABBRECHEN
-// =========================================================
-
-app.post(
-  "/api/trade/cancel",
-  (req, res) => {
-    const player =
-      cleanName(
-        req.body?.player
-      );
-
-    const tradeId =
-      String(
-        req.body?.tradeId ||
-          ""
-      );
-
-    const trade =
-      activeTrades.get(
-        tradeId
-      );
-
-    if (
-      !trade ||
-      (
-        trade.from !==
-          player &&
-        trade.to !==
-          player
-      )
-    ) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Trade nicht gefunden"
-        });
-    }
-
-    activeTrades.delete(
-      tradeId
-    );
-
-    const other =
-      trade.from ===
-      player
-        ? trade.to
-        : trade.from;
-
-    const otherWs =
-      players.get(other);
-
-    if (otherWs) {
-      send(otherWs, {
-        type:
-          "tradeCancelled",
-
-        tradeId
-      });
-    }
-
-    return res.json({
-      ok: true
-    });
-  }
-);
-
-// =========================================================
-// AUFRÄUMEN
-// =========================================================
-
-setInterval(() => {
-  const now = Date.now();
-
-  serverMessages =
-    serverMessages.filter(
-      (m) =>
-        Number(
-          m.endsAt || 0
-        ) > now
-    );
-
-  eventRequests =
-    eventRequests.filter(
-      (r) =>
-        now -
-          Number(
-            r.createdAt || 0
-          ) <
-        10 * 60 * 1000
-    );
-
-  if (
-    activePoll &&
-    Number(
-      activePoll.endsAt || 0
-    ) <= now
-  ) {
-    activePoll = null;
+    tradeRequests.push(request);
 
     broadcast({
-      type:
-        "playerPollClear"
+      type: "tradeRequest",
+      request
+    });
+
+    return json(res, 200, {
+      ok: true,
+      request
+    });
+  }
+);
+
+app.post(
+  "/api/trade/:id/accept",
+  (req, res) => {
+    const request =
+      tradeRequests.find(
+        x => x.id === req.params.id
+      );
+
+    if (!request) {
+      return json(res, 404, {
+        ok: false,
+        error: "Trade nicht gefunden"
+      });
+    }
+
+    request.status = "accepted";
+    request.acceptedAt = Date.now();
+
+    activeTrades.set(
+      request.id,
+      request
+    );
+
+    broadcast({
+      type: "tradeAccepted",
+      request
+    });
+
+    return json(res, 200, {
+      ok: true,
+      request
+    });
+  }
+);
+
+app.post(
+  "/api/trade/:id/decline",
+  (req, res) => {
+    const request =
+      tradeRequests.find(
+        x => x.id === req.params.id
+      );
+
+    if (!request) {
+      return json(res, 404, {
+        ok: false,
+        error: "Trade nicht gefunden"
+      });
+    }
+
+    request.status = "declined";
+    request.declinedAt = Date.now();
+
+    broadcast({
+      type: "tradeDeclined",
+      request
+    });
+
+    return json(res, 200, {
+      ok: true,
+      request
+    });
+  }
+);
+
+// =========================================================
+// WEBSOCKET
+// =========================================================
+
+wss.on("connection", (ws, req) => {
+  const id = randomId("player");
+
+  const player = {
+    id,
+    name: "Spieler",
+    connectedAt: Date.now(),
+    level: 0,
+    world: "normal",
+    coins: 0
+  };
+
+  players.set(id, player);
+
+  send(ws, {
+    type: "connected",
+    playerId: id,
+    ...eventState(),
+    poll: activePoll,
+    messages: serverMessages
+  });
+
+  send(ws, {
+    type: "serverMessages",
+    messages: serverMessages
+  });
+
+  ws.on("message", raw => {
+    let data;
+
+    try {
+      data = JSON.parse(
+        raw.toString()
+      );
+    } catch (err) {
+      send(ws, {
+        type: "error",
+        error: "Ungültige Nachricht"
+      });
+
+      return;
+    }
+
+    if (!data || typeof data !== "object") {
+      return;
+    }
+
+    // =====================================================
+    // PLAYER REGISTER
+    // =====================================================
+
+    if (data.type === "register") {
+      player.name =
+        cleanText(
+          data.name || "Spieler",
+          100
+        ) || "Spieler";
+
+      if (
+        Number.isFinite(
+          Number(data.level)
+        )
+      ) {
+        player.level =
+          Number(data.level);
+      }
+
+      if (data.world) {
+        player.world =
+          cleanText(
+            data.world,
+            100
+          );
+      }
+
+      if (
+        Number.isFinite(
+          Number(data.coins)
+        )
+      ) {
+        player.coins =
+          Math.max(
+            0,
+            Math.floor(
+              Number(data.coins)
+            )
+          );
+      }
+
+      broadcast({
+        type: "playerUpdate",
+        player: {
+          id: player.id,
+          name: player.name,
+          level: player.level,
+          world: player.world,
+          coins: player.coins
+        }
+      });
+
+      return;
+    }
+
+    // =====================================================
+    // PLAYER LEVEL UPDATE
+    // =====================================================
+
+    if (data.type === "levelUpdate") {
+      const level =
+        Number(data.level);
+
+      if (Number.isFinite(level)) {
+        player.level = level;
+      }
+
+      if (data.world) {
+        player.world =
+          cleanText(
+            data.world,
+            100
+          );
+      }
+
+      if (
+        Number.isFinite(
+          Number(data.coins)
+        )
+      ) {
+        player.coins =
+          Math.max(
+            0,
+            Math.floor(
+              Number(data.coins)
+            )
+          );
+      }
+
+      broadcast({
+        type: "playerUpdate",
+        player: {
+          id: player.id,
+          name: player.name,
+          level: player.level,
+          world: player.world,
+          coins: player.coins
+        }
+      });
+
+      return;
+    }
+
+    // =====================================================
+    // PLAYER POLL ANSWER
+    // =====================================================
+
+    if (data.type === "pollAnswer") {
+      if (!activePoll) {
+        send(ws, {
+          type: "pollAnswerResult",
+          ok: false,
+          error: "Keine aktive Umfrage"
+        });
+
+        return;
+      }
+
+      const choice =
+        String(
+          data.choice || ""
+        ).toLowerCase();
+
+      if (
+        choice !== "yes" &&
+        choice !== "no"
+      ) {
+        send(ws, {
+          type: "pollAnswerResult",
+          ok: false,
+          error: "Ungültige Antwort"
+        });
+
+        return;
+      }
+
+      if (choice === "yes") {
+        activePoll.yes++;
+      } else {
+        activePoll.no++;
+      }
+
+      broadcast({
+        type: "pollUpdate",
+        poll: activePoll
+      });
+
+      send(ws, {
+        type: "pollAnswerResult",
+        ok: true,
+        choice
+      });
+
+      return;
+    }
+
+    // =====================================================
+    // PING
+    // =====================================================
+
+    if (data.type === "ping") {
+      send(ws, {
+        type: "pong",
+        time: Date.now()
+      });
+
+      return;
+    }
+
+    // =====================================================
+    // ADMIN MESSAGE VIA WS
+    // =====================================================
+
+    if (data.type === "serverMessage") {
+      const text =
+        cleanText(
+          data.message,
+          500
+        );
+
+      if (!text) return;
+
+      const message = {
+        id: randomId("msg"),
+        text,
+        createdAt: Date.now()
+      };
+
+      serverMessages.push(message);
+
+      if (serverMessages.length > 100) {
+        serverMessages =
+          serverMessages.slice(-100);
+      }
+
+      broadcast({
+        type: "serverMessage",
+        message
+      });
+
+      return;
+    }
+  });
+
+  ws.on("close", () => {
+    players.delete(id);
+
+    broadcast({
+      type: "playerDisconnected",
+      playerId: id
+    });
+  });
+
+  ws.on("error", err => {
+    console.error(
+      "WebSocket error:",
+      err
+    );
+  });
+});
+
+// =========================================================
+// AUTO STOP EVENTS
+// =========================================================
+
+setInterval(() => {
+  const t = Date.now();
+
+  let changed = false;
+
+  if (
+    coinEventUntil > 0 &&
+    coinEventUntil <= t
+  ) {
+    coinEventUntil = 0;
+
+    broadcast({
+      type: "coinEvent",
+      until: 0
+    });
+
+    changed = true;
+  }
+
+  if (
+    tenCoinEventUntil > 0 &&
+    tenCoinEventUntil <= t
+  ) {
+    tenCoinEventUntil = 0;
+
+    broadcast({
+      type: "tenCoinEvent",
+      until: 0
+    });
+
+    changed = true;
+  }
+
+  if (
+    galaxyEventUntil > 0 &&
+    galaxyEventUntil <= t
+  ) {
+    galaxyEventUntil = 0;
+
+    broadcast({
+      type: "galaxyEvent",
+      until: 0
+    });
+
+    changed = true;
+  }
+
+  if (changed) {
+    broadcast({
+      type: "eventState",
+      ...eventState()
     });
   }
 }, 1000);
 
 // =========================================================
-// EVENTS AUTO STOPPEN
-// =========================================================
-
-setInterval(() => {
-  if (
-    coinEventUntil >
-      0 &&
-    Date.now() >=
-      coinEventUntil
-  ) {
-    executeEvent(
-      "coins",
-      "stop",
-      0
-    );
-  }
-
-  if (
-    tenCoinEventUntil >
-      0 &&
-    Date.now() >=
-      tenCoinEventUntil
-  ) {
-    executeEvent(
-      "tenCoins",
-      "stop",
-      0
-    );
-  }
-
-  if (
-    galaxyEventUntil >
-      0 &&
-    Date.now() >=
-      galaxyEventUntil
-  ) {
-    executeEvent(
-      "galaxy",
-      "stop",
-      0
-    );
-  }
-}, 1000);
-
-// =========================================================
-// TRADE AUFRÄUMEN
-// =========================================================
-
-setInterval(() => {
-  const now = Date.now();
-
-  tradeRequests =
-    tradeRequests.filter(
-      (request) =>
-        now -
-          Number(
-            request.createdAt || 0
-          ) <
-        5 * 60 * 1000
-    );
-
-  for (
-    const [
-      id,
-      trade
-    ] of activeTrades
-  ) {
-    if (
-      now -
-        Number(
-          trade.createdAt || 0
-        ) >
-      10 * 60 * 1000
-    ) {
-      activeTrades.delete(
-        id
-      );
-    }
-  }
-}, 5000);
-
-// =========================================================
-// ROUTING
+// ERROR HANDLER
 // =========================================================
 
 app.use(
-  (req, res) => {
-    res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
+  (
+    err,
+    req,
+    res,
+    next
+  ) => {
+    console.error(
+      "Server error:",
+      err
     );
+
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    return json(res, 500, {
+      ok: false,
+      error: "Interner Serverfehler"
+    });
   }
 );
 
