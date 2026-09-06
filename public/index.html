@@ -2041,31 +2041,80 @@ levels.sort((a,b)=>{
   return na-nb;
 });
 
-/* ---------- WELT 5 · BACKROOMS · EIGENE HINDERNISSE ---------- */
+/* ---------- WELT 5 · BACKROOMS · FAIR & EIGENE HINDERNISSE ---------- */
 function buildBackroomsLevels(){
-  const patterns=[];
+  // Schwierigkeit steigt langsam an. Die Abstände sind bewusst groß genug,
+  // damit jedes Hindernis mit normalem Timing schaffbar bleibt.
+  const configs=[
+    {length:7200, step:520, count:11},
+    {length:7600, step:500, count:12},
+    {length:8000, step:480, count:13},
+    {length:8400, step:465, count:14},
+    {length:8800, step:450, count:15},
+    {length:9300, step:440, count:16},
+    {length:9800, step:430, count:17},
+    {length:10300,step:420, count:18},
+    {length:10800,step:410, count:19},
+    {length:11400,step:400, count:20}
+  ];
+
   for(let n=0;n<10;n++){
-    const o=[];
-    let x=650+n*15;
-    for(let j=0;j<18;j++){
-      const kind=(j+n)%4;
-      if(j===4)o.push(["portal",x,445,"ship"]);
-      else if(j===11)o.push(["portal",x,445,"cube"]);
-      else if(kind===0)o.push(["backDoor",x,95+(j%3)*55,72,250+(j%2)*70]);
-      else if(kind===1)o.push(["backPillar",x,260+(j%3)*25,58+(n%2)*6,280-(j%2)*35]);
-      else if(kind===2)o.push(["backCeiling",x,90+(j%4)*75,165+(j%3)*25,20]);
-      else o.push(["backFloorGap",x,95+(j%3)*20]);
-      x+=330+(j%3)*45;
+    const cfg=configs[n];
+    const objects=[];
+    let x=650;
+
+    // Ruhiger Einstieg: erstes Hindernis erst nach etwas Laufweg.
+    for(let j=0;j<cfg.count;j++){
+      const difficulty=Math.min(4,Math.floor(n/2));
+      const typeIndex=(j+n)%5;
+      const gap=cfg.step + ((j%3)-1)*25;
+
+      if(j===4){
+        objects.push(["portal",x,445,"ship"]);
+        x+=420;
+        continue;
+      }
+
+      if(j===10 && n>=2){
+        // Vor dem zweiten Portal immer ein kleiner Ruhebereich.
+        objects.push(["portal",x,445,"cube"]);
+        x+=430;
+        continue;
+      }
+
+      if(typeIndex===0){
+        // Tür: überspringbar, nicht zu hoch und nicht zu breit.
+        const h=105+difficulty*8;
+        objects.push(["backDoor",x,GROUND-h,62,h]);
+      }else if(typeIndex===1){
+        // Säule: schmaler Bodengegner.
+        const h=125+difficulty*10;
+        objects.push(["backPillar",x,GROUND-h,50,h]);
+      }else if(typeIndex===2){
+        // Niedrige Deckenstrebe: nur in späteren Levels häufiger.
+        const y=GROUND-(185+difficulty*12);
+        objects.push(["backCeiling",x,y,118,22]);
+      }else if(typeIndex===3){
+        // Kleine Bodenlücke, mit normalem Sprung problemlos überquerbar.
+        const w=58+difficulty*5;
+        objects.push(["backFloorGap",x,w]);
+      }else{
+        // Breitere Tür nur in den späteren Levels.
+        const h=110+difficulty*7;
+        const w=66+difficulty*3;
+        objects.push(["backDoor",x,GROUND-h,w,h]);
+      }
+
+      x+=gap;
     }
-    patterns.push(o);
-  }
-  for(let n=0;n<10;n++){
+
+    // Sicheres Zielstück, damit der Level nicht direkt am letzten Hindernis endet.
     const level=levels[40+n];
     if(!level)continue;
     level.name=`LEVEL ${41+n}`;
     level.world=5;
-    level.length=8200+n*480;
-    level.objects=patterns[n];
+    level.length=cfg.length;
+    level.objects=objects;
   }
 }
 buildBackroomsLevels();
