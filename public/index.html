@@ -2041,6 +2041,35 @@ levels.sort((a,b)=>{
   return na-nb;
 });
 
+/* ---------- WELT 5 · BACKROOMS · EIGENE HINDERNISSE ---------- */
+function buildBackroomsLevels(){
+  const patterns=[];
+  for(let n=0;n<10;n++){
+    const o=[];
+    let x=650+n*15;
+    for(let j=0;j<18;j++){
+      const kind=(j+n)%4;
+      if(j===4)o.push(["portal",x,445,"ship"]);
+      else if(j===11)o.push(["portal",x,445,"cube"]);
+      else if(kind===0)o.push(["backDoor",x,95+(j%3)*55,72,250+(j%2)*70]);
+      else if(kind===1)o.push(["backPillar",x,260+(j%3)*25,58+(n%2)*6,280-(j%2)*35]);
+      else if(kind===2)o.push(["backCeiling",x,90+(j%4)*75,165+(j%3)*25,20]);
+      else o.push(["backFloorGap",x,95+(j%3)*20]);
+      x+=330+(j%3)*45;
+    }
+    patterns.push(o);
+  }
+  for(let n=0;n<10;n++){
+    const level=levels[40+n];
+    if(!level)continue;
+    level.name=`LEVEL ${41+n}`;
+    level.world=5;
+    level.length=8200+n*480;
+    level.objects=patterns[n];
+  }
+}
+buildBackroomsLevels();
+
 /* ---------- unique music per level ---------- */
 const musicTracks=[
  {bpm:116,lead:[261.63,329.63,392,329.63,440,392,329.63,293.66],bass:[130.81,164.81,196,164.81]},
@@ -3216,7 +3245,7 @@ function updateMenu(){
         b.classList.add("done");
         b.innerHTML="⭐<br>LEVEL "+(i+1)+"<br>GESCHAFFT";
       }else{
-        b.innerHTML="▶<br>LEVEL "+(i+1)+"<br>+1000 🪙";
+        b.innerHTML="▶<br>LEVEL "+(i+1)+"<br>+50 🪙";
       }
       if(i<unlocked)b.addEventListener("click",()=>startLevel(i));
       g5.appendChild(b);
@@ -3345,12 +3374,22 @@ function rectHit(a,b){
  return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 }
 
+function backroomsObstacleRect(o){
+  const x=o[1]-camera+180;
+  if(o[0]==="backDoor" || o[0]==="backPillar" || o[0]==="backCeiling") return {x,y:o[2],w:o[3],h:o[4]};
+  if(o[0]==="backFloorGap") return {x,y:GROUND-8,w:o[2],h:24};
+  return null;
+}
+
 function cubeCollision(){
  const p={x:player.x+7,y:player.y+7,w:32,h:32};
 
  for(const o of levels[levelIndex].objects){
    if(!Array.isArray(o) || !o[0])continue;
    const x=o[1]-camera+180;
+
+   const backRect=backroomsObstacleRect(o);
+   if(backRect && rectHit(p,backRect)) return true;
 
    if(o[0]==="spike"){
      if(rectHit(p,{x:x+7,y:GROUND-o[3]+10,w:o[2]-14,h:o[3]-10}))return true;
@@ -3433,6 +3472,8 @@ function shipCollision(){
 
  for(const o of levels[levelIndex].objects){
    if(!Array.isArray(o) || !o[0])continue;
+   const backRect=backroomsObstacleRect(o);
+   if(backRect && rectHit(p,backRect)) return true;
    if(o[0]!=="wall")continue;
    if(rectHit(p,{x:o[1]-camera+180,y:o[2],w:o[3],h:o[4]}))return true;
  }
@@ -3490,7 +3531,7 @@ function win(){
   const isGalaxy=Number(levels[levelIndex]?.world)===6;
   const isWorld5=Number(levels[levelIndex]?.world)===5;
   const firstTime=!completed.includes(levelIndex);
-  const rewardCoins=isGalaxy ? galaxyReward() : (isWorld5 ? coinReward(1000) : coinReward(500));
+  const rewardCoins=isGalaxy ? galaxyReward() : (isWorld5 ? coinReward(50) : coinReward(500));
 
   if(isGalaxy){
     // Jedes Galaxy-Level gibt bei jedem Abschluss Münzen.
@@ -3760,42 +3801,6 @@ function drawBackground(){
    ctx.restore();
  }
 
- if(world5){
-   // Merkur als Hintergrundplanet.
-   const px=170;
-   const py=125;
-   const pr=82;
-   const pg=ctx.createRadialGradient(px-pr*.38,py-pr*.38,5,px,py,pr);
-   pg.addColorStop(0,"#eee0c8");
-   pg.addColorStop(.32,"#a88d70");
-   pg.addColorStop(.72,"#5d4a3b");
-   pg.addColorStop(1,"#211914");
-   ctx.save();
-   ctx.shadowBlur=25;
-   ctx.shadowColor="rgba(255,190,100,.55)";
-   ctx.fillStyle=pg;
-   ctx.beginPath();ctx.arc(px,py,pr,0,Math.PI*2);ctx.fill();
-   ctx.shadowBlur=0;
-   // Krater
-   for(let i=0;i<18;i++){
-     const a=i*2.399;
-     const rr=18+(i%5)*11;
-     const cx=px+Math.cos(a)*rr;
-     const cy=py+Math.sin(a)*rr;
-     const cr=3+(i%4)*3;
-     ctx.fillStyle="rgba(35,25,20,.32)";
-     ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.fill();
-   }
-   ctx.restore();
-   // Kleine Krater/Steinflächen im Horizont.
-   for(let i=0;i<12;i++){
-     let x=(i*190-camera*.10)%(W+220);
-     if(x<0)x+=W+220;
-     const r=12+(i%4)*5;
-     ctx.fillStyle=i%2?"#4a392e":"#705b48";
-     ctx.beginPath();ctx.arc(x,GROUND-18,r,Math.PI,Math.PI*2);ctx.fill();
-   }
- }
 
  if(world2){
    for(let i=0;i<14;i++){
@@ -4148,6 +4153,30 @@ function drawObjects(){
        for(let k=12;k<w-8;k+=24){
          ctx.fillRect(x+k,y+4,8,3);
        }
+     }
+     ctx.restore();
+     continue;
+   }
+
+   if(type==="backDoor" || type==="backPillar" || type==="backCeiling" || type==="backFloorGap"){
+     if(x<-220||x>W+220)continue;
+     ctx.save();
+     if(type==="backFloorGap"){
+       ctx.fillStyle="#14110a"; ctx.fillRect(x,GROUND-5,o[2],14);
+       ctx.strokeStyle="#3a3018"; ctx.lineWidth=3; ctx.strokeRect(x,GROUND-5,o[2],14);
+     }else if(type==="backDoor"){
+       ctx.fillStyle="#5b4d2b"; ctx.fillRect(x,o[2],o[3],o[4]);
+       ctx.strokeStyle="#d7c887"; ctx.lineWidth=4; ctx.strokeRect(x,o[2],o[3],o[4]);
+       ctx.fillStyle="#2c2517"; ctx.fillRect(x+10,o[2]+12,o[3]-20,o[4]-24);
+       ctx.fillStyle="#d7c887"; ctx.fillRect(x+o[3]-17,o[2]+o[4]/2,5,5);
+     }else if(type==="backPillar"){
+       ctx.fillStyle="#4d4226"; ctx.fillRect(x,o[2],o[3],o[4]);
+       ctx.strokeStyle="#b8aa68"; ctx.lineWidth=3; ctx.strokeRect(x,o[2],o[3],o[4]);
+       ctx.fillStyle="rgba(245,235,170,.28)"; ctx.fillRect(x+8,o[2],7,o[4]);
+     }else{
+       ctx.fillStyle="#74673a"; ctx.fillRect(x,o[2],o[3],o[4]);
+       ctx.fillStyle="#eee6ad"; ctx.fillRect(x+8,o[2]+5,o[3]-16,4);
+       ctx.strokeStyle="#c9bb76"; ctx.lineWidth=3; ctx.strokeRect(x,o[2],o[3],o[4]);
      }
      ctx.restore();
      continue;
